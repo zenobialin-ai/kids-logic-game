@@ -1,0 +1,3144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>小小邏輯探險家 - 升小一邏輯思維與資優鑑定大挑戰</title>
+  <style>
+    :root {
+      --font-content: 18px;
+      --font-title: 20px; /* 標題比內容大2號：18 + 2 = 20px */
+      --primary: #4A90E2;
+      --primary-dark: #2A68B2;
+      --secondary: #FFB300;
+      --accent: #FF5722;
+      --success: #10B981;
+      --gifted: #8B5CF6;
+      --bg-cream: #FDFBF7;
+      --card-bg: #FFFFFF;
+      --text-main: #1E293B;
+      --text-muted: #64748B;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow-sm: 0 4px 10px rgba(0,0,0,0.06);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.1);
+      --shadow-btn: 0 6px 0 rgba(0,0,0,0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      font-size: var(--font-content);
+      line-height: 1.6;
+      background: linear-gradient(135deg, #E0F2FE 0%, #FEF3C7 50%, #FEE2E2 100%);
+      min-height: 100vh;
+      color: var(--text-main);
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .brand-icon {
+      font-size: 32px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    .brand-title {
+      font-size: var(--font-title);
+      font-weight: 900;
+      background: linear-gradient(45deg, #1E40AF, #7C3AED, #DB2777);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .stat-badge {
+      background: #FFF;
+      border: 2px solid #FDE047;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: var(--font-content);
+      color: #B45309;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .sound-btn, .home-btn {
+      background: #F1F5F9;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: var(--font-title);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .sound-btn:hover, .home-btn:hover {
+      background: #E2E8F0;
+      transform: scale(1.08);
+    }
+
+    main {
+      flex: 1;
+      max-width: 980px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* SECTION TITLES IN MENU */
+    .menu-section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 14px 4px;
+    }
+
+    .menu-section-title {
+      font-size: var(--font-title);
+      font-weight: 900;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gifted-ribbon {
+      background: linear-gradient(135deg, #8B5CF6, #EC4899);
+      color: #FFF;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 20px;
+      box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
+    }
+
+    /* HUB / MENU VIEW */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .menu-card {
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      border: 4px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.14);
+    }
+
+    .card-pattern { border-color: #60A5FA; background: linear-gradient(180deg, #EFF6FF 0%, #FFFFFF 100%); }
+    .card-balance { border-color: #FBBF24; background: linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 100%); }
+    .card-blocks  { border-color: #34D399; background: linear-gradient(180deg, #ECFDF5 0%, #FFFFFF 100%); }
+    .card-maze    { border-color: #F472B6; background: linear-gradient(180deg, #FDF2F8 0%, #FFFFFF 100%); }
+    .card-logic   { border-color: #A78BFA; background: linear-gradient(180deg, #F5F3FF 0%, #FFFFFF 100%); }
+    .card-folding { border-color: #C084FC; background: linear-gradient(180deg, #FAF5FF 0%, #FFFFFF 100%); }
+    .card-gears   { border-color: #FB923C; background: linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 100%); }
+    .card-raven   { border-color: #38BDF8; background: linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%); }
+
+    .menu-card .icon {
+      font-size: 52px;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+    }
+
+    .menu-card h3 {
+      font-size: var(--font-title);
+      font-weight: 900;
+      margin-bottom: 8px;
+      color: #1E293B;
+    }
+
+    .menu-card p {
+      font-size: var(--font-content);
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .card-badge {
+      font-size: 16px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.06);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* GAME PLAY CONTAINERS */
+    .game-view {
+      display: none;
+      flex-direction: column;
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .game-view.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .game-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px dashed #E2E8F0;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .game-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .game-title {
+      font-size: var(--font-title);
+      font-weight: 900;
+      color: #1E293B;
+    }
+
+    .level-badge {
+      background: #DBEAFE;
+      color: #1D4ED8;
+      font-weight: 800;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: var(--font-content);
+    }
+
+    .speak-btn {
+      background: #FEE2E2;
+      color: #DC2626;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: var(--font-content);
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .speak-btn:hover {
+      background: #FECACA;
+      transform: scale(1.05);
+    }
+
+    .prompt-box {
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      border-radius: var(--radius-md);
+      padding: 18px 22px;
+      font-size: var(--font-content);
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* PATTERN SPECIFICS */
+    .pattern-track {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      padding: 26px 20px;
+      background: linear-gradient(135deg, #F0F9FF, #E0F2FE);
+      border-radius: var(--radius-md);
+      margin-bottom: 28px;
+      min-height: 130px;
+    }
+
+    .pattern-item {
+      width: 76px;
+      height: 76px;
+      border-radius: 18px;
+      background: #FFF;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 38px;
+      border: 3px solid #BAE6FD;
+    }
+
+    .pattern-target {
+      width: 76px;
+      height: 76px;
+      border-radius: 18px;
+      background: #FFF;
+      border: 3px dashed #F59E0B;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 38px;
+      color: #F59E0B;
+      font-weight: 900;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); border-color: #F59E0B; }
+      50% { transform: scale(1.08); border-color: #EF4444; }
+    }
+
+    .options-grid {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .choice-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      font-size: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .choice-btn:hover {
+      border-color: #3B82F6;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 0 #2563EB;
+    }
+
+    .choice-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #2563EB;
+    }
+
+    /* BALANCE SCALE SPECIFICS */
+    .balance-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 10px 0;
+    }
+
+    .clue-scales {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .scale-card {
+      background: #FFFBEB;
+      border: 2px solid #FDE68A;
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .scale-pan {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #FFF;
+      padding: 8px 16px;
+      border-radius: 12px;
+      border: 2px solid #F59E0B;
+    }
+
+    .scale-equal {
+      color: #D97706;
+      font-size: 32px;
+    }
+
+    .target-scale-box {
+      background: #FEF3C7;
+      border: 3px dashed #F59E0B;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    /* 3D BLOCKS SPECIFICS */
+    .blocks-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      background: #F8FAFC;
+      border: 3px solid #E2E8F0;
+      border-radius: var(--radius-lg);
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    #blockCanvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .xray-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: #6366F1;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: var(--font-content);
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);
+      transition: all 0.2s;
+    }
+
+    .xray-btn:hover {
+      background: #4F46E5;
+      transform: scale(1.05);
+    }
+
+    .number-pad {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      max-width: 440px;
+    }
+
+    .num-btn {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      font-size: 28px;
+      font-weight: 900;
+      color: #1E293B;
+      cursor: pointer;
+      box-shadow: 0 5px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .num-btn:hover {
+      border-color: #10B981;
+      color: #10B981;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 0 #059669;
+    }
+
+    .num-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #059669;
+    }
+
+    /* MAZE / CODING SPECIFICS */
+    .maze-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .maze-board {
+      display: grid;
+      gap: 6px;
+      background: #334155;
+      padding: 10px;
+      border-radius: 18px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .maze-cell {
+      width: 60px;
+      height: 60px;
+      background: #F8FAFC;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      position: relative;
+    }
+
+    .cell-obstacle { background: #64748B; color: #CBD5E1; }
+    .cell-robot { animation: bounce 0.6s infinite alternate; }
+
+    @keyframes bounce {
+      from { transform: scale(0.92); }
+      to { transform: scale(1.08); }
+    }
+
+    .program-deck {
+      width: 100%;
+      background: #F1F5F9;
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .cmd-slots {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 64px;
+      overflow-x: auto;
+      padding: 6px;
+      background: #FFF;
+      border-radius: 12px;
+      border: 2px dashed #94A3B8;
+    }
+
+    .cmd-tag {
+      background: #EEF2FF;
+      border: 2px solid #6366F1;
+      color: #4338CA;
+      font-weight: 800;
+      padding: 8px 14px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--font-content);
+      cursor: pointer;
+    }
+
+    .cmd-tools {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .cmd-palette { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .cmd-add-btn {
+      background: #FFF;
+      border: 2px solid #CBD5E1;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: var(--font-content);
+      cursor: pointer;
+      box-shadow: 0 4px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .cmd-add-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #94A3B8;
+    }
+
+    .action-btn-group { display: flex; gap: 10px; }
+
+    .btn-run {
+      background: #10B981;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: var(--font-content);
+      cursor: pointer;
+      box-shadow: 0 4px 0 #047857;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-run:hover { background: #059669; }
+    .btn-run:active { transform: translateY(3px); box-shadow: none; }
+
+    .btn-clear {
+      background: #EF4444;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: var(--font-content);
+      cursor: pointer;
+      box-shadow: 0 4px 0 #B91C1C;
+    }
+
+    /* DEDUCTION HOUSE SPECIFICS */
+    .houses-grid {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .house-slot {
+      background: #FFF7ED;
+      border: 3px dashed #FDBA74;
+      border-radius: 20px;
+      width: 120px;
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 8px;
+      position: relative;
+    }
+
+    .house-roof { font-size: 34px; margin-bottom: 4px; }
+    .house-num { font-size: 16px; font-weight: 800; color: #EA580C; margin-bottom: 8px; }
+
+    .house-content {
+      width: 80px;
+      height: 80px;
+      background: #FFF;
+      border-radius: 16px;
+      border: 2px solid #FED7AA;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      cursor: pointer;
+    }
+
+    .clues-list {
+      background: #F8FAFC;
+      border: 2px solid #E2E8F0;
+      border-radius: var(--radius-md);
+      padding: 18px 22px;
+      margin-bottom: 20px;
+    }
+
+    .clue-item {
+      font-size: var(--font-content);
+      font-weight: 700;
+      color: #334155;
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .animal-bank {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .animal-token {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      font-size: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #94A3B8;
+      transition: all 0.2s;
+    }
+
+    .animal-token.selected {
+      border-color: #8B5CF6;
+      box-shadow: 0 0 0 4px #C4B5FD, 0 4px 0 #7C3AED;
+      transform: scale(1.1);
+    }
+
+    /* FOLDING & PUNCH */
+    .folding-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+
+    .fold-steps-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      background: #FAF5FF;
+      border: 2px solid #E9D5FF;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      width: 100%;
+    }
+
+    .fold-step-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-arrow {
+      font-size: 28px;
+      color: #8B5CF6;
+      font-weight: 900;
+    }
+
+    .sheet-preview {
+      width: 90px;
+      height: 90px;
+      background: #FFF;
+      border: 2px solid #8B5CF6;
+      border-radius: 10px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .fold-step-text {
+      font-size: var(--font-content);
+      font-weight: 800;
+      color: #6B21A8;
+    }
+
+    .unfold-choices-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    .unfold-choice-card {
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      border-radius: 18px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .unfold-choice-card:hover {
+      border-color: #8B5CF6;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 0 #7C3AED;
+    }
+
+    .unfold-choice-card:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #7C3AED;
+    }
+
+    .unfold-svg-sheet {
+      width: 110px;
+      height: 110px;
+      background: #FFF;
+      border: 2px solid #64748B;
+      border-radius: 8px;
+      position: relative;
+    }
+
+    /* GEARS */
+    .gears-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #gearCanvas {
+      background: #FFF7ED;
+      border: 3px solid #FED7AA;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      max-width: 100%;
+      height: auto;
+    }
+
+    .gear-prompt-highlight {
+      font-size: var(--font-content);
+      color: #C2410C;
+      font-weight: 800;
+      background: #FFEDD5;
+      padding: 8px 18px;
+      border-radius: 20px;
+    }
+
+    .gear-direction-btns {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .gear-dir-btn {
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      padding: 14px 28px;
+      border-radius: 20px;
+      font-size: var(--font-content);
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 6px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .gear-dir-btn:hover {
+      border-color: #EA580C;
+      color: #EA580C;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 0 #C2410C;
+    }
+
+    .gear-dir-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #C2410C;
+    }
+
+    /* RAVEN'S MATRIX */
+    .raven-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .raven-grid-3x3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: #334155;
+      padding: 12px;
+      border-radius: 20px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .raven-cell {
+      width: 90px;
+      height: 90px;
+      background: #FFF;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      position: relative;
+    }
+
+    .raven-cell-target {
+      background: #FEF08A;
+      border: 3px dashed #EAB308;
+      font-size: 38px;
+      font-weight: 900;
+      color: #A16207;
+      animation: pulse 1.5s infinite;
+    }
+
+    .raven-choices {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .raven-opt-btn {
+      width: 86px;
+      height: 86px;
+      border-radius: 20px;
+      background: #FFF;
+      border: 3px solid #CBD5E1;
+      font-size: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #94A3B8;
+      transition: all 0.15s;
+    }
+
+    .raven-opt-btn:hover {
+      border-color: #0284C7;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 0 #0369A1;
+    }
+
+    .raven-opt-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #0369A1;
+    }
+
+    /* CELEBRATION MODAL */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(5px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal-card {
+      background: #FFF;
+      border-radius: 30px;
+      padding: 36px 30px;
+      width: 90%;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      animation: modalPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes modalPop {
+      from { transform: scale(0.7) translateY(20px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-trophy { font-size: 72px; margin-bottom: 12px; animation: float 2s ease-in-out infinite; }
+    .modal-title { font-size: var(--font-title); font-weight: 900; color: #1E293B; margin-bottom: 10px; }
+    .modal-msg { font-size: var(--font-content); color: #64748B; margin-bottom: 24px; line-height: 1.6; }
+
+    .modal-btn {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: #FFF;
+      font-size: var(--font-content);
+      font-weight: 800;
+      border: none;
+      padding: 14px 36px;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #047857;
+      transition: all 0.15s;
+    }
+
+    .modal-btn:hover { transform: translateY(-2px); }
+    .modal-btn:active { transform: translateY(3px); box-shadow: none; }
+
+    /* CONFETTI CANVAS */
+    #confettiCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1001;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .brand-title { font-size: var(--font-title); }
+      .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
+      .choice-btn { width: 64px; height: 64px; font-size: 32px; }
+      .maze-cell { width: 48px; height: 48px; font-size: 24px; }
+      .house-slot { width: 85px; min-height: 120px; }
+      .house-content { width: 60px; height: 60px; font-size: 32px; }
+      .animal-token { width: 56px; height: 56px; font-size: 30px; }
+      .raven-cell { width: 70px; height: 70px; font-size: 32px; }
+      .raven-opt-btn { width: 68px; height: 68px; font-size: 34px; }
+    }
+    .sync-btn {
+      background: linear-gradient(135deg, #6366F1, #8B5CF6);
+      color: #FFF;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: var(--font-content);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s;
+    }
+    .sync-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 14px rgba(99, 102, 241, 0.45);
+    }
+    .toast-box {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1E293B;
+      color: #FFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: var(--font-content);
+      font-weight: 800;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
+    }
+    .toast-box.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="confettiCanvas"></canvas>
+
+  <header>
+    <div class="brand" onclick="goHome()">
+      <div class="brand-icon">🚀</div>
+      <div class="brand-title">小小邏輯探險家</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-badge">
+        <span>⭐</span>
+        <span id="starCount">0</span>
+      </div>
+      <button class="sync-btn" onclick="openSyncModal()" title="跨裝置同步與分享進度">📲 同步/分享</button>
+      <button class="sound-btn" id="soundToggle" onclick="toggleAudio()" title="音效開關">🔊</button>
+      <button class="home-btn" onclick="goHome()" title="回首頁選單">🏠</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- HUB / MAIN MENU -->
+    <div id="view-menu">
+
+      <!-- SECTION 1: FOUNDATION LOGIC -->
+      <div class="menu-section-header">
+        <div class="menu-section-title">
+          <span>🌟</span> 升小一邏輯奠基
+        </div>
+      </div>
+      <div class="cards-grid">
+        <div class="menu-card card-pattern" onclick="startModule('pattern')">
+          <div class="icon">🔮</div>
+          <h3>規律魔法陣</h3>
+          <p>觀察圖案的週期排列，推理下一個出現的是誰？</p>
+          <div class="card-badge" id="badge-pattern">🎯 序列預測與分類觀察</div>
+        </div>
+
+        <div class="menu-card card-balance" onclick="startModule('balance')">
+          <div class="icon">⚖️</div>
+          <h3>神奇智慧天平</h3>
+          <p>小動物和水果在玩蹺蹺板，算算看誰等於誰？</p>
+          <div class="card-badge" id="badge-balance">🍎 等量代換與數學直覺</div>
+        </div>
+
+        <div class="menu-card card-blocks" onclick="startModule('blocks')">
+          <div class="icon">🧱</div>
+          <h3>立體透視積木</h3>
+          <p>數一數有幾個積木？小心底層被藏起來的唷！</p>
+          <div class="card-badge" id="badge-blocks">👓 3D空間感與遮蔽推理</div>
+        </div>
+
+        <div class="menu-card card-maze" onclick="startModule('maze')">
+          <div class="icon">🤖</div>
+          <h3>小機器人尋寶</h3>
+          <p>編寫方向指令卡，帶著機器人避開障礙拿寶藏！</p>
+          <div class="card-badge" id="badge-maze">🗺️ 程式思維與空間方位</div>
+        </div>
+
+        <div class="menu-card card-logic" onclick="startModule('deduction')">
+          <div class="icon">🏡</div>
+          <h3>動物好友排排坐</h3>
+          <p>依照偵探小線索，推理誰才是住在這間房子！</p>
+          <div class="card-badge" id="badge-deduction">🕵️ 條件刪除與演繹邏輯</div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: GIFTED & TALENTED EXAM CHALLENGES -->
+      <div class="menu-section-header">
+        <div class="menu-section-title">
+          <span>🏆</span> 國小資優鑑定特訓題型
+          <span class="gifted-ribbon">資優特訓</span>
+        </div>
+      </div>
+      <div class="cards-grid">
+        <div class="menu-card card-folding" onclick="startModule('folding')">
+          <div class="icon">🪞</div>
+          <h3>摺紙打孔透視</h3>
+          <p>色紙對摺兩次打個洞，猜猜展開後孔洞在哪裡？</p>
+          <div class="card-badge" id="badge-folding">✂️ 空間對稱與心智旋轉</div>
+        </div>
+
+        <div class="menu-card card-gears" onclick="startModule('gears')">
+          <div class="icon">⚙️</div>
+          <h3>齒輪連動旋轉</h3>
+          <p>齒輪互相咬合，第一個順時針轉，最後一個往哪轉？</p>
+          <div class="card-badge" id="badge-gears">⚡ 因果連動與奇偶傳動</div>
+        </div>
+
+        <div class="menu-card card-raven" onclick="startModule('raven')">
+          <div class="icon">🔲</div>
+          <h3>瑞文氏九宮矩陣</h3>
+          <p>資優智力測驗必考！橫看豎看找規律，填補空缺！</p>
+          <div class="card-badge" id="badge-raven">🧩 雙維度特徵歸納抽象思維</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MODULE 1: PATTERN -->
+    <div id="view-pattern" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🔮</span>
+          <div class="game-title">規律魔法陣</div>
+          <span class="level-badge" id="patternLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="patternPrompt">請仔細看圖形的順序，找出問號處應該放什麼！</div>
+      <div class="pattern-track" id="patternTrack"></div>
+      <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin-bottom: 12px;">點選正確的答案：</div>
+      <div class="options-grid" id="patternOptions"></div>
+    </div>
+
+    <!-- MODULE 2: BALANCE -->
+    <div id="view-balance" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">⚖️</span>
+          <div class="game-title">神奇智慧天平</div>
+          <span class="level-badge" id="balanceLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="balancePrompt">看一看天平的平衡秘密，推理問號是幾顆？</div>
+      <div class="balance-container">
+        <div class="clue-scales" id="balanceClues"></div>
+        <div class="target-scale-box" id="balanceTarget"></div>
+      </div>
+      <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin: 16px 0 12px;">點選答案數量：</div>
+      <div class="options-grid" id="balanceOptions"></div>
+    </div>
+
+    <!-- MODULE 3: 3D BLOCKS -->
+    <div id="view-blocks" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🧱</span>
+          <div class="game-title">立體透視積木</div>
+          <span class="level-badge" id="blocksLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="blocksPrompt">這裡一共有幾個積木？注意有些積木躲在底層支撐喔！</div>
+      <div class="blocks-container">
+        <div class="canvas-wrap">
+          <button class="xray-btn" id="xrayBtn" onclick="toggleXray()">👓 開啟透視鏡</button>
+          <canvas id="blockCanvas" width="400" height="320"></canvas>
+        </div>
+        <div style="font-weight: 800; color: #64748B; font-size: var(--font-content); margin-top: 10px;">請點選積木總數：</div>
+        <div class="number-pad" id="blocksPad"></div>
+      </div>
+    </div>
+
+    <!-- MODULE 4: MAZE / CODING -->
+    <div id="view-maze" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🤖</span>
+          <div class="game-title">小機器人尋寶</div>
+          <span class="level-badge" id="mazeLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="mazePrompt">規劃好路線指令，引導機器人安全拿到金色寶箱！</div>
+      <div class="maze-container">
+        <div class="maze-board" id="mazeBoard"></div>
+        <div class="program-deck">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight: 800; color: #475569; font-size: var(--font-content);">指令程式列（點擊指令卡可移除）：</span>
+            <span id="cmdStepCount" style="font-size: var(--font-content); font-weight:700; color:#6366F1;">0 步</span>
+          </div>
+          <div class="cmd-slots" id="cmdSlots">
+            <span style="color:#94A3B8; font-size: var(--font-content); margin:auto;">點擊下方按鈕加入動作指令</span>
+          </div>
+          <div class="cmd-tools">
+            <div class="cmd-palette">
+              <button class="cmd-add-btn" onclick="addCommand('up')">⬆️ 向上走</button>
+              <button class="cmd-add-btn" onclick="addCommand('down')">⬇️ 向下走</button>
+              <button class="cmd-add-btn" onclick="addCommand('left')">⬅️ 向左走</button>
+              <button class="cmd-add-btn" onclick="addCommand('right')">➡️ 向右走</button>
+            </div>
+            <div class="action-btn-group">
+              <button class="btn-clear" onclick="clearCommands()">🗑️ 清空</button>
+              <button class="btn-run" id="btnRunCode" onclick="runMazeProgram()">▶️ 出發執行！</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 5: DEDUCTION -->
+    <div id="view-deduction" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🏡</span>
+          <div class="game-title">動物好友排排坐</div>
+          <span class="level-badge" id="deductionLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀線索
+        </button>
+      </div>
+      <div class="prompt-box" id="deductionPrompt">根據偵探線索，把小動物放到正確的房間裡！</div>
+      <div class="clues-list" id="deductionClues"></div>
+      <div class="houses-grid" id="deductionHouses"></div>
+      <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin-bottom: 10px;">先點選小動物，再點選房屋放置（點擊已放入動物可收回）：</div>
+      <div class="animal-bank" id="deductionBank"></div>
+      <div style="display:flex; justify-content:center; margin-top:10px;">
+        <button class="btn-run" onclick="checkDeductionAnswer()">✅ 檢查推理結果</button>
+      </div>
+    </div>
+
+    <!-- MODULE 6: FOLDING & PUNCH (資優題型：摺紙打孔) -->
+    <div id="view-folding" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🪞</span>
+          <div class="game-title">摺紙打孔透視 (資優題)</div>
+          <span class="level-badge" id="foldingLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="foldingPrompt">一張正方形色紙照著箭頭摺疊並剪下孔洞，展開後會是哪一張？</div>
+      <div class="folding-container">
+        <div class="fold-steps-row" id="foldingStepsRow"></div>
+        <div style="font-weight: 800; color: #64748B; font-size: var(--font-content); margin-top: 10px;">點選展開後的正確圖案：</div>
+        <div class="unfold-choices-grid" id="foldingChoicesGrid"></div>
+      </div>
+    </div>
+
+    <!-- MODULE 7: GEARS (資優題型：齒輪連動) -->
+    <div id="view-gears" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">⚙️</span>
+          <div class="game-title">齒輪連動旋轉 (資優題)</div>
+          <span class="level-badge" id="gearsLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="gearsPrompt">齒輪互相咬合！當第 1 個齒輪如箭頭轉動，最後一個齒輪會往哪轉？</div>
+      <div class="gears-container">
+        <canvas id="gearCanvas" width="560" height="260"></canvas>
+        <div class="gear-prompt-highlight" id="gearTargetText">請問標記 ★ 的齒輪旋轉方向是？</div>
+        <div class="gear-direction-btns">
+          <button class="gear-dir-btn" onclick="checkGearAnswer('cw')">↷ 順時針轉 (跟時鐘一樣)</button>
+          <button class="gear-dir-btn" onclick="checkGearAnswer('ccw')">↶ 逆時針轉 (反過來轉)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 8: RAVEN'S MATRIX (資優題型：瑞文氏九宮矩陣) -->
+    <div id="view-raven" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🔲</span>
+          <div class="game-title">瑞文氏九宮矩陣 (資優題)</div>
+          <span class="level-badge" id="ravenLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="ravenPrompt">橫著看有規律，豎著看也有規律！問號處該填入哪一個？</div>
+      <div class="raven-container">
+        <div class="raven-grid-3x3" id="ravenGrid"></div>
+        <div style="font-weight: 800; color: #64748B; font-size: var(--font-content); margin-top: 10px;">點選最符合規律的圖形：</div>
+        <div class="raven-choices" id="ravenChoices"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- VICTORY MODAL -->
+  <div class="modal-overlay" id="victoryModal">
+    <div class="modal-card">
+      <div class="modal-trophy" id="modalTrophy">🏆</div>
+      <div class="modal-title" id="modalTitle">挑戰成功！太棒了！</div>
+      <div class="modal-msg" id="modalMsg">你靈活的小腦袋真是太厲害了！</div>
+      <button class="modal-btn" onclick="nextQuestionOrFinish()">繼續下一關 🚀</button>
+    </div>
+  </div>
+
+  <!-- SYNC / SHARE MODAL -->
+  <div class="modal-overlay" id="syncModal">
+    <div class="modal-card" style="max-width: 520px; text-align: left; padding: 28px 24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-size:var(--font-title); font-weight:900; color:#1E293B; display:flex; align-items:center; gap:8px;">
+          <span>📲</span> 跨裝置學習同步與分享
+        </div>
+        <button onclick="closeSyncModal()" style="border:none; background:#F1F5F9; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
+      </div>
+
+      <!-- SECTION 1: 換裝置掃碼 -->
+      <div style="background:#EEF2FF; border:2px solid #C7D2FE; border-radius:18px; padding:16px; margin-bottom:14px; text-align:center;">
+        <div style="font-weight:900; color:#3730A3; font-size:var(--font-content); margin-bottom:6px;">📱 換手機或 iPad 接著玩（免登入直接連動）</div>
+        <div style="font-size:15px; color:#4B5563; margin-bottom:10px;">拿出手機或 iPad 相機，對準下方 QR Code 掃描，星星與解鎖關卡立即無縫轉移！</div>
+        <div style="display:inline-block; background:#FFF; padding:10px; border-radius:14px; border:2px solid #A5B4FC; margin-bottom:10px;">
+          <img id="syncQrImg" src="" alt="進度同步 QR Code" style="width:160px; height:160px; display:block; margin:0 auto;">
+        </div>
+        <div>
+          <button class="modal-btn" onclick="copySyncLink()" style="font-size:15px; padding:8px 20px; border-radius:14px; display:inline-flex; align-items:center; gap:6px;">
+            <span>🔗</span> 複製帶進度的專屬網址
+          </button>
+        </div>
+      </div>
+
+      <!-- SECTION 2: 手動代碼匯出 / 匯入 -->
+      <div style="background:#F8FAFC; border:2px solid #E2E8F0; border-radius:18px; padding:14px 16px; margin-bottom:14px;">
+        <div style="font-weight:900; color:#334155; font-size:16px; margin-bottom:6px;">📋 手動匯入 / 匯出進度碼</div>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+          <input type="text" id="syncCodeInput" placeholder="在另一台裝置貼上進度代碼..." style="flex:1; padding:8px 12px; border-radius:10px; border:2px solid #CBD5E1; font-size:14px; font-family:monospace;">
+          <button onclick="importSyncCode()" style="background:#10B981; color:#FFF; border:none; padding:8px 14px; border-radius:10px; font-weight:800; font-size:14px; cursor:pointer;">📥 載入進度</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:14px; color:#64748B;">目前已解鎖：<strong id="syncModalStarCount" style="color:#D97706;">0</strong> 顆星</span>
+          <button onclick="copyRawCode()" style="background:#FFF; border:2px solid #CBD5E1; padding:4px 12px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">複製代碼</button>
+        </div>
+      </div>
+
+      <!-- SECTION 3: 分享全新遊戲給親友 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#FFFBEB; border:2px solid #FDE68A; border-radius:14px; padding:12px 16px;">
+        <div>
+          <div style="font-weight:800; color:#92400E; font-size:15px;">🎁 分享全新遊戲給好友的孩子</div>
+          <div style="font-size:13px; color:#B45309;">不帶當前進度，讓好友的小朋友從第 1 關重新挑戰</div>
+        </div>
+        <button onclick="copyCleanGameLink()" style="background:#F59E0B; color:#FFF; border:none; padding:8px 14px; border-radius:10px; font-weight:800; font-size:14px; cursor:pointer; white-space:nowrap;">複製分享連結</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast-box" id="toastBox">提示訊息</div>
+
+  <script>
+    /* =========================================================
+       AUDIO SYNTHESIZER (Web Audio API - 100% Offline Friendly)
+       ========================================================= */
+    let audioCtx = null;
+    let audioEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.15) {
+      if (!audioEnabled) return;
+      initAudio();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e){}
+    }
+
+    function soundSuccess() {
+      if (!audioEnabled) return;
+      initAudio();
+      playTone(523.25, 'triangle', 0.12, 0.2); // C5
+      setTimeout(() => playTone(659.25, 'triangle', 0.12, 0.2), 100); // E5
+      setTimeout(() => playTone(783.99, 'triangle', 0.15, 0.2), 200); // G5
+      setTimeout(() => playTone(1046.50, 'triangle', 0.25, 0.25), 300); // C6
+    }
+
+    function soundError() {
+      if (!audioEnabled) return;
+      initAudio();
+      playTone(220, 'sawtooth', 0.2, 0.15);
+      setTimeout(() => playTone(180, 'sawtooth', 0.3, 0.15), 150);
+    }
+
+    function soundStep() {
+      if (!audioEnabled) return;
+      playTone(400, 'sine', 0.05, 0.08);
+    }
+
+    function soundClick() {
+      if (!audioEnabled) return;
+      playTone(700, 'sine', 0.04, 0.08);
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('soundToggle').textContent = audioEnabled ? '🔊' : '🔇';
+    }
+
+    /* SPEECH SYNTHESIS (ZH-TW) */
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-TW';
+      utterance.rate = 0.95;
+      utterance.pitch = 1.2;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    /* GLOBAL GAME STATE & CROSS-DEVICE SYNC ENGINE */
+    const SAVE_KEY = 'little_logic_save_v1';
+    let userProgress = {
+      stars: 0,
+      completed: {
+        pattern: 0,
+        balance: 0,
+        blocks: 0,
+        maze: 0,
+        deduction: 0,
+        folding: 0,
+        gears: 0,
+        raven: 0
+      },
+      lastUpdated: Date.now()
+    };
+
+    let currentModule = null;
+    let currentLevel = 0;
+    let starsEarned = 0;
+
+    function addStars(num) {
+      starsEarned += num;
+      userProgress.stars = starsEarned;
+      document.getElementById('starCount').textContent = starsEarned;
+      saveToLocalStorage();
+    }
+
+    function saveToLocalStorage() {
+      try {
+        userProgress.stars = starsEarned;
+        userProgress.lastUpdated = Date.now();
+        localStorage.setItem(SAVE_KEY, JSON.stringify(userProgress));
+      } catch(e){}
+      updateMenuProgressBadges();
+    }
+
+    function updateMenuProgressBadges() {
+      for (const mod in userProgress.completed) {
+        const el = document.getElementById(`badge-${mod}`);
+        if (el) {
+          const done = userProgress.completed[mod] || 0;
+          if (done > 0) {
+            el.innerHTML = `⭐ 已破 ${done}/5 關`;
+            el.style.background = "#FEF08A";
+            el.style.color = "#854D0E";
+          }
+        }
+      }
+    }
+
+    function loadSavedProgress() {
+      // 1. Check URL query param ?save=
+      const urlParams = new URLSearchParams(window.location.search);
+      const saveParam = urlParams.get('save');
+      if (saveParam) {
+        try {
+          const jsonStr = decodeURIComponent(escape(atob(saveParam)));
+          const decoded = JSON.parse(jsonStr);
+          if (decoded && typeof decoded.stars === 'number') {
+            userProgress = decoded;
+            starsEarned = userProgress.stars || 0;
+            saveToLocalStorage();
+            setTimeout(() => {
+              showToast("🎉 成功同步跨裝置進度！目前已累積 " + starsEarned + " 顆星！");
+            }, 500);
+          }
+        } catch(e) {
+          console.warn("URL save decode failed", e);
+        }
+      } else {
+        // 2. Read from localStorage
+        try {
+          const saved = localStorage.getItem(SAVE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && typeof parsed.stars === 'number') {
+              userProgress = parsed;
+              starsEarned = userProgress.stars || 0;
+            }
+          }
+        } catch(e){}
+      }
+      document.getElementById('starCount').textContent = starsEarned;
+      updateMenuProgressBadges();
+    }
+
+    function getSyncSaveCode() {
+      userProgress.stars = starsEarned;
+      userProgress.lastUpdated = Date.now();
+      return btoa(unescape(encodeURIComponent(JSON.stringify(userProgress))));
+    }
+
+    function getSyncUrl() {
+      const code = getSyncSaveCode();
+      const url = new URL(window.location.href);
+      url.searchParams.set('save', code);
+      return url.toString();
+    }
+
+    function openSyncModal() {
+      initAudio();
+      soundClick();
+      const syncUrl = getSyncUrl();
+      const rawCode = getSyncSaveCode();
+      document.getElementById('syncModalStarCount').textContent = starsEarned;
+      document.getElementById('syncCodeInput').value = rawCode;
+      
+      const qrImg = document.getElementById('syncQrImg');
+      qrImg.style.display = 'block';
+      qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(syncUrl);
+      qrImg.onerror = function() {
+        qrImg.style.display = 'none';
+      };
+
+      document.getElementById('syncModal').classList.add('active');
+    }
+
+    function closeSyncModal() {
+      soundClick();
+      document.getElementById('syncModal').classList.remove('active');
+    }
+
+    function copySyncLink() {
+      soundClick();
+      const url = getSyncUrl();
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          showToast("📋 已複製同步網址！可貼到 LINE 或傳至手機/iPad！");
+        }).catch(() => {
+          prompt("請複製下方專屬同步網址：", url);
+        });
+      } else {
+        prompt("請複製下方專屬同步網址：", url);
+      }
+    }
+
+    function copyRawCode() {
+      soundClick();
+      const rawCode = getSyncSaveCode();
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(rawCode).then(() => {
+          showToast("📋 已複製進度存檔代碼！");
+        }).catch(() => {
+          prompt("請複製下方存檔代碼：", rawCode);
+        });
+      } else {
+        prompt("請複製下方存檔代碼：", rawCode);
+      }
+    }
+
+    function copyCleanGameLink() {
+      soundClick();
+      const cleanUrl = window.location.origin + window.location.pathname;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(cleanUrl).then(() => {
+          showToast("🎁 已複製純淨遊戲分享連結！快分享給朋友吧！");
+        }).catch(() => {
+          prompt("請複製下方遊戲網址：", cleanUrl);
+        });
+      } else {
+        prompt("請複製下方遊戲網址：", cleanUrl);
+      }
+    }
+
+    function importSyncCode() {
+      soundClick();
+      const input = document.getElementById('syncCodeInput').value.trim();
+      if (!input) {
+        showToast("⚠️ 請先貼上進度代碼！");
+        return;
+      }
+      try {
+        const jsonStr = decodeURIComponent(escape(atob(input)));
+        const parsed = JSON.parse(jsonStr);
+        if (parsed && typeof parsed.stars === 'number') {
+          userProgress = parsed;
+          starsEarned = userProgress.stars || 0;
+          document.getElementById('starCount').textContent = starsEarned;
+          saveToLocalStorage();
+          soundSuccess();
+          showToast(`🎉 成功同步進度！恢復了 ${starsEarned} 顆星星！`);
+          setTimeout(closeSyncModal, 1200);
+          return;
+        }
+      } catch(e) {
+        console.error(e);
+      }
+      soundError();
+      showToast("❌ 代碼格式不正確，請確認是否完整複製！");
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      if (!box) return;
+      box.textContent = msg;
+      box.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        box.classList.remove('show');
+      }, 3200);
+    }
+
+    function goHome() {
+      if (mazeTimer) clearInterval(mazeTimer);
+      if (gearAnimId) cancelAnimationFrame(gearAnimId);
+      window.speechSynthesis && window.speechSynthesis.cancel();
+      document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-menu').style.display = 'block';
+      currentModule = null;
+      updateMenuProgressBadges();
+    }
+
+    function startModule(modName) {
+      initAudio();
+      soundClick();
+      if (gearAnimId) cancelAnimationFrame(gearAnimId);
+      document.getElementById('view-menu').style.display = 'none';
+      document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
+      currentModule = modName;
+      currentLevel = 0;
+
+      const view = document.getElementById(`view-${modName}`);
+      if (view) view.classList.add('active');
+
+      if (modName === 'pattern') loadPatternLevel();
+      else if (modName === 'balance') loadBalanceLevel();
+      else if (modName === 'blocks') loadBlocksLevel();
+      else if (modName === 'maze') loadMazeLevel();
+      else if (modName === 'deduction') loadDeductionLevel();
+      else if (modName === 'folding') loadFoldingLevel();
+      else if (modName === 'gears') loadGearsLevel();
+      else if (modName === 'raven') loadRavenLevel();
+    }
+
+    function speakCurrentPrompt() {
+      let promptText = "";
+      if (currentModule === 'pattern') {
+        promptText = document.getElementById('patternPrompt').innerText;
+      } else if (currentModule === 'balance') {
+        promptText = document.getElementById('balancePrompt').innerText;
+      } else if (currentModule === 'blocks') {
+        promptText = document.getElementById('blocksPrompt').innerText;
+      } else if (currentModule === 'maze') {
+        promptText = document.getElementById('mazePrompt').innerText;
+      } else if (currentModule === 'deduction') {
+        const clueEls = document.querySelectorAll('#deductionClues .clue-item');
+        let clues = Array.from(clueEls).map(el => el.innerText).join('。');
+        promptText = "請聽線索：" + clues;
+      } else if (currentModule === 'folding') {
+        promptText = document.getElementById('foldingPrompt').innerText;
+      } else if (currentModule === 'gears') {
+        promptText = document.getElementById('gearsPrompt').innerText;
+      } else if (currentModule === 'raven') {
+        promptText = document.getElementById('ravenPrompt').innerText;
+      }
+      speakText(promptText);
+    }
+
+    function triggerVictory(title, msg, isLastLevel = false) {
+      soundSuccess();
+      launchConfetti();
+      addStars(3);
+
+      if (currentModule) {
+        userProgress.completed[currentModule] = Math.max(userProgress.completed[currentModule] || 0, currentLevel + 1);
+        saveToLocalStorage();
+      }
+
+      const modal = document.getElementById('victoryModal');
+      document.getElementById('modalTitle').textContent = title || "太厲害了！答對了！";
+      document.getElementById('modalMsg').textContent = msg || "你具有超級偵探的邏輯頭腦！獲得 3 顆星星 ⭐⭐⭐";
+      
+      const btn = modal.querySelector('.modal-btn');
+      if (isLastLevel) {
+        btn.textContent = "完成大挑戰！回首頁 🏆";
+      } else {
+        btn.textContent = "進入下一關 🚀";
+      }
+      modal.classList.add('active');
+    }
+
+    function nextQuestionOrFinish() {
+      const modal = document.getElementById('victoryModal');
+      modal.classList.remove('active');
+      currentLevel++;
+
+      if (currentModule === 'pattern') {
+        if (currentLevel < patternLevels.length) loadPatternLevel(); else goHome();
+      } else if (currentModule === 'balance') {
+        if (currentLevel < balanceLevels.length) loadBalanceLevel(); else goHome();
+      } else if (currentModule === 'blocks') {
+        if (currentLevel < blocksLevels.length) loadBlocksLevel(); else goHome();
+      } else if (currentModule === 'maze') {
+        if (currentLevel < mazeLevels.length) loadMazeLevel(); else goHome();
+      } else if (currentModule === 'deduction') {
+        if (currentLevel < deductionLevels.length) loadDeductionLevel(); else goHome();
+      } else if (currentModule === 'folding') {
+        if (currentLevel < foldingLevels.length) loadFoldingLevel(); else goHome();
+      } else if (currentModule === 'gears') {
+        if (currentLevel < gearsLevels.length) loadGearsLevel(); else goHome();
+      } else if (currentModule === 'raven') {
+        if (currentLevel < ravenLevels.length) loadRavenLevel(); else goHome();
+      }
+    }
+
+    /* =========================================================
+       MODULE 1: PATTERN MAGIC (規律魔法陣)
+       ========================================================= */
+    const patternLevels = [
+      {
+        prompt: "看一看小動物隊伍：紅蘋果、香蕉、紅蘋果、香蕉，下一個是誰？",
+        sequence: ["🍎", "🍌", "🍎", "🍌", "🍎", "?"],
+        answer: "🍌",
+        options: ["🍌", "🍎", "🍇", "🍉"]
+      },
+      {
+        prompt: "兩隻小熊、一顆星星、兩隻小熊、一顆星星，接著應該是什麼？",
+        sequence: ["🐻", "🐻", "⭐", "🐻", "🐻", "?"],
+        answer: "⭐",
+        options: ["🐻", "⭐", "🐰", "🎈"]
+      },
+      {
+        prompt: "彩虹三重奏：小車、飛機、帆船，小車、飛機，問號處是？",
+        sequence: ["🚗", "✈️", "⛵", "🚗", "✈️", "?"],
+        answer: "⛵",
+        options: ["🚗", "⛵", "🚀", "✈️"]
+      },
+      {
+        prompt: "數量在長大唷：1朵花、2朵花、3朵花，後面要有幾朵花呢？",
+        sequence: ["🌸", "🌸🌸", "🌸🌸🌸", "?"],
+        answer: "🌸🌸🌸🌸",
+        options: ["🌸🌸", "🌸🌸🌸🌸", "🌸🌸🌸🌸🌸", "🌸"]
+      },
+      {
+        prompt: "綜合大挑戰：太陽、月亮、星星、太陽、月亮、問號、太陽！",
+        sequence: ["☀️", "🌙", "⭐", "☀️", "🌙", "?", "☀️"],
+        answer: "⭐",
+        options: ["☀️", "🌙", "⭐", "☁️"]
+      }
+    ];
+
+    function loadPatternLevel() {
+      const data = patternLevels[currentLevel];
+      document.getElementById('patternLevelBadge').textContent = `第 ${currentLevel + 1} / ${patternLevels.length} 關`;
+      document.getElementById('patternPrompt').textContent = data.prompt;
+
+      const track = document.getElementById('patternTrack');
+      track.innerHTML = "";
+      data.sequence.forEach(item => {
+        if (item === "?") {
+          const target = document.createElement('div');
+          target.className = 'pattern-target';
+          target.textContent = "？";
+          track.appendChild(target);
+        } else {
+          const el = document.createElement('div');
+          el.className = 'pattern-item';
+          el.textContent = item;
+          track.appendChild(el);
+        }
+      });
+
+      const optsContainer = document.getElementById('patternOptions');
+      optsContainer.innerHTML = "";
+      data.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.textContent = opt;
+        btn.onclick = () => checkPatternChoice(opt, data.answer);
+        optsContainer.appendChild(btn);
+      });
+
+      speakText(data.prompt);
+    }
+
+    function checkPatternChoice(chosen, answer) {
+      if (chosen === answer) {
+        const target = document.querySelector('.pattern-target');
+        if (target) {
+          target.textContent = chosen;
+          target.style.borderColor = '#10B981';
+          target.style.color = '#10B981';
+        }
+        triggerVictory("規律破解成功！", "你敏銳的觀察力找到了圖形的秩序！", currentLevel === patternLevels.length - 1);
+      } else {
+        soundError();
+        speakText("再看仔細一點唷！想想看前面圖案的排隊規律是什麼！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 2: BALANCE SCALE (神奇天平)
+       ========================================================= */
+    const balanceLevels = [
+      {
+        prompt: "1個西瓜跟2個鳳梨一樣重，那2個西瓜等於幾個鳳梨？",
+        clues: [{ left: "🍉", right: "🍍🍍" }],
+        targetLeft: "🍉🍉",
+        targetItem: "🍍",
+        answer: 4,
+        options: [2, 3, 4, 5]
+      },
+      {
+        prompt: "1隻可愛企鵝等於3顆糖果，那2隻企鵝可以換幾顆糖果？",
+        clues: [{ left: "🐧", right: "🍬🍬🍬" }],
+        targetLeft: "🐧🐧",
+        targetItem: "🍬",
+        answer: 6,
+        options: [4, 5, 6, 8]
+      },
+      {
+        prompt: "大熊貓等於2隻小白兔，1隻小白兔等於2根胡蘿蔔，那1隻大熊貓等於幾根胡蘿蔔？",
+        clues: [
+          { left: "🐼", right: "🐰🐰" },
+          { left: "🐰", right: "🥕🥕" }
+        ],
+        targetLeft: "🐼",
+        targetItem: "🥕",
+        answer: 4,
+        options: [2, 3, 4, 6]
+      },
+      {
+        prompt: "小獅子等於2隻小猴子，1隻小猴子等於3根香蕉，那1隻小獅子等於幾根香蕉？",
+        clues: [
+          { left: "🦁", right: "🐵🐵" },
+          { left: "🐵", right: "🍌🍌🍌" }
+        ],
+        targetLeft: "🦁",
+        targetItem: "🍌",
+        answer: 6,
+        options: [4, 5, 6, 8]
+      },
+      {
+        prompt: "2顆草莓等於4顆櫻桃，那1顆草莓等於幾顆櫻桃呢？",
+        clues: [{ left: "🍓🍓", right: "🍒🍒🍒🍒" }],
+        targetLeft: "🍓",
+        targetItem: "🍒",
+        answer: 2,
+        options: [1, 2, 3, 4]
+      }
+    ];
+
+    function loadBalanceLevel() {
+      const data = balanceLevels[currentLevel];
+      document.getElementById('balanceLevelBadge').textContent = `第 ${currentLevel + 1} / ${balanceLevels.length} 關`;
+      document.getElementById('balancePrompt').textContent = data.prompt;
+
+      const cluesContainer = document.getElementById('balanceClues');
+      cluesContainer.innerHTML = "";
+      data.clues.forEach(clue => {
+        const card = document.createElement('div');
+        card.className = 'scale-card';
+        card.innerHTML = `
+          <div class="scale-pan">${clue.left}</div>
+          <div class="scale-equal">=</div>
+          <div class="scale-pan">${clue.right}</div>
+        `;
+        cluesContainer.appendChild(card);
+      });
+
+      const targetBox = document.getElementById('balanceTarget');
+      targetBox.innerHTML = `
+        <div class="scale-pan">${data.targetLeft}</div>
+        <div class="scale-equal">=</div>
+        <div class="scale-pan">？ 個 ${data.targetItem}</div>
+      `;
+
+      const optionsBox = document.getElementById('balanceOptions');
+      optionsBox.innerHTML = "";
+      data.options.forEach(num => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.style.width = '70px';
+        btn.style.height = '70px';
+        btn.style.fontSize = '30px';
+        btn.textContent = num;
+        btn.onclick = () => checkBalanceChoice(num, data.answer);
+        optionsBox.appendChild(btn);
+      });
+
+      speakText(data.prompt);
+    }
+
+    function checkBalanceChoice(chosen, answer) {
+      if (chosen === answer) {
+        triggerVictory("智慧代換大師！", `答對了！就是 ${answer} 個！你懂得用代換方法解決難題！`, currentLevel === balanceLevels.length - 1);
+      } else {
+        soundError();
+        speakText("想一想，一個可以換幾個？再加在一起算算看！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 3: 3D BLOCKS (立體透視積木)
+       ========================================================= */
+    const blocksLevels = [
+      {
+        prompt: "數一數這裡有幾個木塊積木？",
+        grid: [
+          [1, 1],
+          [1, 0]
+        ],
+        total: 3
+      },
+      {
+        prompt: "有積木疊在上面喔！最下面支撐它的也要算進去唷！",
+        grid: [
+          [2, 1],
+          [1, 1]
+        ],
+        total: 5
+      },
+      {
+        prompt: "立體城堡蓋得更高了！數數看一共有幾個積木？",
+        grid: [
+          [3, 1],
+          [2, 0]
+        ],
+        total: 6
+      },
+      {
+        prompt: "小心躲在背後的積木！開啟透視鏡可以幫你看清楚喔！",
+        grid: [
+          [1, 2, 1],
+          [2, 1, 0]
+        ],
+        total: 7
+      },
+      {
+        prompt: "終極透視挑戰！數出這座大城堡到底由幾塊積木組成？",
+        grid: [
+          [3, 2, 1],
+          [2, 1, 1],
+          [1, 0, 0]
+        ],
+        total: 10
+      }
+    ];
+
+    let xrayMode = false;
+
+    function toggleXray() {
+      xrayMode = !xrayMode;
+      const btn = document.getElementById('xrayBtn');
+      if (xrayMode) {
+        btn.textContent = "👓 關閉透視鏡";
+        btn.style.background = "#EC4899";
+        soundClick();
+      } else {
+        btn.textContent = "👓 開啟透視鏡";
+        btn.style.background = "#6366F1";
+        soundClick();
+      }
+      renderBlocks();
+    }
+
+    function loadBlocksLevel() {
+      xrayMode = false;
+      const btn = document.getElementById('xrayBtn');
+      btn.textContent = "👓 開啟透視鏡";
+      btn.style.background = "#6366F1";
+
+      const data = blocksLevels[currentLevel];
+      document.getElementById('blocksLevelBadge').textContent = `第 ${currentLevel + 1} / ${blocksLevels.length} 關`;
+      document.getElementById('blocksPrompt').textContent = data.prompt;
+
+      renderBlocks();
+
+      const pad = document.getElementById('blocksPad');
+      pad.innerHTML = "";
+      for (let i = 1; i <= 12; i++) {
+        const nBtn = document.createElement('button');
+        nBtn.className = 'num-btn';
+        nBtn.textContent = i;
+        nBtn.onclick = () => checkBlocksAnswer(i, data.total);
+        pad.appendChild(nBtn);
+      }
+
+      speakText(data.prompt);
+    }
+
+    function renderBlocks() {
+      const canvas = document.getElementById('blockCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const grid = blocksLevels[currentLevel].grid;
+      const rows = grid.length;
+      const cols = grid[0].length;
+
+      const tileWidth = 60;
+      const tileHeight = 34;
+      const blockHeight = 44;
+
+      const originX = canvas.width / 2;
+      const originY = 190;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const height = grid[r][c];
+          for (let z = 0; z < height; z++) {
+            const isoX = originX + (c - r) * (tileWidth / 2);
+            const isoY = originY + (c + r) * (tileHeight / 2) - z * blockHeight;
+            drawIsoCube(ctx, isoX, isoY, tileWidth, tileHeight, blockHeight, xrayMode);
+          }
+        }
+      }
+    }
+
+    function drawIsoCube(ctx, x, y, tw, th, bh, isXray) {
+      const hw = tw / 2;
+      const hh = th / 2;
+
+      // Top Face
+      ctx.beginPath();
+      ctx.moveTo(x, y - bh);
+      ctx.lineTo(x + hw, y - bh + hh);
+      ctx.lineTo(x, y - bh + th);
+      ctx.lineTo(x - hw, y - bh + hh);
+      ctx.closePath();
+      ctx.fillStyle = isXray ? "rgba(96, 165, 250, 0.45)" : "#FDE047";
+      ctx.fill();
+      ctx.strokeStyle = isXray ? "#3B82F6" : "#CA8A04";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Left Face
+      ctx.beginPath();
+      ctx.moveTo(x - hw, y - bh + hh);
+      ctx.lineTo(x, y - bh + th);
+      ctx.lineTo(x, y + th);
+      ctx.lineTo(x - hw, y + hh);
+      ctx.closePath();
+      ctx.fillStyle = isXray ? "rgba(59, 130, 246, 0.4)" : "#EAB308";
+      ctx.fill();
+      ctx.stroke();
+
+      // Right Face
+      ctx.beginPath();
+      ctx.moveTo(x, y - bh + th);
+      ctx.lineTo(x + hw, y - bh + hh);
+      ctx.lineTo(x + hw, y + hh);
+      ctx.lineTo(x, y + th);
+      ctx.closePath();
+      ctx.fillStyle = isXray ? "rgba(37, 99, 235, 0.4)" : "#CA8A04";
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    function checkBlocksAnswer(chosen, total) {
+      if (chosen === total) {
+        triggerVictory("透視大師！答對了！", `總共確實是 ${total} 個積木！你連躲在底部的都算到了！`, currentLevel === blocksLevels.length - 1);
+      } else {
+        soundError();
+        speakText(chosen < total ? "不只這些喔！底層有被壓在下面的積木，打開透視鏡看看！" : "比這個少一點點喔，再數一次試試看！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 4: ROBOT CODING MAZE (小機器人尋寶)
+       ========================================================= */
+    const mazeLevels = [
+      {
+        prompt: "引導小機器人向前走拿到寶箱！",
+        size: 4,
+        start: { r: 1, c: 0 },
+        goal: { r: 1, c: 3 },
+        obstacles: [{ r: 0, c: 1 }, { r: 2, c: 2 }]
+      },
+      {
+        prompt: "中間有一條小河擋住了！必須轉彎繞過它！",
+        size: 4,
+        start: { r: 0, c: 0 },
+        goal: { r: 2, c: 2 },
+        obstacles: [{ r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 2 }]
+      },
+      {
+        prompt: "大石頭擋住直通的路了，請規劃一條安全的路線！",
+        size: 5,
+        start: { r: 0, c: 0 },
+        goal: { r: 4, c: 4 },
+        obstacles: [
+          { r: 0, c: 2 }, { r: 1, c: 2 }, { r: 2, c: 2 },
+          { r: 2, c: 3 }, { r: 4, c: 2 }
+        ]
+      },
+      {
+        prompt: "迷宮轉彎考驗：小心水塘，按順序走到金幣寶箱！",
+        size: 5,
+        start: { r: 4, c: 0 },
+        goal: { r: 0, c: 4 },
+        obstacles: [
+          { r: 3, c: 1 }, { r: 3, c: 2 }, { r: 1, c: 3 }, { r: 2, c: 3 }
+        ]
+      },
+      {
+        prompt: "終極演算法迷宮！用最聰明的路線奪得最終大寶箱！",
+        size: 5,
+        start: { r: 0, c: 0 },
+        goal: { r: 4, c: 2 },
+        obstacles: [
+          { r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 3 },
+          { r: 2, c: 3 }, { r: 3, c: 1 }, { r: 3, c: 2 }
+        ]
+      }
+    ];
+
+    let currentCommands = [];
+    let robotPos = { r: 0, c: 0 };
+    let mazeTimer = null;
+    let isRunningMaze = false;
+
+    function loadMazeLevel() {
+      if (mazeTimer) clearInterval(mazeTimer);
+      isRunningMaze = false;
+      currentCommands = [];
+      const data = mazeLevels[currentLevel];
+      robotPos = { ...data.start };
+
+      document.getElementById('mazeLevelBadge').textContent = `第 ${currentLevel + 1} / ${mazeLevels.length} 關`;
+      document.getElementById('mazePrompt').textContent = data.prompt;
+      document.getElementById('btnRunCode').disabled = false;
+
+      renderMazeGrid();
+      updateCommandUI();
+      speakText(data.prompt);
+    }
+
+    function renderMazeGrid() {
+      const data = mazeLevels[currentLevel];
+      const board = document.getElementById('mazeBoard');
+      board.style.gridTemplateColumns = `repeat(${data.size}, 1fr)`;
+      board.innerHTML = "";
+
+      for (let r = 0; r < data.size; r++) {
+        for (let c = 0; c < data.size; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'maze-cell';
+          cell.id = `cell-${r}-${c}`;
+
+          const isObs = data.obstacles.some(o => o.r === r && o.c === c);
+          if (isObs) {
+            cell.classList.add('cell-obstacle');
+            cell.textContent = "🪨";
+          } else if (r === data.goal.r && c === data.goal.c) {
+            cell.textContent = "🎁";
+          } else if (r === robotPos.r && c === robotPos.c) {
+            cell.classList.add('cell-robot');
+            cell.textContent = "🤖";
+          }
+
+          board.appendChild(cell);
+        }
+      }
+    }
+
+    function addCommand(cmd) {
+      if (isRunningMaze) return;
+      if (currentCommands.length >= 16) {
+        speakText("指令太多囉，先執行看看吧！");
+        return;
+      }
+      soundClick();
+      currentCommands.push(cmd);
+      updateCommandUI();
+    }
+
+    function removeCommand(idx) {
+      if (isRunningMaze) return;
+      soundClick();
+      currentCommands.splice(idx, 1);
+      updateCommandUI();
+    }
+
+    function clearCommands() {
+      if (isRunningMaze) return;
+      soundClick();
+      currentCommands = [];
+      const data = mazeLevels[currentLevel];
+      robotPos = { ...data.start };
+      renderMazeGrid();
+      updateCommandUI();
+    }
+
+    function updateCommandUI() {
+      const container = document.getElementById('cmdSlots');
+      const stepCount = document.getElementById('cmdStepCount');
+      stepCount.textContent = `${currentCommands.length} 步`;
+
+      if (currentCommands.length === 0) {
+        container.innerHTML = `<span style="color:#94A3B8; font-size: var(--font-content); margin:auto;">點擊下方按鈕加入動作指令</span>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      const cmdMap = {
+        up: "⬆️ 向上",
+        down: "⬇️ 向下",
+        left: "⬅️ 向左",
+        right: "➡️ 向右"
+      };
+
+      currentCommands.forEach((cmd, idx) => {
+        const tag = document.createElement('div');
+        tag.className = 'cmd-tag';
+        tag.id = `cmd-tag-${idx}`;
+        tag.textContent = `${idx + 1}. ${cmdMap[cmd]}`;
+        tag.onclick = () => removeCommand(idx);
+        container.appendChild(tag);
+      });
+    }
+
+    function runMazeProgram() {
+      if (isRunningMaze) return;
+      if (currentCommands.length === 0) {
+        speakText("請先點選方向箭頭加入指令喔！");
+        return;
+      }
+
+      isRunningMaze = true;
+      document.getElementById('btnRunCode').disabled = true;
+      const data = mazeLevels[currentLevel];
+      robotPos = { ...data.start };
+      renderMazeGrid();
+
+      let stepIndex = 0;
+      mazeTimer = setInterval(() => {
+        document.querySelectorAll('.cmd-tag').forEach(t => t.style.background = '#EEF2FF');
+        const activeTag = document.getElementById(`cmd-tag-${stepIndex}`);
+        if (activeTag) activeTag.style.background = '#FDE047';
+
+        if (stepIndex >= currentCommands.length) {
+          clearInterval(mazeTimer);
+          isRunningMaze = false;
+          document.getElementById('btnRunCode').disabled = false;
+          checkMazeResult();
+          return;
+        }
+
+        const cmd = currentCommands[stepIndex];
+        soundStep();
+        if (cmd === 'up') robotPos.r--;
+        else if (cmd === 'down') robotPos.r++;
+        else if (cmd === 'left') robotPos.c--;
+        else if (cmd === 'right') robotPos.c++;
+
+        const hitWall = robotPos.r < 0 || robotPos.r >= data.size || robotPos.c < 0 || robotPos.c >= data.size;
+        const hitObs = data.obstacles.some(o => o.r === robotPos.r && o.c === robotPos.c);
+
+        if (hitWall || hitObs) {
+          clearInterval(mazeTimer);
+          soundError();
+          isRunningMaze = false;
+          document.getElementById('btnRunCode').disabled = false;
+          speakText(hitWall ? "哎呀！撞到迷宮外牆了！請修正路線！" : "哎呀！撞到大石頭障礙了！再試一次！");
+          robotPos = { ...data.start };
+          renderMazeGrid();
+          return;
+        }
+
+        renderMazeGrid();
+        stepIndex++;
+      }, 450);
+    }
+
+    function checkMazeResult() {
+      const data = mazeLevels[currentLevel];
+      if (robotPos.r === data.goal.r && robotPos.c === data.goal.c) {
+        triggerVictory("恭喜奪得寶藏！", "你的程式演算法指令非常精準！成功帶領機器人過關！", currentLevel === mazeLevels.length - 1);
+      } else {
+        soundError();
+        speakText("機器人還沒走到寶箱位置喔，路線還差幾步，加油！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 5: DEDUCTION HOUSE (動物好友排排坐)
+       ========================================================= */
+    const deductionLevels = [
+      {
+        prompt: "3位小動物住進3棟房子，聽聽看誰住哪裡！",
+        animals: ["🐰", "🐻", "🐱"],
+        houses: 3,
+        clues: [
+          "小白兔 🐰 住在最左邊的 1 號房。",
+          "小黑熊 🐻 住在最右邊的 3 號房。"
+        ],
+        solution: ["🐰", "🐱", "🐻"]
+      },
+      {
+        prompt: "小狐狸、小貓熊與小獅子正在選房間！",
+        animals: ["🦊", "🐼", "🦁"],
+        houses: 3,
+        clues: [
+          "小獅子 🦁 住在中間的 2 號房。",
+          "小狐狸 🦊 住在小獅子的右邊。"
+        ],
+        solution: ["🐼", "🦁", "🦊"]
+      },
+      {
+        prompt: "4間房子的大挑戰！仔細閱讀左右鄰居的關係！",
+        animals: ["🐶", "🐵", "🐸", "🐰"],
+        houses: 4,
+        clues: [
+          "小青蛙 🐸 住在最右邊的 4 號房。",
+          "小狗 🐶 住在小青蛙的左邊鄰居 (3號房)。",
+          "小兔子 🐰 住在最左邊的 1 號房。"
+        ],
+        solution: ["🐰", "🐵", "🐶", "🐸"]
+      },
+      {
+        prompt: "邏輯排除推理：誰不喜歡住在哪裡？",
+        animals: ["🐯", "🐨", "🐧", "🦄"],
+        houses: 4,
+        clues: [
+          "獨角獸 🦄 住在 1 號房。",
+          "無尾熊 🐨 住在 4 號房。",
+          "小老虎 🐯 不住在 2 號房。"
+        ],
+        solution: ["🦄", "🐧", "🐯", "🐨"]
+      },
+      {
+        prompt: "終極大偵探！結合所有線索推理出所有小動物的位置！",
+        animals: ["🐘", "🦒", "🦓", "🦔"],
+        houses: 4,
+        clues: [
+          "長頸鹿 🦒 住在 2 號房。",
+          "刺蝟 🦔 住在長頸鹿的左邊鄰居。",
+          "大象 🐘 住在最右邊的 4 號房。"
+        ],
+        solution: ["🦔", "🦒", "🦓", "🐘"]
+      }
+    ];
+
+    let deductionPlacements = [];
+    let selectedAnimal = null;
+
+    function loadDeductionLevel() {
+      const data = deductionLevels[currentLevel];
+      deductionPlacements = new Array(data.houses).fill(null);
+      selectedAnimal = null;
+
+      document.getElementById('deductionLevelBadge').textContent = `第 ${currentLevel + 1} / ${deductionLevels.length} 關`;
+      document.getElementById('deductionPrompt').textContent = data.prompt;
+
+      const cluesList = document.getElementById('deductionClues');
+      cluesList.innerHTML = "";
+      data.clues.forEach(clue => {
+        const item = document.createElement('div');
+        item.className = 'clue-item';
+        item.innerHTML = `<span>🔍</span> ${clue}`;
+        cluesList.appendChild(item);
+      });
+
+      renderDeductionHouses();
+      renderDeductionBank();
+      speakCurrentPrompt();
+    }
+
+    function renderDeductionHouses() {
+      const data = deductionLevels[currentLevel];
+      const housesGrid = document.getElementById('deductionHouses');
+      housesGrid.innerHTML = "";
+
+      for (let i = 0; i < data.houses; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'house-slot';
+
+        const roof = document.createElement('div');
+        roof.className = 'house-roof';
+        roof.textContent = "🏠";
+
+        const num = document.createElement('div');
+        num.className = 'house-num';
+        num.textContent = `${i + 1} 號房`;
+
+        const content = document.createElement('div');
+        content.className = 'house-content';
+        content.textContent = deductionPlacements[i] || "❓";
+        content.onclick = () => placeAnimalInHouse(i);
+
+        slot.appendChild(roof);
+        slot.appendChild(num);
+        slot.appendChild(content);
+        housesGrid.appendChild(slot);
+      }
+    }
+
+    function renderDeductionBank() {
+      const data = deductionLevels[currentLevel];
+      const bank = document.getElementById('deductionBank');
+      bank.innerHTML = "";
+
+      data.animals.forEach(ani => {
+        const isPlaced = deductionPlacements.includes(ani);
+        const token = document.createElement('div');
+        token.className = `animal-token ${selectedAnimal === ani ? 'selected' : ''}`;
+        token.textContent = ani;
+        token.style.opacity = isPlaced ? '0.35' : '1';
+        token.style.pointerEvents = isPlaced ? 'none' : 'auto';
+
+        token.onclick = () => {
+          soundClick();
+          selectedAnimal = (selectedAnimal === ani) ? null : ani;
+          renderDeductionBank();
+        };
+
+        bank.appendChild(token);
+      });
+    }
+
+    function placeAnimalInHouse(houseIdx) {
+      if (deductionPlacements[houseIdx]) {
+        soundClick();
+        deductionPlacements[houseIdx] = null;
+        renderDeductionHouses();
+        renderDeductionBank();
+        return;
+      }
+
+      if (selectedAnimal) {
+        soundClick();
+        deductionPlacements[houseIdx] = selectedAnimal;
+        selectedAnimal = null;
+        renderDeductionHouses();
+        renderDeductionBank();
+      } else {
+        speakText("請先點選下方的小動物，再點選要住進哪間房子！");
+      }
+    }
+
+    function checkDeductionAnswer() {
+      const data = deductionLevels[currentLevel];
+      if (deductionPlacements.some(p => p === null)) {
+        soundError();
+        speakText("還有房間空著唷！請把所有小動物都安排好房間！");
+        return;
+      }
+
+      let isCorrect = true;
+      for (let i = 0; i < data.houses; i++) {
+        if (deductionPlacements[i] !== data.solution[i]) {
+          isCorrect = false;
+          break;
+        }
+      }
+
+      if (isCorrect) {
+        triggerVictory("推理大偵探過關！", "太厲害了！你完全破解了所有線索，安排得一清二楚！", currentLevel === deductionLevels.length - 1);
+      } else {
+        soundError();
+        speakText("好像有小動物走錯房間囉！再對照一次上面的偵探線索看看！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 6: PAPER FOLDING & PUNCH (摺紙打孔透視 - 資優題型)
+       ========================================================= */
+    const foldingLevels = [
+      {
+        prompt: "將正方形色紙【向上對摺】成一半，在頂端打一個圓孔，展開後會是？",
+        steps: [
+          { text: "完整色紙", visual: "full" },
+          { text: "⬆️ 向上對摺", visual: "fold-up" },
+          { text: "頂部打孔 ⭕", visual: "punched-top" }
+        ],
+        options: [
+          { dots: [{ cx: 50, cy: 15 }, { cx: 50, cy: 85 }] },
+          { dots: [{ cx: 50, cy: 15 }] },
+          { dots: [{ cx: 15, cy: 50 }, { cx: 85, cy: 50 }] },
+          { dots: [{ cx: 50, cy: 50 }] }
+        ],
+        answerIdx: 0,
+        explanation: "因為紙張由下往上對摺，在頂部打洞展開後，上下會有一對對稱的圓孔！"
+      },
+      {
+        prompt: "將正方形色紙【向右對摺】成一半，在右下角剪一個洞，展開後會是？",
+        steps: [
+          { text: "完整色紙", visual: "full" },
+          { text: "➡️ 向右對摺", visual: "fold-right" },
+          { text: "右下角剪孔 ⭕", visual: "punched-br" }
+        ],
+        options: [
+          { dots: [{ cx: 85, cy: 85 }] },
+          { dots: [{ cx: 15, cy: 85 }, { cx: 85, cy: 85 }] },
+          { dots: [{ cx: 85, cy: 15 }, { cx: 85, cy: 85 }] },
+          { dots: [{ cx: 50, cy: 50 }] }
+        ],
+        answerIdx: 1,
+        explanation: "向右摺疊後在角落打洞，展開後左右兩邊角落會各出現一個洞！"
+      },
+      {
+        prompt: "【雙重摺疊】：向上對摺，再向右對摺成四分之一，在中心角打洞，展開後是？",
+        steps: [
+          { text: "完整色紙", visual: "full" },
+          { text: "⬆️ 向上摺", visual: "fold-up" },
+          { text: "➡️ 再向右摺", visual: "fold-quarter" },
+          { text: "中心角打孔 ⭐", visual: "punched-center-corner" }
+        ],
+        options: [
+          { dots: [{ cx: 50, cy: 50 }] },
+          { dots: [{ cx: 20, cy: 20 }, { cx: 80, cy: 20 }, { cx: 20, cy: 80 }, { cx: 80, cy: 80 }] },
+          { dots: [{ cx: 50, cy: 20 }, { cx: 50, cy: 80 }] },
+          { dots: [{ cx: 20, cy: 50 }, { cx: 80, cy: 50 }] }
+        ],
+        answerIdx: 0,
+        explanation: "四層紙的中心角正是整張大色紙的「正中心點」，所以展開後會在中心形成一個大孔洞！"
+      },
+      {
+        prompt: "向上對摺，再向右對摺，在【外側右上角】打洞，展開後會是？",
+        steps: [
+          { text: "完整色紙", visual: "full" },
+          { text: "⬆️ 向上摺", visual: "fold-up" },
+          { text: "➡️ 再向右摺", visual: "fold-quarter" },
+          { text: "外側角打孔 ⭕", visual: "punched-outer-corner" }
+        ],
+        options: [
+          { dots: [{ cx: 50, cy: 50 }] },
+          { dots: [{ cx: 85, cy: 15 }] },
+          { dots: [{ cx: 15, cy: 15 }, { cx: 85, cy: 15 }, { cx: 15, cy: 85 }, { cx: 85, cy: 85 }] },
+          { dots: [{ cx: 50, cy: 15 }, { cx: 50, cy: 85 }] }
+        ],
+        answerIdx: 2,
+        explanation: "外側四個角展開後，剛好對應到大正方形色紙的「四個角落」！"
+      },
+      {
+        prompt: "資優壓軸：向上對摺，再向右對摺，在兩折痕邊緣剪半圓，展開後是？",
+        steps: [
+          { text: "完整色紙", visual: "full" },
+          { text: "⬆️ 向上摺", visual: "fold-up" },
+          { text: "➡️ 再向右摺", visual: "fold-quarter" },
+          { text: "對稱邊緣打孔", visual: "punched-edges" }
+        ],
+        options: [
+          { dots: [{ cx: 50, cy: 18 }, { cx: 50, cy: 82 }, { cx: 18, cy: 50 }, { cx: 82, cy: 50 }] },
+          { dots: [{ cx: 50, cy: 50 }] },
+          { dots: [{ cx: 20, cy: 20 }, { cx: 80, cy: 80 }] },
+          { dots: [{ cx: 18, cy: 18 }, { cx: 82, cy: 18 }, { cx: 18, cy: 82 }, { cx: 82, cy: 82 }] }
+        ],
+        answerIdx: 0,
+        explanation: "摺痕邊緣展開後會形成上下左右十字對稱的 4 個孔洞！太聰明了！"
+      }
+    ];
+
+    function loadFoldingLevel() {
+      const data = foldingLevels[currentLevel];
+      document.getElementById('foldingLevelBadge').textContent = `第 ${currentLevel + 1} / ${foldingLevels.length} 關`;
+      document.getElementById('foldingPrompt').textContent = data.prompt;
+
+      const stepsRow = document.getElementById('foldingStepsRow');
+      stepsRow.innerHTML = "";
+
+      data.steps.forEach((step, idx) => {
+        const box = document.createElement('div');
+        box.className = 'fold-step-box';
+
+        let innerSVG = "";
+        if (step.visual === "full") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;"><rect x="5" y="5" width="90" height="90" fill="#E0E7FF" stroke="#6366F1" stroke-width="4" rx="4"/></svg>`;
+        } else if (step.visual === "fold-up") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="5" y="5" width="90" height="45" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
+            <line x1="5" y1="50" x2="95" y2="50" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>
+          </svg>`;
+        } else if (step.visual === "fold-right") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="90" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
+            <line x1="50" y1="5" x2="50" y2="95" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>
+          </svg>`;
+        } else if (step.visual === "fold-quarter") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
+          </svg>`;
+        } else if (step.visual === "punched-top") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="5" y="5" width="90" height="45" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
+            <circle cx="50" cy="15" r="8" fill="#EF4444"/>
+          </svg>`;
+        } else if (step.visual === "punched-br") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="90" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
+            <circle cx="85" cy="85" r="8" fill="#EF4444"/>
+          </svg>`;
+        } else if (step.visual === "punched-center-corner") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
+            <circle cx="52" cy="48" r="8" fill="#EF4444"/>
+          </svg>`;
+        } else if (step.visual === "punched-outer-corner") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
+            <circle cx="88" cy="12" r="8" fill="#EF4444"/>
+          </svg>`;
+        } else if (step.visual === "punched-edges") {
+          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
+            <circle cx="50" cy="27" r="7" fill="#EF4444"/>
+            <circle cx="72" cy="50" r="7" fill="#EF4444"/>
+          </svg>`;
+        }
+
+        box.innerHTML = `
+          <div class="sheet-preview">${innerSVG}</div>
+          <div class="fold-step-text">${step.text}</div>
+        `;
+        stepsRow.appendChild(box);
+
+        if (idx < data.steps.length - 1) {
+          const arr = document.createElement('div');
+          arr.className = 'step-arrow';
+          arr.textContent = "➔";
+          stepsRow.appendChild(arr);
+        }
+      });
+
+      const grid = document.getElementById('foldingChoicesGrid');
+      grid.innerHTML = "";
+
+      data.options.forEach((opt, idx) => {
+        const card = document.createElement('div');
+        card.className = 'unfold-choice-card';
+
+        let circles = opt.dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="9" fill="#EF4444" stroke="#B91C1C" stroke-width="2"/>`).join('');
+        card.innerHTML = `
+          <div class="unfold-svg-sheet">
+            <svg viewBox="0 0 100 100" style="width:100%;height:100%;">
+              <rect x="5" y="5" width="90" height="90" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" rx="4"/>
+              <line x1="5" y1="50" x2="95" y2="50" stroke="#CBD5E1" stroke-dasharray="3"/>
+              <line x1="50" y1="5" x2="50" y2="95" stroke="#CBD5E1" stroke-dasharray="3"/>
+              ${circles}
+            </svg>
+          </div>
+          <div style="font-weight:800; color:#475569; font-size: var(--font-content);">選項 ${String.fromCharCode(65 + idx)}</div>
+        `;
+        card.onclick = () => checkFoldingAnswer(idx, data.answerIdx, data.explanation);
+        grid.appendChild(card);
+      });
+
+      speakText(data.prompt);
+    }
+
+    function checkFoldingAnswer(chosenIdx, answerIdx, explanation) {
+      if (chosenIdx === answerIdx) {
+        triggerVictory("空間對稱大師！答對了！", explanation, currentLevel === foldingLevels.length - 1);
+      } else {
+        soundError();
+        speakText("想一想紙張展開時，孔洞會往哪邊鏡像翻開？再試一次！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 7: GEAR TRANSMISSION (齒輪連動推理 - 資優題型)
+       ========================================================= */
+    const gearsLevels = [
+      {
+        prompt: "【雙齒輪咬合】：齒輪 1 正順時針轉 (↷)，齒輪 2 會往哪個方向轉？",
+        gears: [
+          { x: 180, y: 130, r: 60, teeth: 12, dir: 1, label: "1" },
+          { x: 300, y: 130, r: 60, teeth: 12, dir: -1, label: "2 ★" }
+        ],
+        targetGearIndex: 1,
+        answer: "ccw",
+        rule: "兩個齒輪互相咬合時，旋轉方向必定相反！"
+      },
+      {
+        prompt: "【三齒輪串聯】：齒輪 1 順時針轉，最右邊的齒輪 3 (★) 往哪轉？",
+        gears: [
+          { x: 120, y: 130, r: 50, teeth: 10, dir: 1, label: "1" },
+          { x: 220, y: 130, r: 50, teeth: 10, dir: -1, label: "2" },
+          { x: 320, y: 130, r: 50, teeth: 10, dir: 1, label: "3 ★" }
+        ],
+        targetGearIndex: 2,
+        answer: "cw",
+        rule: "第1個順時針 ➔ 第2個逆時針 ➔ 第3個又變回順時針！"
+      },
+      {
+        prompt: "【大小齒輪咬合】：齒輪 1 順時針轉，大齒輪 2 (★) 往哪個方向轉？",
+        gears: [
+          { x: 140, y: 130, r: 40, teeth: 8, dir: 1, label: "1" },
+          { x: 250, y: 130, r: 70, teeth: 14, dir: -1, label: "2 ★" }
+        ],
+        targetGearIndex: 1,
+        answer: "ccw",
+        rule: "不管齒輪是大是小，只要互相咬合，方向就一定是相反的！"
+      },
+      {
+        prompt: "【四齒輪長火車】：齒輪 1 順時針轉，請推理最後一個齒輪 4 (★) 的方向！",
+        gears: [
+          { x: 90, y: 130, r: 40, teeth: 8, dir: 1, label: "1" },
+          { x: 170, y: 130, r: 40, teeth: 8, dir: -1, label: "2" },
+          { x: 250, y: 130, r: 40, teeth: 8, dir: 1, label: "3" },
+          { x: 330, y: 130, r: 40, teeth: 8, dir: -1, label: "4 ★" }
+        ],
+        targetGearIndex: 3,
+        answer: "ccw",
+        rule: "偶數個咬合齒輪（2、4、6...），最後一個的方向必定與第1個相反！"
+      },
+      {
+        prompt: "【資優幾何三角齒輪鏈】：齒輪 1 順時針轉，經過 2 號，齒輪 3 (★) 往哪轉？",
+        gears: [
+          { x: 150, y: 170, r: 50, teeth: 10, dir: 1, label: "1" },
+          { x: 230, y: 80,  r: 50, teeth: 10, dir: -1, label: "2" },
+          { x: 310, y: 170, r: 50, teeth: 10, dir: 1, label: "3 ★" }
+        ],
+        targetGearIndex: 2,
+        answer: "cw",
+        rule: "即使排列成三角拐彎，奇數第 3 個齒輪依然與第 1 個同方向旋轉！"
+      }
+    ];
+
+    let gearAnimId = null;
+    let gearAngle = 0;
+
+    function loadGearsLevel() {
+      if (gearAnimId) cancelAnimationFrame(gearAnimId);
+      const data = gearsLevels[currentLevel];
+      document.getElementById('gearsLevelBadge').textContent = `第 ${currentLevel + 1} / ${gearsLevels.length} 關`;
+      document.getElementById('gearsPrompt').textContent = data.prompt;
+      document.getElementById('gearTargetText').textContent = `請問標記 ★ 的「${data.gears[data.targetGearIndex].label}」齒輪旋轉方向是？`;
+
+      gearAngle = 0;
+      startGearAnimation();
+      speakText(data.prompt);
+    }
+
+    function startGearAnimation() {
+      const canvas = document.getElementById('gearCanvas');
+      const ctx = canvas.getContext('2d');
+      const data = gearsLevels[currentLevel];
+
+      function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        gearAngle += 0.03;
+
+        data.gears.forEach((gear, idx) => {
+          const currentRotation = gearAngle * gear.dir;
+          const isTarget = idx === data.targetGearIndex;
+          const isSource = idx === 0;
+
+          drawSingleGear(ctx, gear.x, gear.y, gear.r, gear.teeth, currentRotation, isSource, isTarget, gear.label);
+        });
+
+        gearAnimId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function drawSingleGear(ctx, cx, cy, r, teeth, angle, isSource, isTarget, label) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      ctx.beginPath();
+      const step = (Math.PI * 2) / teeth;
+      for (let i = 0; i < teeth; i++) {
+        const a1 = i * step;
+        const a2 = a1 + step * 0.35;
+        const a3 = a1 + step * 0.65;
+        const a4 = (i + 1) * step;
+
+        const rOuter = r + 10;
+        const rInner = r;
+
+        if (i === 0) ctx.moveTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+        else ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+
+        ctx.lineTo(Math.cos(a2) * rOuter, Math.sin(a2) * rOuter);
+        ctx.lineTo(Math.cos(a3) * rOuter, Math.sin(a3) * rOuter);
+        ctx.lineTo(Math.cos(a4) * rInner, Math.sin(a4) * rInner);
+      }
+      ctx.closePath();
+
+      if (isTarget) {
+        ctx.fillStyle = "#FDE047";
+        ctx.strokeStyle = "#CA8A04";
+      } else if (isSource) {
+        ctx.fillStyle = "#93C5FD";
+        ctx.strokeStyle = "#2563EB";
+      } else {
+        ctx.fillStyle = "#FED7AA";
+        ctx.strokeStyle = "#EA580C";
+      }
+      ctx.lineWidth = 4;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "#FFF";
+      ctx.fill();
+      ctx.stroke();
+
+      for (let s = 0; s < 4; s++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(s * Math.PI / 2) * (r * 0.8), Math.sin(s * Math.PI / 2) * (r * 0.8));
+        ctx.strokeStyle = "rgba(0,0,0,0.15)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillStyle = "#1E293B";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, cx, cy);
+
+      if (isSource) {
+        ctx.strokeStyle = "#DC2626";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 24, -Math.PI / 3, Math.PI / 3, false);
+        ctx.stroke();
+        ctx.fillStyle = "#DC2626";
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(Math.PI / 3) * (r + 24), cy + Math.sin(Math.PI / 3) * (r + 24));
+        ctx.lineTo(cx + Math.cos(Math.PI / 3) * (r + 24) - 8, cy + Math.sin(Math.PI / 3) * (r + 24) - 12);
+        ctx.lineTo(cx + Math.cos(Math.PI / 3) * (r + 24) + 10, cy + Math.sin(Math.PI / 3) * (r + 24) - 4);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function checkGearAnswer(chosen) {
+      const data = gearsLevels[currentLevel];
+      if (chosen === data.answer) {
+        triggerVictory("齒輪力學大師！答對了！", data.rule, currentLevel === gearsLevels.length - 1);
+      } else {
+        soundError();
+        speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
+      }
+    }
+
+    /* =========================================================
+       MODULE 8: RAVEN'S MATRIX (瑞文氏九宮矩陣 - 資優題型)
+       ========================================================= */
+    const ravenLevels = [
+      {
+        prompt: "【形狀九宮格】：每行、每列都有圓形、三角形、正方形！問號是誰？",
+        grid: [
+          "🔵", "🔺", "🟩",
+          "🔺", "🟩", "🔵",
+          "🟩", "🔵", "?"
+        ],
+        answer: "🔺",
+        options: ["🔺", "🔵", "🟩", "⭐"],
+        rule: "拉丁方陣規律：每一橫排和直排，三種圖形都剛好出現一次！"
+      },
+      {
+        prompt: "【顏色與形狀雙重規律】：橫排形狀相同，直排顏色相同！問號是誰？",
+        grid: [
+          "🔴", "🟢", "🟡",
+          "🔺", "🔺", "🔺",
+          "🟥", "🟩", "?"
+        ],
+        answer: "🟨",
+        options: ["🟨", "🟥", "🟦", "🟣"],
+        rule: "第3行直排全是黃色家族（🟡、黃色三角形、黃色正方形）！"
+      },
+      {
+        prompt: "【數量遞增矩陣】：看一看每格裡水果的數量變化規律！",
+        grid: [
+          "🍎", "🍎🍎", "🍎🍎🍎",
+          "🍌", "🍌🍌", "🍌🍌🍌",
+          "🍓", "🍓🍓", "?"
+        ],
+        answer: "🍓🍓🍓",
+        options: ["🍓🍓🍓", "🍓", "🍓🍓", "🍌🍌🍌"],
+        rule: "每行都是從 1 個、2 個增加到 3 個！所以問號處有 3 顆草莓！"
+      },
+      {
+        prompt: "【方向旋轉推理】：時鐘指針每向右一格，就順時針旋轉 90 度！",
+        grid: [
+          "⬆️", "➡️", "⬇️",
+          "➡️", "⬇️", "⬅️",
+          "⬇️", "⬅️", "?"
+        ],
+        answer: "⬆️",
+        options: ["⬆️", "⬇️", "➡️", "↗️"],
+        rule: "指針順時針旋轉：向下 ➔ 向左 ➔ 轉回向上 (⬆️)！"
+      },
+      {
+        prompt: "【資優圖形合成疊加】：第 1 格 ＋ 第 2 格 ＝ 第 3 格組合圖！",
+        grid: [
+          "⚪", "➕", "🎯",
+          "🔶", "⭐", "🌟",
+          "🔴", "🟡", "?"
+        ],
+        answer: "🟠",
+        options: ["🟠", "🟣", "⚪", "⬛"],
+        rule: "色彩疊加混合：紅色 ＋ 黃色 ＝ 溫暖的橘色 (🟠)！"
+      }
+    ];
+
+    function loadRavenLevel() {
+      const data = ravenLevels[currentLevel];
+      document.getElementById('ravenLevelBadge').textContent = `第 ${currentLevel + 1} / ${ravenLevels.length} 關`;
+      document.getElementById('ravenPrompt').textContent = data.prompt;
+
+      const gridContainer = document.getElementById('ravenGrid');
+      gridContainer.innerHTML = "";
+
+      data.grid.forEach(cell => {
+        const el = document.createElement('div');
+        el.className = 'raven-cell';
+        if (cell === "?") {
+          el.classList.add('raven-cell-target');
+          el.textContent = "？";
+        } else {
+          el.textContent = cell;
+        }
+        gridContainer.appendChild(el);
+      });
+
+      const choicesBox = document.getElementById('ravenChoices');
+      choicesBox.innerHTML = "";
+      data.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'raven-opt-btn';
+        btn.textContent = opt;
+        btn.onclick = () => checkRavenChoice(opt, data.answer, data.rule);
+        choicesBox.appendChild(btn);
+      });
+
+      speakText(data.prompt);
+    }
+
+    function checkRavenChoice(chosen, answer, rule) {
+      if (chosen === answer) {
+        const target = document.querySelector('.raven-cell-target');
+        if (target) {
+          target.textContent = chosen;
+          target.style.background = "#DCFCE7";
+          target.style.borderColor = "#10B981";
+          target.style.color = "#15803D";
+        }
+        triggerVictory("瑞文氏資優思維達人！", rule, currentLevel === ravenLevels.length - 1);
+      } else {
+        soundError();
+        speakText("橫著看一看，豎著看一看，注意顏色、形狀或數量的雙向規律喔！");
+      }
+    }
+
+    /* =========================================================
+       CONFETTI CANNON EFFECT
+       ========================================================= */
+    function launchConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+
+      for (let i = 0; i < 90; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 18,
+          vy: (Math.random() - 0.7) * 18,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() * 8 + 6,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 12,
+          gravity: 0.45,
+          alpha: 1
+        });
+      }
+
+      let animId;
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = 0;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.rotation += p.rotationSpeed;
+          p.alpha -= 0.012;
+
+          if (p.alpha > 0) {
+            alive++;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation * Math.PI / 180);
+            ctx.globalAlpha = Math.max(0, p.alpha);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            ctx.restore();
+          }
+        });
+
+        if (alive > 0) {
+          animId = requestAnimationFrame(animate);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animId);
+        }
+      }
+      animate();
+    }
+
+    // Auto window resize handler
+    window.addEventListener('resize', () => {
+      const canvas = document.getElementById('confettiCanvas');
+      if (canvas) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      if (currentModule === 'blocks') {
+        renderBlocks();
+      }
+    });
+
+    // Initialize & restore saved progress
+    window.addEventListener('DOMContentLoaded', loadSavedProgress);
+    loadSavedProgress();
+  </script>
+</body>
+</html>

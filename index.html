@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>幼小銜接學習樂園 - 跨裝置分享與同步中心</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-dark: #3730A3;
+      --bg-cream: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text-main: #1E293B;
+      --text-muted: #64748B;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow-md: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      background: linear-gradient(135deg, #EEF2FF 0%, #FEF3C7 50%, #ECFDF5 100%);
+      min-height: 100vh;
+      color: var(--text-main);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      max-width: 860px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* HEADER */
+    .portal-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+      border: 3px solid #E2E8F0;
+    }
+
+    .portal-title {
+      font-size: 28px;
+      font-weight: 900;
+      background: linear-gradient(45deg, #4338CA, #D97706, #059669);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    .portal-subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* QUICK IP SCAN BOX */
+    .scan-card {
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      border: 3px solid #C7D2FE;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .qr-frame {
+      background: #FFF;
+      border: 3px solid #818CF8;
+      border-radius: 20px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+      margin: 16px 0;
+    }
+
+    .qr-img {
+      width: 220px;
+      height: 220px;
+      display: block;
+    }
+
+    .ip-badge {
+      background: #EEF2FF;
+      border: 2px solid #A5B4FC;
+      color: #3730A3;
+      font-family: monospace;
+      font-size: 18px;
+      font-weight: 800;
+      padding: 8px 18px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+
+    /* GAME CARDS */
+    .games-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .game-card {
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 4px solid transparent;
+      transition: all 0.25s;
+    }
+
+    .game-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.12);
+    }
+
+    .card-logic {
+      border-color: #8B5CF6;
+      background: linear-gradient(180deg, #FAF5FF 0%, #FFFFFF 100%);
+    }
+
+    .card-math {
+      border-color: #10B981;
+      background: linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%);
+    }
+
+    .game-head {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .game-icon {
+      font-size: 48px;
+    }
+
+    .game-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #1E293B;
+    }
+
+    .game-desc {
+      font-size: 15px;
+      color: #64748B;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    .features-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 20px;
+    }
+
+    .btn-play {
+      background: #4F46E5;
+      color: #FFF;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 800;
+      padding: 12px 20px;
+      border-radius: 16px;
+      text-align: center;
+      display: block;
+      box-shadow: 0 4px 0 #3730A3;
+      transition: all 0.15s;
+    }
+
+    .btn-play-math {
+      background: #10B981;
+      box-shadow: 0 4px 0 #047857;
+    }
+
+    .btn-play:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-play:active {
+      transform: translateY(3px);
+      box-shadow: none;
+    }
+
+    /* INSTRUCTIONS */
+    .guide-card {
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      border: 2px dashed #94A3B8;
+    }
+
+    .guide-title {
+      font-size: 18px;
+      font-weight: 900;
+      color: #1E293B;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guide-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #334155;
+    }
+
+    .guide-steps li {
+      margin-left: 20px;
+    }
+
+    .toast-box {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1E293B;
+      color: #FFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 800;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast-box.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toast-box" id="toastBox">提示</div>
+
+  <div class="container">
+    <!-- HEADER -->
+    <header class="portal-header">
+      <h1 class="portal-title">🎓 幼小銜接學習樂園・跨裝置分享站</h1>
+      <p class="portal-subtitle">電腦、iPad、平板、手機全裝置自動同步・家庭區網一掃即玩</p>
+    </header>
+
+    <!-- SCAN CARD -->
+    <div class="scan-card">
+      <div style="font-size: 20px; font-weight: 900; color: #3730A3;">📱 手機・iPad 掃碼立即暢玩</div>
+      <p style="font-size: 15px; color: #64748B; margin-top: 4px;">確定手機或 iPad 連接到與電腦相同的家用 Wi-Fi，打開相機即可連線！</p>
+      
+      <div class="qr-frame">
+        <img class="qr-img" id="portalQr" src="" alt="Portal QR Code">
+      </div>
+
+      <div class="ip-badge" id="portalUrl">正在連線...</div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button onclick="copyCurrentPortalLink()" style="background:#4F46E5; color:#FFF; border:none; padding:10px 20px; border-radius:12px; font-weight:800; font-size:15px; cursor:pointer;">
+          🔗 複製入口網址
+        </button>
+      </div>
+    </div>
+
+    <!-- GAME CARDS -->
+    <div class="games-row">
+      <!-- GAME 1 -->
+      <div class="game-card card-logic">
+        <div>
+          <div class="game-head">
+            <div class="game-icon">🚀</div>
+            <div>
+              <div class="game-title">小小邏輯探險家</div>
+              <span style="font-size:13px; font-weight:800; color:#7C3AED; background:#EDE9FE; padding:3px 10px; border-radius:12px;">8合1 升小一邏輯＋資優鑑定</span>
+            </div>
+          </div>
+          <p class="game-desc">
+            針對 5~7 歲兒童設計，涵蓋規律魔法陣、智慧天平代換、3D透視積木、程式迷宮、動物推理，以及<strong>摺紙打孔對稱、齒輪連動、瑞文氏九宮矩陣</strong>等資優測驗考題！
+          </p>
+          <ul class="features-list">
+            <li>✨ 具備「📲 跨裝置進度同步」與自動存檔功能</li>
+            <li>🔊 全程中文語音題目朗讀與立體過關音效</li>
+          </ul>
+        </div>
+        <a id="linkLogic" href="logic_game.html" class="btn-play">進入《小小邏輯探險家》➔</a>
+      </div>
+
+      <!-- GAME 2 -->
+      <div class="game-card card-math">
+        <div>
+          <div class="game-head">
+            <div class="game-icon">🌱</div>
+            <div>
+              <div class="game-title">蒙特梭利數學樂園</div>
+              <span style="font-size:13px; font-weight:800; color:#059669; background:#D1FAE5; padding:3px 10px; border-radius:12px;">數與量・幾何空間感知</span>
+            </div>
+          </div>
+          <p class="game-desc">
+            以蒙特梭利實體教具視覺化（數棒、彩色串珠、十進位金黃色珠、賽根板），幫助幼兒直觀建立對數字大小、加減運算與空間形狀的真實感受。
+          </p>
+          <ul class="features-list">
+            <li>🪵 溫潤木質教具互動視覺效果</li>
+            <li>🧩 循序漸進引導幼兒具象化數學啟蒙</li>
+          </ul>
+        </div>
+        <a id="linkMath" href="montessori_math_game.html" class="btn-play btn-play-math">進入《蒙特梭利數學樂園》➔</a>
+      </div>
+    </div>
+
+    <!-- GUIDE -->
+    <div class="guide-card">
+      <div class="guide-title">
+        <span>💡</span> 如何在 iPad / 手機獲得最佳體驗？
+      </div>
+      <ol class="guide-steps">
+        <li><strong>加入主畫面變身獨立 App</strong>：在 Safari 點擊底部的「分享」按鈕，選擇「<strong>加入主畫面</strong>」，之後就能像原生 App 一樣全螢幕遊玩，不會看到瀏覽器網址列！</li>
+        <li><strong>星星進度帶到新裝置</strong>：在電腦玩完後，點擊頂部的「<strong>📲 同步/分享</strong>」，用 iPad 相機掃描彈窗裡的專屬 QR Code，星星進度與所有通關紀錄立即連動！</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    const portalUrl = window.location.href.split('?')[0].split('#')[0];
+    document.getElementById('portalUrl').textContent = portalUrl;
+
+    const qrImg = document.getElementById('portalQr');
+    qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" + encodeURIComponent(portalUrl);
+    qrImg.onerror = function() {
+      qrImg.style.display = 'none';
+    };
+
+    function copyCurrentPortalLink() {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(portalUrl).then(() => {
+          showToast("📋 已複製學習入口網址！可貼到 LINE 或 AirDrop 給 iPad！");
+        });
+      } else {
+        prompt("請複製下方入口網址：", portalUrl);
+      }
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      box.textContent = msg;
+      box.classList.add('show');
+      setTimeout(() => box.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>
