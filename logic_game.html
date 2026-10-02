@@ -1039,12 +1039,61 @@
       z-index: 1001;
     }
 
+    /* DIFFICULTY PICKER */
+    .difficulty-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: #FFF;
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      box-shadow: var(--shadow-sm);
+      margin: 8px 0 4px;
+    }
+
+    .difficulty-label {
+      font-size: var(--font-title);
+      font-weight: 900;
+      color: #334155;
+    }
+
+    .diff-btn {
+      border: 3px solid #CBD5E1;
+      background: #F8FAFC;
+      color: #334155;
+      font-family: inherit;
+      font-size: var(--font-content);
+      font-weight: 800;
+      padding: 8px 18px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .diff-btn:hover { transform: translateY(-2px); }
+
+    .diff-btn.active {
+      background: #DCFCE7;
+      border-color: #10B981;
+      color: #065F46;
+      box-shadow: 0 3px 0 #10B981;
+    }
+
+    /* 一格裡有多個圖案（數量題）時縮小字級 */
+    .pattern-item.multi { width: auto; min-width: 76px; padding: 0 10px; font-size: 24px; }
+    .choice-btn.multi { width: auto; min-width: 80px; padding: 0 10px; font-size: 22px; }
+    .raven-cell.multi { font-size: 20px; }
+    .raven-opt-btn.multi { width: auto; min-width: 80px; padding: 0 8px; font-size: 20px; }
+
     /* RESPONSIVE */
     @media (max-width: 600px) {
       .brand-title { font-size: var(--font-title); }
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
+      .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
       .house-slot { width: 85px; min-height: 120px; }
       .house-content { width: 60px; height: 60px; font-size: 32px; }
       .animal-token { width: 56px; height: 56px; font-size: 30px; }
@@ -1116,6 +1165,14 @@
   <main>
     <!-- HUB / MAIN MENU -->
     <div id="view-menu">
+
+      <!-- DIFFICULTY PICKER -->
+      <div class="difficulty-bar">
+        <span class="difficulty-label">🎚️ 難度</span>
+        <button class="diff-btn" data-diff="easy" onclick="setDifficulty('easy')">🌱 簡單</button>
+        <button class="diff-btn" data-diff="normal" onclick="setDifficulty('normal')">🌿 普通</button>
+        <button class="diff-btn" data-diff="hard" onclick="setDifficulty('hard')">🌳 挑戰</button>
+      </div>
 
       <!-- SECTION 1: FOUNDATION LOGIC -->
       <div class="menu-section-header">
@@ -1565,6 +1622,7 @@
           }
         }
       }
+      updateDifficultyButtons();
     }
 
     function loadSavedProgress() {
@@ -1742,15 +1800,20 @@
       const view = document.getElementById(`view-${modName}`);
       if (view) view.classList.add('active');
 
-      if (modName === 'pattern') loadPatternLevel();
-      else if (modName === 'balance') loadBalanceLevel();
-      else if (modName === 'blocks') loadBlocksLevel();
-      else if (modName === 'maze') loadMazeLevel();
-      else if (modName === 'deduction') loadDeductionLevel();
-      else if (modName === 'folding') loadFoldingLevel();
-      else if (modName === 'gears') loadGearsLevel();
-      else if (modName === 'raven') loadRavenLevel();
+      roundSeen = new Set();
+      loadCurrentQuestion();
     }
+
+    const MODULE_LOADERS = {
+      pattern: loadPatternLevel,
+      balance: loadBalanceLevel,
+      blocks: loadBlocksLevel,
+      maze: loadMazeLevel,
+      deduction: loadDeductionLevel,
+      folding: loadFoldingLevel,
+      gears: loadGearsLevel,
+      raven: loadRavenLevel
+    };
 
     function speakCurrentPrompt() {
       let promptText = "";
@@ -1804,64 +1867,700 @@
       modal.classList.remove('active');
       currentLevel++;
 
-      if (currentModule === 'pattern') {
-        if (currentLevel < patternLevels.length) loadPatternLevel(); else goHome();
-      } else if (currentModule === 'balance') {
-        if (currentLevel < balanceLevels.length) loadBalanceLevel(); else goHome();
-      } else if (currentModule === 'blocks') {
-        if (currentLevel < blocksLevels.length) loadBlocksLevel(); else goHome();
-      } else if (currentModule === 'maze') {
-        if (currentLevel < mazeLevels.length) loadMazeLevel(); else goHome();
-      } else if (currentModule === 'deduction') {
-        if (currentLevel < deductionLevels.length) loadDeductionLevel(); else goHome();
-      } else if (currentModule === 'folding') {
-        if (currentLevel < foldingLevels.length) loadFoldingLevel(); else goHome();
-      } else if (currentModule === 'gears') {
-        if (currentLevel < gearsLevels.length) loadGearsLevel(); else goHome();
-      } else if (currentModule === 'raven') {
-        if (currentLevel < ravenLevels.length) loadRavenLevel(); else goHome();
-      }
+      if (currentLevel < ROUND_SIZE) loadCurrentQuestion(); else goHome();
     }
+
+    /* =========================================================
+       DIFFICULTY SELECTION (難度選擇：簡單 / 普通 / 挑戰)
+       每關題目都由下方的題目產生器依難度即時產生
+       ========================================================= */
+    const ROUND_SIZE = 5;
+    const DIFFICULTIES = {
+      easy:   { label: '簡單', icon: '🌱' },
+      normal: { label: '普通', icon: '🌿' },
+      hard:   { label: '挑戰', icon: '🌳' }
+    };
+
+    let currentQuestion = null;
+    let roundSeen = new Set();
+
+    function getDifficulty() {
+      return DIFFICULTIES[userProgress.difficulty] ? userProgress.difficulty : 'normal';
+    }
+
+    function setDifficulty(diff) {
+      if (!DIFFICULTIES[diff]) return;
+      soundClick();
+      userProgress.difficulty = diff;
+      saveToLocalStorage();
+      updateDifficultyButtons();
+      showToast(`${DIFFICULTIES[diff].icon} 難度切換為「${DIFFICULTIES[diff].label}」`);
+    }
+
+    function updateDifficultyButtons() {
+      const current = getDifficulty();
+      document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.diff === current);
+      });
+    }
+
+    function levelBadgeText() {
+      return `第 ${currentLevel + 1} / ${ROUND_SIZE} 關 · ${DIFFICULTIES[getDifficulty()].label}`;
+    }
+
+    function isLastQuestion() {
+      return currentLevel === ROUND_SIZE - 1;
+    }
+
+    // 同一輪避免出現一模一樣的題目
+    function generateQuestion(modName) {
+      const generator = QUESTION_GENERATORS[modName];
+      let question = generator(getDifficulty());
+      for (let i = 0; i < 30 && roundSeen.has(JSON.stringify(question)); i++) {
+        question = generator(getDifficulty());
+      }
+      roundSeen.add(JSON.stringify(question));
+      return question;
+    }
+
+    function loadCurrentQuestion() {
+      currentQuestion = generateQuestion(currentModule);
+      MODULE_LOADERS[currentModule]();
+    }
+
+    /* RANDOM HELPERS */
+    const randInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    const sample = (arr, n) => shuffle(arr).slice(0, n);
+
+    function makeOptions(answer, distractors, count = 4) {
+      const pool = [...new Set(distractors)].filter(d => d !== answer);
+      return shuffle([answer, ...shuffle(pool).slice(0, count - 1)]);
+    }
+
+    // 反覆產生直到符合條件；make() 回傳 null 代表這次不合格
+    function generateUntil(make, maxTries = 3000) {
+      for (let i = 0; i < maxTries; i++) {
+        const result = make();
+        if (result) return result;
+      }
+      throw new Error('Question generator gave up');
+    }
+
+    function permutations(n) {
+      if (n === 1) return [[0]];
+      const result = [];
+      permutations(n - 1).forEach(p => {
+        for (let i = 0; i <= p.length; i++) result.push([...p.slice(0, i), n - 1, ...p.slice(i)]);
+      });
+      return result;
+    }
+
+    /* --- 1. 規律魔法陣 --- */
+    const PATTERN_THEMES = [
+      ['🍎', '🍌', '🍇', '🍉', '🍓', '🍊'],
+      ['🐻', '🐰', '🐱', '🐶', '🐸', '🐼'],
+      ['🚗', '🚌', '⛵', '🚀', '🚲', '🚂'],
+      ['🌞', '🌛', '⭐', '⛄', '🌈', '🌂'],
+      ['🌸', '🌻', '🍀', '🍄', '🌵', '🌷']
+    ];
+    const PATTERN_RULES = {
+      easy:   ['AB', 'AAB', 'ABB'],
+      normal: ['ABC', 'AABB', 'ABAC', 'grow-up'],
+      hard:   ['ABCD', 'AABC', 'ABBC', 'grow-down', 'hidden-middle']
+    };
+
+    function genPattern(diff) {
+      const rule = pick(PATTERN_RULES[diff]);
+      const theme = pick(PATTERN_THEMES);
+      if (rule.startsWith('grow')) return genGrowPattern(rule, theme);
+
+      const hideMiddle = rule === 'hidden-middle';
+      const unit = hideMiddle ? pick(['ABC', 'AABB', 'ABCD']) : rule;
+      const letters = [...new Set(unit)];
+      const symbols = sample(theme, letters.length);
+      const total = unit.length === 2 ? 6 : unit.length * 2 + (hideMiddle ? 2 : 1);
+      const sequence = Array.from({ length: total }, (_, i) => symbols[letters.indexOf(unit[i % unit.length])]);
+      const hideIdx = hideMiddle ? randInt(unit.length, total - 2) : total - 1;
+      const answer = sequence[hideIdx];
+      sequence[hideIdx] = '?';
+
+      return {
+        prompt: hideMiddle
+          ? "隊伍中間有一位躲起來了！找出排隊的規律，問號是誰？"
+          : "看一看隊伍的排列規律，問號的地方應該是誰呢？",
+        sequence,
+        answer,
+        options: makeOptions(answer, [...symbols, ...sample(theme.filter(s => !symbols.includes(s)), 2)])
+      };
+    }
+
+    function genGrowPattern(rule, theme) {
+      const symbol = pick(theme);
+      const start = rule === 'grow-up' ? randInt(1, 2) : 5;
+      const step = rule === 'grow-up' ? 1 : -1;
+      const counts = [0, 1, 2, 3].map(i => start + step * i);
+      const answer = symbol.repeat(counts[3]);
+      const shown = counts.slice(0, 3);
+
+      return {
+        prompt: `數量${step > 0 ? '在長大' : '在變少'}唷：${shown.join(' 個、')} 個，後面要有幾個呢？`,
+        sequence: [...shown.map(n => symbol.repeat(n)), '?'],
+        answer,
+        options: makeOptions(answer, [1, 2, 3, 4, 5, 6].map(n => symbol.repeat(n))),
+        multi: true
+      };
+    }
+
+    /* --- 2. 神奇天平 --- */
+    const BALANCE_ITEMS = [
+      { e: '🍉', n: '西瓜', u: '個' }, { e: '🍍', n: '鳳梨', u: '個' }, { e: '🍎', n: '蘋果', u: '顆' },
+      { e: '🍓', n: '草莓', u: '顆' }, { e: '🍒', n: '櫻桃', u: '顆' }, { e: '🍌', n: '香蕉', u: '根' },
+      { e: '🥕', n: '胡蘿蔔', u: '根' }, { e: '🍬', n: '糖果', u: '顆' }, { e: '🐼', n: '熊貓', u: '隻' },
+      { e: '🐰', n: '小白兔', u: '隻' }, { e: '🐧', n: '企鵝', u: '隻' }, { e: '🦁', n: '小獅子', u: '隻' },
+      { e: '🐵', n: '小猴子', u: '隻' }
+    ];
+    const BALANCE_KINDS = {
+      easy:   ['multiply'],
+      normal: ['multiply', 'reverse'],
+      hard:   ['chain', 'chain-double', 'reverse']
+    };
+
+    function genBalance(diff) {
+      const kind = pick(BALANCE_KINDS[diff]);
+      const [A, B, C] = sample(BALANCE_ITEMS, 3);
+      const qty = (n, item) => `${n}${item.u}${item.n}`;
+      const ask = item => `等於幾${item.u}${item.n}？`;
+      let prompt, clues, targetLeft, targetItem, answer;
+
+      if (kind === 'multiply') {
+        const k = diff === 'easy' ? randInt(2, 3) : randInt(2, 4);
+        const m = diff === 'easy' ? 2 : (k === 4 ? 2 : randInt(2, 3));
+        prompt = `${qty(1, A)}跟${qty(k, B)}一樣重，那${qty(m, A)}${ask(B)}`;
+        clues = [{ left: A.e, right: B.e.repeat(k) }];
+        targetLeft = A.e.repeat(m);
+        targetItem = B;
+        answer = m * k;
+      } else if (kind === 'reverse') {
+        const [m, k] = pick([[2, 2], [2, 3], [3, 2]]);
+        prompt = `${qty(m, A)}跟${qty(m * k, B)}一樣重，那${qty(1, A)}${ask(B)}`;
+        clues = [{ left: A.e.repeat(m), right: B.e.repeat(m * k) }];
+        targetLeft = A.e;
+        targetItem = B;
+        answer = k;
+      } else {
+        const [k1, k2] = pick([[2, 2], [2, 3], [3, 2], [3, 3]]);
+        const m = kind === 'chain-double' && k1 * k2 <= 6 ? 2 : 1;
+        prompt = `${qty(1, A)}等於${qty(k1, B)}，${qty(1, B)}等於${qty(k2, C)}，那${qty(m, A)}${ask(C)}`;
+        clues = [{ left: A.e, right: B.e.repeat(k1) }, { left: B.e, right: C.e.repeat(k2) }];
+        targetLeft = A.e.repeat(m);
+        targetItem = C;
+        answer = m * k1 * k2;
+      }
+
+      const nearby = [-3, -2, -1, 1, 2, 3].map(d => answer + d).filter(n => n > 0);
+      return { prompt, clues, targetLeft, targetItem: targetItem.e, answer, options: makeOptions(answer, nearby).sort((a, b) => a - b) };
+    }
+
+    /* --- 3. 立體透視積木 --- */
+    const BLOCKS_RULES = {
+      easy:   { rows: 2, cols: 2, maxH: 2, total: [3, 6],   hidden: [0, 0], padMax: 12,
+                prompt: "數一數這裡有幾個木塊積木？" },
+      normal: { rows: 2, cols: 3, maxH: 3, total: [5, 10],  hidden: [0, 1], padMax: 12,
+                prompt: "有積木疊在上面喔！最下面支撐它的也要算進去唷！" },
+      hard:   { rows: 3, cols: 3, maxH: 3, total: [9, 15], hidden: [1, 3], padMax: 18,
+                prompt: "小心躲在背後的積木！開啟透視鏡可以幫你看清楚喔！" }
+    };
+
+    const BLOCK_SIZE = { tileWidth: 60, tileHeight: 34, blockHeight: 44 };
+
+    // 方塊在畫面上的位置（相對於原點），renderBlocks 與隱藏判斷共用
+    function blockScreenPos(r, c, z) {
+      return {
+        x: (c - r) * (BLOCK_SIZE.tileWidth / 2),
+        y: (c + r) * (BLOCK_SIZE.tileHeight / 2) - z * BLOCK_SIZE.blockHeight
+      };
+    }
+
+    function cubeOutline(x, y) {
+      const { tileWidth: tw, tileHeight: th, blockHeight: bh } = BLOCK_SIZE;
+      const hw = tw / 2, hh = th / 2;
+      return [[x, y - bh], [x + hw, y - bh + hh], [x + hw, y + hh], [x, y + th], [x - hw, y + hh], [x - hw, y - bh + hh]];
+    }
+
+    function insideConvex(poly, px, py) {
+      let sign = 0;
+      for (let i = 0; i < poly.length; i++) {
+        const [x1, y1] = poly[i];
+        const [x2, y2] = poly[(i + 1) % poly.length];
+        const cross = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
+        if (cross === 0) continue;
+        if (sign === 0) sign = Math.sign(cross);
+        else if (Math.sign(cross) !== sign) return false;
+      }
+      return true;
+    }
+
+    // 依繪圖順序（後畫的蓋住先畫的）在每個方塊上取樣，露出不到 20% 的算「被藏起來」
+    function countHiddenBlocks(grid) {
+      const cubes = [];
+      grid.forEach((row, r) => row.forEach((h, c) => {
+        for (let z = 0; z < h; z++) {
+          const p = blockScreenPos(r, c, z);
+          cubes.push(cubeOutline(p.x, p.y));
+        }
+      }));
+
+      let hidden = 0;
+      cubes.forEach((poly, idx) => {
+        const xs = poly.map(p => p[0]), ys = poly.map(p => p[1]);
+        const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+        const later = cubes.slice(idx + 1);
+        let total = 0, visible = 0;
+        for (let i = 1; i < 10; i++) {
+          for (let j = 1; j < 10; j++) {
+            const px = minX + (maxX - minX) * i / 10;
+            const py = minY + (maxY - minY) * j / 10;
+            if (!insideConvex(poly, px, py)) continue;
+            total++;
+            if (!later.some(other => insideConvex(other, px, py))) visible++;
+          }
+        }
+        if (visible / total < 0.2) hidden++;
+      });
+      return hidden;
+    }
+
+    function genBlocks(diff) {
+      const rule = BLOCKS_RULES[diff];
+      return generateUntil(() => {
+        const grid = Array.from({ length: rule.rows }, () =>
+          Array.from({ length: rule.cols }, () => randInt(0, rule.maxH)));
+        const total = grid.flat().reduce((a, b) => a + b, 0);
+        const hidden = countHiddenBlocks(grid);
+        if (total < rule.total[0] || total > rule.total[1]) return null;
+        if (hidden < rule.hidden[0] || hidden > rule.hidden[1]) return null;
+        if (grid[0][0] === 0 || grid.some(row => row.every(h => h === 0))) return null;
+        return { prompt: rule.prompt, grid, total, padMax: rule.padMax };
+      });
+    }
+
+    /* --- 4. 小機器人尋寶 --- */
+    const MAZE_RULES = {
+      easy:   { size: 4, obstacles: [2, 3],  steps: [3, 5],  turns: [0, 1],
+                prompt: "引導小機器人走到寶箱！" },
+      normal: { size: 5, obstacles: [4, 6],  steps: [5, 8],  turns: [2, 3],
+                prompt: "路上有大石頭，記得轉彎繞過去！" },
+      hard:   { size: 6, obstacles: [8, 11], steps: [8, 12], turns: [3, 6],
+                prompt: "大迷宮挑戰！規劃一條安全的路線走到寶箱！" }
+    };
+
+    // 回傳最短路線的步數，以及最短路線中最少的轉彎次數
+    function solveMaze(maze) {
+      const blocked = (r, c) => r < 0 || c < 0 || r >= maze.size || c >= maze.size ||
+        maze.obstacles.some(o => o.r === r && o.c === c);
+      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const reached = new Set([`${maze.start.r},${maze.start.c}`]);
+      let frontier = [{ r: maze.start.r, c: maze.start.c, d: -1, turns: 0 }];
+
+      for (let steps = 1; frontier.length; steps++) {
+        const next = new Map();
+        frontier.forEach(s => dirs.forEach(([dr, dc], d) => {
+          const r = s.r + dr, c = s.c + dc;
+          if (blocked(r, c) || reached.has(`${r},${c}`)) return;
+          const turns = s.turns + (s.d !== -1 && s.d !== d ? 1 : 0);
+          const key = `${r},${c},${d}`;
+          if (!next.has(key) || next.get(key).turns > turns) next.set(key, { r, c, d, turns });
+        }));
+        frontier = [...next.values()];
+        frontier.forEach(s => reached.add(`${s.r},${s.c}`));
+        const atGoal = frontier.filter(s => s.r === maze.goal.r && s.c === maze.goal.c);
+        if (atGoal.length) return { steps, turns: Math.min(...atGoal.map(s => s.turns)) };
+      }
+      return null;
+    }
+
+    function genMaze(diff) {
+      const rule = MAZE_RULES[diff];
+      const n = rule.size;
+      return generateUntil(() => {
+        const cells = shuffle(Array.from({ length: n * n }, (_, i) => ({ r: Math.floor(i / n), c: i % n })));
+        const [start, goal] = cells;
+        const obstacles = cells.slice(2, 2 + randInt(rule.obstacles[0], rule.obstacles[1]));
+        const maze = { prompt: rule.prompt, size: n, start, goal, obstacles };
+        const solved = solveMaze(maze);
+        if (!solved) return null;
+        if (solved.steps < rule.steps[0] || solved.steps > rule.steps[1]) return null;
+        if (solved.turns < rule.turns[0] || solved.turns > rule.turns[1]) return null;
+        return maze;
+      });
+    }
+
+    /* --- 5. 動物好友排排坐 --- */
+    const DEDUCTION_ANIMALS = [
+      { e: '🐰', n: '小白兔' }, { e: '🐻', n: '小熊' }, { e: '🐱', n: '小貓' }, { e: '🦊', n: '小狐狸' },
+      { e: '🐼', n: '熊貓' }, { e: '🦁', n: '小獅子' }, { e: '🐶', n: '小狗' }, { e: '🐵', n: '小猴子' },
+      { e: '🐸', n: '小青蛙' }, { e: '🐯', n: '小老虎' }, { e: '🐨', n: '無尾熊' }, { e: '🐧', n: '企鵝' },
+      { e: '🦒', n: '長頸鹿' }, { e: '🐘', n: '大象' }, { e: '🦔', n: '刺蝟' }
+    ];
+    const DEDUCTION_RULES = {
+      easy:   { houses: [3],    types: ['at', 'nextLeft', 'nextRight'], maxAt: 2, need: [] },
+      normal: { houses: [4],    types: ['at', 'nextLeft', 'nextRight', 'notAt'], maxAt: 2, need: ['nextLeft', 'nextRight'] },
+      hard:   { houses: [4, 5], types: ['at', 'nextLeft', 'nextRight', 'notAt', 'leftOf'], maxAt: 1, need: ['notAt', 'leftOf'] }
+    };
+
+    function deductionClueHolds(clue, pos) {
+      if (clue.type === 'at') return pos[clue.a] === clue.i;
+      if (clue.type === 'notAt') return pos[clue.a] !== clue.i;
+      if (clue.type === 'nextLeft') return pos[clue.a] === pos[clue.b] - 1;
+      if (clue.type === 'nextRight') return pos[clue.a] === pos[clue.b] + 1;
+      if (clue.type === 'leftOf') return pos[clue.a] < pos[clue.b];
+      return false;
+    }
+
+    function deductionClueText(clue, animals, n) {
+      const name = idx => `${animals[idx].n} ${animals[idx].e}`;
+      if (clue.type === 'at') {
+        const where = clue.i === 0 ? '最左邊的 ' : clue.i === n - 1 ? '最右邊的 ' : ' ';
+        return `${name(clue.a)} 住在${where}${clue.i + 1} 號房。`;
+      }
+      if (clue.type === 'notAt') return `${name(clue.a)} 不住在 ${clue.i + 1} 號房。`;
+      if (clue.type === 'nextLeft') return `${name(clue.a)} 住在${name(clue.b)} 的左邊隔壁。`;
+      if (clue.type === 'nextRight') return `${name(clue.a)} 住在${name(clue.b)} 的右邊隔壁。`;
+      return `${name(clue.a)} 住在${name(clue.b)} 左邊的某一間（不一定是隔壁）。`;
+    }
+
+    function genDeduction(diff) {
+      const rule = DEDUCTION_RULES[diff];
+      return generateUntil(() => {
+        const n = pick(rule.houses);
+        const animals = sample(DEDUCTION_ANIMALS, n);
+        const perms = permutations(n); // perm[動物] = 房間
+        const pos = pick(perms);
+
+        // 列出所有「真的」線索
+        const candidates = [];
+        for (let a = 0; a < n; a++) {
+          for (let b = 0; b < n; b++) {
+            if (a === b) continue;
+            if (pos[a] === pos[b] - 1) candidates.push({ type: 'nextLeft', a, b }, { type: 'nextRight', a: b, b: a });
+            if (pos[a] < pos[b] - 1) candidates.push({ type: 'leftOf', a, b });
+          }
+          candidates.push({ type: 'at', a, i: pos[a] });
+          for (let i = 0; i < n; i++) if (i !== pos[a]) candidates.push({ type: 'notAt', a, i });
+        }
+
+        const countSolutions = clues => perms.filter(p => clues.every(cl => deductionClueHolds(cl, p))).length;
+        let clues = [];
+        for (const clue of shuffle(candidates.filter(cl => rule.types.includes(cl.type)))) {
+          if (countSolutions([...clues, clue]) < countSolutions(clues)) clues.push(clue);
+          if (countSolutions(clues) === 1) break;
+        }
+        if (countSolutions(clues) !== 1) return null;
+        // 拿掉多餘的線索
+        for (const clue of shuffle(clues)) {
+          const rest = clues.filter(cl => cl !== clue);
+          if (countSolutions(rest) === 1) clues = rest;
+        }
+
+        if (clues.length > n) return null;
+        if (clues.filter(cl => cl.type === 'at').length > rule.maxAt) return null;
+        if (rule.need.length && !clues.some(cl => rule.need.includes(cl.type))) return null;
+
+        const solution = [];
+        pos.forEach((house, a) => { solution[house] = animals[a].e; });
+        return {
+          prompt: `${n} 位小動物要住進 ${n} 間房子，聽聽線索，猜猜誰住哪裡！`,
+          animals: animals.map(an => an.e),
+          houses: n,
+          clues: clues.map(cl => deductionClueText(cl, animals, n)),
+          solution
+        };
+      });
+    }
+
+    /* --- 6. 摺紙打孔透視 --- */
+    // 色紙座標 5~95，摺線在 50。每種摺法保留一半，展開時孔洞沿摺線鏡像
+    const FOLDS = {
+      up:    { text: '⬆️ 向上對摺', name: '向上對摺', axis: 'y', keep: { y1: 5, y2: 50 } },
+      down:  { text: '⬇️ 向下對摺', name: '向下對摺', axis: 'y', keep: { y1: 50, y2: 95 } },
+      right: { text: '➡️ 向右對摺', name: '向右對摺', axis: 'x', keep: { x1: 50, x2: 95 } },
+      left:  { text: '⬅️ 向左對摺', name: '向左對摺', axis: 'x', keep: { x1: 5, x2: 50 } }
+    };
+    const FOLDING_RULES = {
+      easy:   { folds: 1, holes: [1, 1], onFold: false },
+      normal: { folds: 2, holes: [1, 1], onFold: false },
+      hard:   { folds: 2, holes: [1, 2], onFold: true }
+    };
+
+    const dotKey = dots => dots.map(d => `${d.cx},${d.cy}`).sort().join('|');
+
+    function mirrorDots(dots, axes) {
+      let result = dots.slice();
+      axes.forEach(axis => {
+        result = result.concat(result.map(d => axis === 'x' ? { cx: 100 - d.cx, cy: d.cy } : { cx: d.cx, cy: 100 - d.cy }));
+      });
+      const seen = new Map();
+      result.forEach(d => seen.set(`${d.cx},${d.cy}`, d));
+      return [...seen.values()];
+    }
+
+    function genFolding(diff) {
+      const rule = FOLDING_RULES[diff];
+      return generateUntil(() => {
+        const foldNames = rule.folds === 1
+          ? [pick(Object.keys(FOLDS))]
+          : shuffle([pick(['up', 'down']), pick(['left', 'right'])]);
+        const region = { x1: 5, y1: 5, x2: 95, y2: 95 };
+        const steps = [{ text: '完整色紙', sheet: { ...region, layers: 1, dots: [] } }];
+        foldNames.forEach((f, i) => {
+          Object.assign(region, FOLDS[f].keep);
+          steps.push({ text: (i ? '再' : '') + FOLDS[f].text, sheet: { ...region, layers: i + 2, fold: f, dots: [] } });
+        });
+
+        // 打洞位置：遠離摺線的兩格 + (挑戰) 正好在摺線上
+        const spots = (lo, hi, folded) => {
+          if (!folded) return [lo + 10, 50, hi - 10];
+          const edge = lo === 50 ? lo : hi;
+          const inner = lo === 50 ? [65, 85] : [15, 35];
+          return rule.onFold ? [...inner, edge] : inner;
+        };
+        const axes = foldNames.map(f => FOLDS[f].axis);
+        const xs = spots(region.x1, region.x2, axes.includes('x'));
+        const ys = spots(region.y1, region.y2, axes.includes('y'));
+        const allSpots = xs.flatMap(cx => ys.map(cy => ({ cx, cy })));
+        const punched = sample(allSpots, randInt(rule.holes[0], rule.holes[1]));
+        // 兩個洞太近會黏在一起看不清楚
+        if (punched.length > 1 && Math.hypot(punched[0].cx - punched[1].cx, punched[0].cy - punched[1].cy) < 30) return null;
+        steps.push({ text: '在紅點打洞 ⭕', sheet: { ...region, layers: foldNames.length + 1, dots: punched } });
+
+        const answer = mirrorDots(punched, axes);
+        const wrongs = [
+          punched,
+          mirrorDots(punched, axes.length === 1 ? [axes[0] === 'x' ? 'y' : 'x'] : [axes[0]]),
+          mirrorDots(punched, axes.length === 1 ? ['x', 'y'] : [axes[1]]),
+          punched.map(d => ({ cx: 100 - d.cx, cy: 100 - d.cy })).concat(punched)
+        ];
+        const optionMap = new Map([[dotKey(answer), answer]]);
+        wrongs.forEach(w => { if (!optionMap.has(dotKey(w))) optionMap.set(dotKey(w), w); });
+        if (optionMap.size < 4) return null;
+
+        const options = shuffle([...optionMap.values()].slice(0, 4));
+        const answerIdx = options.findIndex(o => dotKey(o) === dotKey(answer));
+        const foldText = foldNames.length === 1
+          ? FOLDS[foldNames[0]].name
+          : `先${FOLDS[foldNames[0]].name}，再${FOLDS[foldNames[1]].name}`;
+        const merged = answer.length < punched.length * 2 ** axes.length;
+
+        return {
+          prompt: `把正方形色紙${foldText}，在紅點的位置打洞，展開後會是哪一個？`,
+          steps: steps.map(s => ({ text: s.text, sheet: s.sheet })),
+          options: options.map(dots => ({ dots })),
+          answerIdx,
+          explanation: (axes.length === 1
+            ? '對摺後紙有 2 層，打一次洞兩層都會穿過，展開時洞會沿著摺痕左右（上下）對稱出現！'
+            : '摺兩次後紙有 4 層，每一層都會被打穿，展開時孔洞會對稱分布在四個區塊！') +
+            (merged ? '打在摺痕上的洞，展開後會連成同一個洞喔！' : '')
+        };
+      });
+    }
+
+    /* --- 7. 齒輪連動 --- */
+    const GEARS_RULES = {
+      easy:   { count: [2, 3], sizes: [50],         turns: false, targetLast: true },
+      normal: { count: [3, 4], sizes: [35, 45, 55], turns: false, targetLast: false },
+      hard:   { count: [4, 6], sizes: [30, 40, 50], turns: true,  targetLast: false }
+    };
+    const GEAR_CANVAS = { w: 560, h: 260, margin: 30 };
+    const GEAR_GAP = 6; // 齒高 10，留一點間距讓齒咬合得比較清楚
+
+    function genGears(diff) {
+      const rule = GEARS_RULES[diff];
+      return generateUntil(() => {
+        const count = randInt(rule.count[0], rule.count[1]);
+        const gears = [];
+        let angle = 0;
+        for (let i = 0; i < count; i++) {
+          const r = pick(rule.sizes);
+          if (i === 0) {
+            gears.push({ x: 0, y: GEAR_CANVAS.h / 2, r });
+            continue;
+          }
+          const prev = gears[i - 1];
+          if (rule.turns) angle = pick([-45, -30, 0, 30, 45]) * Math.PI / 180;
+          const dist = prev.r + r + GEAR_GAP;
+          gears.push({ x: prev.x + Math.cos(angle) * dist, y: prev.y + Math.sin(angle) * dist, r });
+        }
+
+        // 水平置中，並檢查是否超出畫布、或不相鄰的齒輪互相卡住
+        const minX = Math.min(...gears.map(g => g.x - g.r));
+        const maxX = Math.max(...gears.map(g => g.x + g.r));
+        const shift = (GEAR_CANVAS.w - (maxX - minX)) / 2 - minX;
+        gears.forEach(g => { g.x = Math.round(g.x + shift); g.y = Math.round(g.y); });
+        const m = GEAR_CANVAS.margin;
+        if (gears.some(g => g.x - g.r < m || g.x + g.r > GEAR_CANVAS.w - m || g.y - g.r < m || g.y + g.r > GEAR_CANVAS.h - m)) return null;
+        for (let i = 0; i < count; i++) {
+          for (let j = i + 2; j < count; j++) {
+            if (Math.hypot(gears[i].x - gears[j].x, gears[i].y - gears[j].y) < gears[i].r + gears[j].r + 24) return null;
+          }
+        }
+
+        const target = rule.targetLast ? count - 1 : randInt(Math.max(1, count - 3), count - 1);
+        const meshes = target;
+        const sameDir = meshes % 2 === 0;
+        return {
+          prompt: `齒輪 1 順時針轉 (↷)，標記 ★ 的齒輪 ${target + 1} 會往哪個方向轉？`,
+          gears: gears.map((g, i) => ({
+            x: g.x, y: g.y, r: g.r, teeth: Math.round(g.r / 5),
+            dir: i % 2 === 0 ? 1 : -1,
+            label: `${i + 1}${i === target ? ' ★' : ''}`
+          })),
+          targetGearIndex: target,
+          answer: sameDir ? 'cw' : 'ccw',
+          rule: `每咬合一次，方向就換一次！齒輪 1 到齒輪 ${target + 1} 換了 ${meshes} 次，` +
+            `所以${sameDir ? '跟齒輪 1 一樣是順時針' : '跟齒輪 1 相反，是逆時針'}！`
+        };
+      });
+    }
+
+    /* --- 8. 瑞文氏九宮矩陣 --- */
+    const RAVEN_SHAPES = {
+      circle: { red: '🔴', green: '🟢', yellow: '🟡', blue: '🔵', purple: '🟣', orange: '🟠' },
+      square: { red: '🟥', green: '🟩', yellow: '🟨', blue: '🟦', purple: '🟪', orange: '🟧' },
+      heart:  { red: '❤️', green: '💚', yellow: '💛', blue: '💙', purple: '💜', orange: '🧡' }
+    };
+    const RAVEN_SHAPE_NAMES = { circle: '圓形', square: '正方形', heart: '愛心' };
+    const RAVEN_COLOR_NAMES = { red: '紅色', green: '綠色', yellow: '黃色', blue: '藍色', purple: '紫色', orange: '橘色' };
+    const RAVEN_SYMBOL_SETS = [['🔵', '🔺', '🟩'], ['🍎', '🍌', '🍇'], ['🐶', '🐱', '🐰'], ['⭐', '🌛', '🌞']];
+    const RAVEN_EXTRA_SYMBOLS = ['🍓', '🐸', '🌈', '🔶'];
+    const ARROWS = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'];
+    const RAVEN_KINDS = {
+      easy:   ['latin', 'count'],
+      normal: ['shape-color', 'rotate', 'latin-anywhere'],
+      hard:   ['mixing', 'latin-color', 'rotate-45']
+    };
+
+    function randomLatinSquare() {
+      const rows = shuffle([0, 1, 2]);
+      const cols = shuffle([0, 1, 2]);
+      return rows.map(r => cols.map(c => (r + c) % 3));
+    }
+
+    function ravenQuestion(grid, hideIdx, wrongs, prompt, rule, multi = false) {
+      const answer = grid[hideIdx];
+      const cells = grid.slice();
+      cells[hideIdx] = '?';
+      return { prompt, grid: cells, answer, options: makeOptions(answer, wrongs), rule, multi };
+    }
+
+    function genRaven(diff) {
+      const kind = pick(RAVEN_KINDS[diff]);
+      const lastIdx = 8;
+
+      if (kind === 'latin' || kind === 'latin-anywhere') {
+        const symbols = pick(RAVEN_SYMBOL_SETS);
+        const grid = randomLatinSquare().flat().map(i => symbols[i]);
+        return ravenQuestion(grid, kind === 'latin' ? lastIdx : randInt(0, 8),
+          [...symbols, pick(RAVEN_EXTRA_SYMBOLS)],
+          "【九宮格】：每一橫排、每一直排，三種圖案都剛好出現一次！問號是誰？",
+          "每一橫排和直排，三種圖案都剛好出現一次，所以問號就是還沒出現的那一個！");
+      }
+
+      if (kind === 'count') {
+        const fruits = sample(['🍎', '🍌', '🍓', '🍇', '🍊', '🍒'], 4);
+        const counts = Math.random() < 0.5 ? [1, 2, 3] : [3, 2, 1];
+        const grid = [0, 1, 2].flatMap(r => counts.map(n => fruits[r].repeat(n)));
+        const answerCount = counts[2];
+        return ravenQuestion(grid, lastIdx,
+          [1, 2, 3].map(n => fruits[2].repeat(n)).concat(fruits[3].repeat(answerCount), fruits[1].repeat(answerCount)),
+          "【數量矩陣】：看一看每格裡水果的數量怎麼變化！",
+          `每一橫排的數量都是 ${counts.join('、')} 個，所以問號處有 ${answerCount} 個！`, true);
+      }
+
+      if (kind === 'shape-color' || kind === 'latin-color') {
+        const shapes = sample(Object.keys(RAVEN_SHAPES), 3);
+        const colors = sample(Object.keys(RAVEN_COLOR_NAMES), 3);
+        const latin = randomLatinSquare();
+        const transposed = Math.random() < 0.5;
+        const grid = [];
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            const shape = kind === 'latin-color' ? shapes[latin[r][c]] : shapes[transposed ? c : r];
+            grid.push(RAVEN_SHAPES[shape][colors[transposed ? r : c]]);
+          }
+        }
+        const hideIdx = kind === 'latin-color' ? randInt(0, 8) : lastIdx;
+        const hideShape = Object.keys(RAVEN_SHAPES).find(s => Object.values(RAVEN_SHAPES[s]).includes(grid[hideIdx]));
+        const hideColor = colors[transposed ? Math.floor(hideIdx / 3) : hideIdx % 3];
+        const otherShapes = shapes.filter(s => s !== hideShape);
+        const otherColors = Object.keys(RAVEN_COLOR_NAMES).filter(c => c !== hideColor);
+        const wrongs = [
+          ...otherShapes.map(s => RAVEN_SHAPES[s][hideColor]),
+          ...sample(otherColors, 2).map(c => RAVEN_SHAPES[hideShape][c])
+        ];
+        const lineA = transposed ? '橫排' : '直排';
+        const lineB = transposed ? '直排' : '橫排';
+        return kind === 'latin-color'
+          ? ravenQuestion(grid, hideIdx, wrongs,
+              "【雙重規律】：仔細看形狀和顏色，各有什麼規律？問號是誰？",
+              `${lineA}的顏色都一樣，而每一橫排、直排的三種形狀都剛好出現一次！答案是${RAVEN_COLOR_NAMES[hideColor]}的${RAVEN_SHAPE_NAMES[hideShape]}！`)
+          : ravenQuestion(grid, hideIdx, wrongs,
+              `【顏色與形狀】：${lineB}形狀相同，${lineA}顏色相同！問號是誰？`,
+              `問號在${RAVEN_SHAPE_NAMES[hideShape]}的那一排、${RAVEN_COLOR_NAMES[hideColor]}的那一排，所以是${RAVEN_COLOR_NAMES[hideColor]}的${RAVEN_SHAPE_NAMES[hideShape]}！`);
+      }
+
+      if (kind === 'rotate' || kind === 'rotate-45') {
+        const colStep = (kind === 'rotate' ? 2 : 1) * (Math.random() < 0.5 ? 1 : -1);
+        const start = randInt(0, 3) * 2;
+        const grid = [0, 1, 2].flatMap(r => [0, 1, 2].map(c => ARROWS[(start + 2 * r + colStep * c + 16) % 8]));
+        const turn = colStep > 0 ? '順時針' : '逆時針';
+        const degrees = Math.abs(colStep) * 45;
+        return ravenQuestion(grid, lastIdx, ARROWS,
+          kind === 'rotate'
+            ? `【方向旋轉】：箭頭每往右一格，就${turn}轉 90 度！問號是哪個箭頭？`
+            : "【旋轉挑戰】：箭頭每往右一格，都轉一樣的角度！問號是哪個箭頭？",
+          `箭頭每往右一格就${turn}轉 ${degrees} 度，所以答案是 ${grid[lastIdx]}！`);
+      }
+
+      // mixing：紅＋藍＝紫、藍＋黃＝綠、紅＋黃＝橘
+      const mixes = shuffle([['red', 'blue', 'purple'], ['blue', 'yellow', 'green'], ['red', 'yellow', 'orange']])
+        .map(mix => Math.random() < 0.5 ? mix : [mix[1], mix[0], mix[2]]);
+      const shape = pick(Object.keys(RAVEN_SHAPES));
+      const grid = mixes.flat().map(color => RAVEN_SHAPES[shape][color]);
+      const last = mixes[2];
+      return ravenQuestion(grid, lastIdx, ['purple', 'green', 'orange', 'red', 'blue', 'yellow'].map(c => RAVEN_SHAPES[shape][c]),
+        "【色彩混合】：每一橫排，第 1 格顏色 ＋ 第 2 格顏色 ＝ 第 3 格！問號是誰？",
+        `三原色混合：紅＋藍＝紫、藍＋黃＝綠、紅＋黃＝橘！所以${RAVEN_COLOR_NAMES[last[0]]}＋${RAVEN_COLOR_NAMES[last[1]]}＝${RAVEN_COLOR_NAMES[last[2]]}！`);
+    }
+
+    const QUESTION_GENERATORS = {
+      pattern: genPattern,
+      balance: genBalance,
+      blocks: genBlocks,
+      maze: genMaze,
+      deduction: genDeduction,
+      folding: genFolding,
+      gears: genGears,
+      raven: genRaven
+    };
 
     /* =========================================================
        MODULE 1: PATTERN MAGIC (規律魔法陣)
        ========================================================= */
-    const patternLevels = [
-      {
-        prompt: "看一看小動物隊伍：紅蘋果、香蕉、紅蘋果、香蕉，下一個是誰？",
-        sequence: ["🍎", "🍌", "🍎", "🍌", "🍎", "?"],
-        answer: "🍌",
-        options: ["🍌", "🍎", "🍇", "🍉"]
-      },
-      {
-        prompt: "兩隻小熊、一顆星星、兩隻小熊、一顆星星，接著應該是什麼？",
-        sequence: ["🐻", "🐻", "⭐", "🐻", "🐻", "?"],
-        answer: "⭐",
-        options: ["🐻", "⭐", "🐰", "🎈"]
-      },
-      {
-        prompt: "彩虹三重奏：小車、飛機、帆船，小車、飛機，問號處是？",
-        sequence: ["🚗", "✈️", "⛵", "🚗", "✈️", "?"],
-        answer: "⛵",
-        options: ["🚗", "⛵", "🚀", "✈️"]
-      },
-      {
-        prompt: "數量在長大唷：1朵花、2朵花、3朵花，後面要有幾朵花呢？",
-        sequence: ["🌸", "🌸🌸", "🌸🌸🌸", "?"],
-        answer: "🌸🌸🌸🌸",
-        options: ["🌸🌸", "🌸🌸🌸🌸", "🌸🌸🌸🌸🌸", "🌸"]
-      },
-      {
-        prompt: "綜合大挑戰：太陽、月亮、星星、太陽、月亮、問號、太陽！",
-        sequence: ["☀️", "🌙", "⭐", "☀️", "🌙", "?", "☀️"],
-        answer: "⭐",
-        options: ["☀️", "🌙", "⭐", "☁️"]
-      }
-    ];
-
+    
     function loadPatternLevel() {
-      const data = patternLevels[currentLevel];
-      document.getElementById('patternLevelBadge').textContent = `第 ${currentLevel + 1} / ${patternLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('patternLevelBadge').textContent = levelBadgeText();
       document.getElementById('patternPrompt').textContent = data.prompt;
 
       const track = document.getElementById('patternTrack');
@@ -1874,7 +2573,7 @@
           track.appendChild(target);
         } else {
           const el = document.createElement('div');
-          el.className = 'pattern-item';
+          el.className = data.multi ? 'pattern-item multi' : 'pattern-item';
           el.textContent = item;
           track.appendChild(el);
         }
@@ -1884,7 +2583,7 @@
       optsContainer.innerHTML = "";
       data.options.forEach(opt => {
         const btn = document.createElement('button');
-        btn.className = 'choice-btn';
+        btn.className = data.multi ? 'choice-btn multi' : 'choice-btn';
         btn.textContent = opt;
         btn.onclick = () => checkPatternChoice(opt, data.answer);
         optsContainer.appendChild(btn);
@@ -1901,7 +2600,7 @@
           target.style.borderColor = '#10B981';
           target.style.color = '#10B981';
         }
-        triggerVictory("規律破解成功！", "你敏銳的觀察力找到了圖形的秩序！", currentLevel === patternLevels.length - 1);
+        triggerVictory("規律破解成功！", "你敏銳的觀察力找到了圖形的秩序！", isLastQuestion());
       } else {
         soundError();
         speakText("再看仔細一點唷！想想看前面圖案的排隊規律是什麼！");
@@ -1911,58 +2610,10 @@
     /* =========================================================
        MODULE 2: BALANCE SCALE (神奇天平)
        ========================================================= */
-    const balanceLevels = [
-      {
-        prompt: "1個西瓜跟2個鳳梨一樣重，那2個西瓜等於幾個鳳梨？",
-        clues: [{ left: "🍉", right: "🍍🍍" }],
-        targetLeft: "🍉🍉",
-        targetItem: "🍍",
-        answer: 4,
-        options: [2, 3, 4, 5]
-      },
-      {
-        prompt: "1隻可愛企鵝等於3顆糖果，那2隻企鵝可以換幾顆糖果？",
-        clues: [{ left: "🐧", right: "🍬🍬🍬" }],
-        targetLeft: "🐧🐧",
-        targetItem: "🍬",
-        answer: 6,
-        options: [4, 5, 6, 8]
-      },
-      {
-        prompt: "大熊貓等於2隻小白兔，1隻小白兔等於2根胡蘿蔔，那1隻大熊貓等於幾根胡蘿蔔？",
-        clues: [
-          { left: "🐼", right: "🐰🐰" },
-          { left: "🐰", right: "🥕🥕" }
-        ],
-        targetLeft: "🐼",
-        targetItem: "🥕",
-        answer: 4,
-        options: [2, 3, 4, 6]
-      },
-      {
-        prompt: "小獅子等於2隻小猴子，1隻小猴子等於3根香蕉，那1隻小獅子等於幾根香蕉？",
-        clues: [
-          { left: "🦁", right: "🐵🐵" },
-          { left: "🐵", right: "🍌🍌🍌" }
-        ],
-        targetLeft: "🦁",
-        targetItem: "🍌",
-        answer: 6,
-        options: [4, 5, 6, 8]
-      },
-      {
-        prompt: "2顆草莓等於4顆櫻桃，那1顆草莓等於幾顆櫻桃呢？",
-        clues: [{ left: "🍓🍓", right: "🍒🍒🍒🍒" }],
-        targetLeft: "🍓",
-        targetItem: "🍒",
-        answer: 2,
-        options: [1, 2, 3, 4]
-      }
-    ];
-
+    
     function loadBalanceLevel() {
-      const data = balanceLevels[currentLevel];
-      document.getElementById('balanceLevelBadge').textContent = `第 ${currentLevel + 1} / ${balanceLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('balanceLevelBadge').textContent = levelBadgeText();
       document.getElementById('balancePrompt').textContent = data.prompt;
 
       const cluesContainer = document.getElementById('balanceClues');
@@ -2003,7 +2654,7 @@
 
     function checkBalanceChoice(chosen, answer) {
       if (chosen === answer) {
-        triggerVictory("智慧代換大師！", `答對了！就是 ${answer} 個！你懂得用代換方法解決難題！`, currentLevel === balanceLevels.length - 1);
+        triggerVictory("智慧代換大師！", `答對了！就是 ${answer} 個！你懂得用代換方法解決難題！`, isLastQuestion());
       } else {
         soundError();
         speakText("想一想，一個可以換幾個？再加在一起算算看！");
@@ -2013,50 +2664,7 @@
     /* =========================================================
        MODULE 3: 3D BLOCKS (立體透視積木)
        ========================================================= */
-    const blocksLevels = [
-      {
-        prompt: "數一數這裡有幾個木塊積木？",
-        grid: [
-          [1, 1],
-          [1, 0]
-        ],
-        total: 3
-      },
-      {
-        prompt: "有積木疊在上面喔！最下面支撐它的也要算進去唷！",
-        grid: [
-          [2, 1],
-          [1, 1]
-        ],
-        total: 5
-      },
-      {
-        prompt: "立體城堡蓋得更高了！數數看一共有幾個積木？",
-        grid: [
-          [3, 1],
-          [2, 0]
-        ],
-        total: 6
-      },
-      {
-        prompt: "小心躲在背後的積木！開啟透視鏡可以幫你看清楚喔！",
-        grid: [
-          [1, 2, 1],
-          [2, 1, 0]
-        ],
-        total: 7
-      },
-      {
-        prompt: "終極透視挑戰！數出這座大城堡到底由幾塊積木組成？",
-        grid: [
-          [3, 2, 1],
-          [2, 1, 1],
-          [1, 0, 0]
-        ],
-        total: 11
-      }
-    ];
-
+    
     let xrayMode = false;
 
     function toggleXray() {
@@ -2080,15 +2688,15 @@
       btn.textContent = "👓 開啟透視鏡";
       btn.style.background = "#6366F1";
 
-      const data = blocksLevels[currentLevel];
-      document.getElementById('blocksLevelBadge').textContent = `第 ${currentLevel + 1} / ${blocksLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('blocksLevelBadge').textContent = levelBadgeText();
       document.getElementById('blocksPrompt').textContent = data.prompt;
 
       renderBlocks();
 
       const pad = document.getElementById('blocksPad');
       pad.innerHTML = "";
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= data.padMax; i++) {
         const nBtn = document.createElement('button');
         nBtn.className = 'num-btn';
         nBtn.textContent = i;
@@ -2104,13 +2712,11 @@
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const grid = blocksLevels[currentLevel].grid;
+      const grid = currentQuestion.grid;
       const rows = grid.length;
       const cols = grid[0].length;
 
-      const tileWidth = 60;
-      const tileHeight = 34;
-      const blockHeight = 44;
+      const { tileWidth, tileHeight, blockHeight } = BLOCK_SIZE;
 
       const originX = canvas.width / 2;
       const originY = 190;
@@ -2119,9 +2725,8 @@
         for (let c = 0; c < cols; c++) {
           const height = grid[r][c];
           for (let z = 0; z < height; z++) {
-            const isoX = originX + (c - r) * (tileWidth / 2);
-            const isoY = originY + (c + r) * (tileHeight / 2) - z * blockHeight;
-            drawIsoCube(ctx, isoX, isoY, tileWidth, tileHeight, blockHeight, xrayMode);
+            const pos = blockScreenPos(r, c, z);
+            drawIsoCube(ctx, originX + pos.x, originY + pos.y, tileWidth, tileHeight, blockHeight, xrayMode);
           }
         }
       }
@@ -2169,7 +2774,7 @@
 
     function checkBlocksAnswer(chosen, total) {
       if (chosen === total) {
-        triggerVictory("透視大師！答對了！", `總共確實是 ${total} 個積木！你連躲在底部的都算到了！`, currentLevel === blocksLevels.length - 1);
+        triggerVictory("透視大師！答對了！", `總共確實是 ${total} 個積木！你連躲在底部的都算到了！`, isLastQuestion());
       } else {
         soundError();
         speakText(chosen < total ? "不只這些喔！底層有被壓在下面的積木，打開透視鏡看看！" : "比這個少一點點喔，再數一次試試看！");
@@ -2179,52 +2784,7 @@
     /* =========================================================
        MODULE 4: ROBOT CODING MAZE (小機器人尋寶)
        ========================================================= */
-    const mazeLevels = [
-      {
-        prompt: "引導小機器人向前走拿到寶箱！",
-        size: 4,
-        start: { r: 1, c: 0 },
-        goal: { r: 1, c: 3 },
-        obstacles: [{ r: 0, c: 1 }, { r: 2, c: 2 }]
-      },
-      {
-        prompt: "中間有一條小河擋住了！必須轉彎繞過它！",
-        size: 4,
-        start: { r: 0, c: 0 },
-        goal: { r: 2, c: 2 },
-        obstacles: [{ r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 2 }]
-      },
-      {
-        prompt: "大石頭擋住直通的路了，請規劃一條安全的路線！",
-        size: 5,
-        start: { r: 0, c: 0 },
-        goal: { r: 4, c: 4 },
-        obstacles: [
-          { r: 0, c: 2 }, { r: 1, c: 2 }, { r: 2, c: 2 },
-          { r: 2, c: 3 }, { r: 4, c: 2 }
-        ]
-      },
-      {
-        prompt: "迷宮轉彎考驗：小心水塘，按順序走到金幣寶箱！",
-        size: 5,
-        start: { r: 4, c: 0 },
-        goal: { r: 0, c: 4 },
-        obstacles: [
-          { r: 3, c: 1 }, { r: 3, c: 2 }, { r: 1, c: 3 }, { r: 2, c: 3 }
-        ]
-      },
-      {
-        prompt: "終極演算法迷宮！用最聰明的路線奪得最終大寶箱！",
-        size: 5,
-        start: { r: 0, c: 0 },
-        goal: { r: 4, c: 2 },
-        obstacles: [
-          { r: 0, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 3 },
-          { r: 2, c: 3 }, { r: 3, c: 1 }, { r: 3, c: 2 }
-        ]
-      }
-    ];
-
+    
     let currentCommands = [];
     let robotPos = { r: 0, c: 0 };
     let mazeTimer = null;
@@ -2234,10 +2794,10 @@
       if (mazeTimer) clearInterval(mazeTimer);
       isRunningMaze = false;
       currentCommands = [];
-      const data = mazeLevels[currentLevel];
+      const data = currentQuestion;
       robotPos = { ...data.start };
 
-      document.getElementById('mazeLevelBadge').textContent = `第 ${currentLevel + 1} / ${mazeLevels.length} 關`;
+      document.getElementById('mazeLevelBadge').textContent = levelBadgeText();
       document.getElementById('mazePrompt').textContent = data.prompt;
       document.getElementById('btnRunCode').disabled = false;
 
@@ -2247,9 +2807,10 @@
     }
 
     function renderMazeGrid() {
-      const data = mazeLevels[currentLevel];
+      const data = currentQuestion;
       const board = document.getElementById('mazeBoard');
       board.style.gridTemplateColumns = `repeat(${data.size}, 1fr)`;
+      board.classList.toggle('compact', data.size >= 6);
       board.innerHTML = "";
 
       for (let r = 0; r < data.size; r++) {
@@ -2296,7 +2857,7 @@
       if (isRunningMaze) return;
       soundClick();
       currentCommands = [];
-      const data = mazeLevels[currentLevel];
+      const data = currentQuestion;
       robotPos = { ...data.start };
       renderMazeGrid();
       updateCommandUI();
@@ -2339,7 +2900,7 @@
 
       isRunningMaze = true;
       document.getElementById('btnRunCode').disabled = true;
-      const data = mazeLevels[currentLevel];
+      const data = currentQuestion;
       robotPos = { ...data.start };
       renderMazeGrid();
 
@@ -2384,9 +2945,9 @@
     }
 
     function checkMazeResult() {
-      const data = mazeLevels[currentLevel];
+      const data = currentQuestion;
       if (robotPos.r === data.goal.r && robotPos.c === data.goal.c) {
-        triggerVictory("恭喜奪得寶藏！", "你的程式演算法指令非常精準！成功帶領機器人過關！", currentLevel === mazeLevels.length - 1);
+        triggerVictory("恭喜奪得寶藏！", "你的程式演算法指令非常精準！成功帶領機器人過關！", isLastQuestion());
       } else {
         soundError();
         speakText("機器人還沒走到寶箱位置喔，路線還差幾步，加油！");
@@ -2396,71 +2957,16 @@
     /* =========================================================
        MODULE 5: DEDUCTION HOUSE (動物好友排排坐)
        ========================================================= */
-    const deductionLevels = [
-      {
-        prompt: "3位小動物住進3棟房子，聽聽看誰住哪裡！",
-        animals: ["🐰", "🐻", "🐱"],
-        houses: 3,
-        clues: [
-          "小白兔 🐰 住在最左邊的 1 號房。",
-          "小黑熊 🐻 住在最右邊的 3 號房。"
-        ],
-        solution: ["🐰", "🐱", "🐻"]
-      },
-      {
-        prompt: "小狐狸、小貓熊與小獅子正在選房間！",
-        animals: ["🦊", "🐼", "🦁"],
-        houses: 3,
-        clues: [
-          "小獅子 🦁 住在中間的 2 號房。",
-          "小狐狸 🦊 住在小獅子的右邊。"
-        ],
-        solution: ["🐼", "🦁", "🦊"]
-      },
-      {
-        prompt: "4間房子的大挑戰！仔細閱讀左右鄰居的關係！",
-        animals: ["🐶", "🐵", "🐸", "🐰"],
-        houses: 4,
-        clues: [
-          "小青蛙 🐸 住在最右邊的 4 號房。",
-          "小狗 🐶 住在小青蛙的左邊鄰居 (3號房)。",
-          "小兔子 🐰 住在最左邊的 1 號房。"
-        ],
-        solution: ["🐰", "🐵", "🐶", "🐸"]
-      },
-      {
-        prompt: "邏輯排除推理：誰不喜歡住在哪裡？",
-        animals: ["🐯", "🐨", "🐧", "🦄"],
-        houses: 4,
-        clues: [
-          "獨角獸 🦄 住在 1 號房。",
-          "無尾熊 🐨 住在 4 號房。",
-          "小老虎 🐯 不住在 2 號房。"
-        ],
-        solution: ["🦄", "🐧", "🐯", "🐨"]
-      },
-      {
-        prompt: "終極大偵探！結合所有線索推理出所有小動物的位置！",
-        animals: ["🐘", "🦒", "🦓", "🦔"],
-        houses: 4,
-        clues: [
-          "長頸鹿 🦒 住在 2 號房。",
-          "刺蝟 🦔 住在長頸鹿的左邊鄰居。",
-          "大象 🐘 住在最右邊的 4 號房。"
-        ],
-        solution: ["🦔", "🦒", "🦓", "🐘"]
-      }
-    ];
-
+    
     let deductionPlacements = [];
     let selectedAnimal = null;
 
     function loadDeductionLevel() {
-      const data = deductionLevels[currentLevel];
+      const data = currentQuestion;
       deductionPlacements = new Array(data.houses).fill(null);
       selectedAnimal = null;
 
-      document.getElementById('deductionLevelBadge').textContent = `第 ${currentLevel + 1} / ${deductionLevels.length} 關`;
+      document.getElementById('deductionLevelBadge').textContent = levelBadgeText();
       document.getElementById('deductionPrompt').textContent = data.prompt;
 
       const cluesList = document.getElementById('deductionClues');
@@ -2478,7 +2984,7 @@
     }
 
     function renderDeductionHouses() {
-      const data = deductionLevels[currentLevel];
+      const data = currentQuestion;
       const housesGrid = document.getElementById('deductionHouses');
       housesGrid.innerHTML = "";
 
@@ -2507,7 +3013,7 @@
     }
 
     function renderDeductionBank() {
-      const data = deductionLevels[currentLevel];
+      const data = currentQuestion;
       const bank = document.getElementById('deductionBank');
       bank.innerHTML = "";
 
@@ -2550,7 +3056,7 @@
     }
 
     function checkDeductionAnswer() {
-      const data = deductionLevels[currentLevel];
+      const data = currentQuestion;
       if (deductionPlacements.some(p => p === null)) {
         soundError();
         speakText("還有房間空著唷！請把所有小動物都安排好房間！");
@@ -2566,7 +3072,7 @@
       }
 
       if (isCorrect) {
-        triggerVictory("推理大偵探過關！", "太厲害了！你完全破解了所有線索，安排得一清二楚！", currentLevel === deductionLevels.length - 1);
+        triggerVictory("推理大偵探過關！", "太厲害了！你完全破解了所有線索，安排得一清二楚！", isLastQuestion());
       } else {
         soundError();
         speakText("好像有小動物走錯房間囉！再對照一次上面的偵探線索看看！");
@@ -2576,95 +3082,28 @@
     /* =========================================================
        MODULE 6: PAPER FOLDING & PUNCH (摺紙打孔透視 - 資優題型)
        ========================================================= */
-    const foldingLevels = [
-      {
-        prompt: "將正方形色紙【向上對摺】成一半，在頂端打一個圓孔，展開後會是？",
-        steps: [
-          { text: "完整色紙", visual: "full" },
-          { text: "⬆️ 向上對摺", visual: "fold-up" },
-          { text: "頂部打孔 ⭕", visual: "punched-top" }
-        ],
-        options: [
-          { dots: [{ cx: 50, cy: 15 }, { cx: 50, cy: 85 }] },
-          { dots: [{ cx: 50, cy: 15 }] },
-          { dots: [{ cx: 15, cy: 50 }, { cx: 85, cy: 50 }] },
-          { dots: [{ cx: 50, cy: 50 }] }
-        ],
-        answerIdx: 0,
-        explanation: "因為紙張由下往上對摺，在頂部打洞展開後，上下會有一對對稱的圓孔！"
-      },
-      {
-        prompt: "將正方形色紙【向右對摺】成一半，在右下角剪一個洞，展開後會是？",
-        steps: [
-          { text: "完整色紙", visual: "full" },
-          { text: "➡️ 向右對摺", visual: "fold-right" },
-          { text: "右下角剪孔 ⭕", visual: "punched-br" }
-        ],
-        options: [
-          { dots: [{ cx: 85, cy: 85 }] },
-          { dots: [{ cx: 15, cy: 85 }, { cx: 85, cy: 85 }] },
-          { dots: [{ cx: 85, cy: 15 }, { cx: 85, cy: 85 }] },
-          { dots: [{ cx: 50, cy: 50 }] }
-        ],
-        answerIdx: 1,
-        explanation: "向右摺疊後在角落打洞，展開後左右兩邊角落會各出現一個洞！"
-      },
-      {
-        prompt: "【雙重摺疊】：向上對摺，再向右對摺成四分之一，在中心角打洞，展開後是？",
-        steps: [
-          { text: "完整色紙", visual: "full" },
-          { text: "⬆️ 向上摺", visual: "fold-up" },
-          { text: "➡️ 再向右摺", visual: "fold-quarter" },
-          { text: "中心角打孔 ⭐", visual: "punched-center-corner" }
-        ],
-        options: [
-          { dots: [{ cx: 50, cy: 50 }] },
-          { dots: [{ cx: 20, cy: 20 }, { cx: 80, cy: 20 }, { cx: 20, cy: 80 }, { cx: 80, cy: 80 }] },
-          { dots: [{ cx: 50, cy: 20 }, { cx: 50, cy: 80 }] },
-          { dots: [{ cx: 20, cy: 50 }, { cx: 80, cy: 50 }] }
-        ],
-        answerIdx: 0,
-        explanation: "四層紙的中心角正是整張大色紙的「正中心點」，所以展開後會在中心形成一個大孔洞！"
-      },
-      {
-        prompt: "向上對摺，再向右對摺，在【外側右上角】打洞，展開後會是？",
-        steps: [
-          { text: "完整色紙", visual: "full" },
-          { text: "⬆️ 向上摺", visual: "fold-up" },
-          { text: "➡️ 再向右摺", visual: "fold-quarter" },
-          { text: "外側角打孔 ⭕", visual: "punched-outer-corner" }
-        ],
-        options: [
-          { dots: [{ cx: 50, cy: 50 }] },
-          { dots: [{ cx: 85, cy: 15 }] },
-          { dots: [{ cx: 15, cy: 15 }, { cx: 85, cy: 15 }, { cx: 15, cy: 85 }, { cx: 85, cy: 85 }] },
-          { dots: [{ cx: 50, cy: 15 }, { cx: 50, cy: 85 }] }
-        ],
-        answerIdx: 2,
-        explanation: "外側四個角展開後，剛好對應到大正方形色紙的「四個角落」！"
-      },
-      {
-        prompt: "資優壓軸：向上對摺，再向右對摺，在兩折痕邊緣剪半圓，展開後是？",
-        steps: [
-          { text: "完整色紙", visual: "full" },
-          { text: "⬆️ 向上摺", visual: "fold-up" },
-          { text: "➡️ 再向右摺", visual: "fold-quarter" },
-          { text: "對稱邊緣打孔", visual: "punched-edges" }
-        ],
-        options: [
-          { dots: [{ cx: 50, cy: 18 }, { cx: 50, cy: 82 }, { cx: 18, cy: 50 }, { cx: 82, cy: 50 }] },
-          { dots: [{ cx: 50, cy: 50 }] },
-          { dots: [{ cx: 20, cy: 20 }, { cx: 80, cy: 80 }] },
-          { dots: [{ cx: 18, cy: 18 }, { cx: 82, cy: 18 }, { cx: 18, cy: 82 }, { cx: 82, cy: 82 }] }
-        ],
-        answerIdx: 0,
-        explanation: "摺痕邊緣展開後會形成上下左右十字對稱的 4 個孔洞！太聰明了！"
+    
+    // 依摺疊後保留的區塊畫出色紙；摺痕用紅色虛線，打洞位置用紅點
+    function foldSheetSVG(sheet) {
+      const fills = ["#E0E7FF", "#C7D2FE", "#A5B4FC"];
+      const strokes = ["#6366F1", "#4F46E5", "#4338CA"];
+      const layer = Math.min(sheet.layers, 3) - 1;
+      let foldLine = "";
+      if (sheet.fold === 'up' || sheet.fold === 'down') {
+        foldLine = `<line x1="${sheet.x1}" y1="50" x2="${sheet.x2}" y2="50" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>`;
+      } else if (sheet.fold === 'left' || sheet.fold === 'right') {
+        foldLine = `<line x1="50" y1="${sheet.y1}" x2="50" y2="${sheet.y2}" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>`;
       }
-    ];
+      const dots = sheet.dots.map(d => `<circle cx="${d.cx}" cy="${d.cy}" r="8" fill="#EF4444"/>`).join('');
+      return `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
+            <rect x="${sheet.x1}" y="${sheet.y1}" width="${sheet.x2 - sheet.x1}" height="${sheet.y2 - sheet.y1}" fill="${fills[layer]}" stroke="${strokes[layer]}" stroke-width="4" rx="4"/>
+            ${foldLine}${dots}
+          </svg>`;
+    }
 
     function loadFoldingLevel() {
-      const data = foldingLevels[currentLevel];
-      document.getElementById('foldingLevelBadge').textContent = `第 ${currentLevel + 1} / ${foldingLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('foldingLevelBadge').textContent = levelBadgeText();
       document.getElementById('foldingPrompt').textContent = data.prompt;
 
       const stepsRow = document.getElementById('foldingStepsRow');
@@ -2674,50 +3113,7 @@
         const box = document.createElement('div');
         box.className = 'fold-step-box';
 
-        let innerSVG = "";
-        if (step.visual === "full") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;"><rect x="5" y="5" width="90" height="90" fill="#E0E7FF" stroke="#6366F1" stroke-width="4" rx="4"/></svg>`;
-        } else if (step.visual === "fold-up") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="5" y="5" width="90" height="45" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
-            <line x1="5" y1="50" x2="95" y2="50" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>
-          </svg>`;
-        } else if (step.visual === "fold-right") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="90" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
-            <line x1="50" y1="5" x2="50" y2="95" stroke="#EF4444" stroke-width="3" stroke-dasharray="4"/>
-          </svg>`;
-        } else if (step.visual === "fold-quarter") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
-          </svg>`;
-        } else if (step.visual === "punched-top") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="5" y="5" width="90" height="45" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
-            <circle cx="50" cy="15" r="8" fill="#EF4444"/>
-          </svg>`;
-        } else if (step.visual === "punched-br") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="90" fill="#C7D2FE" stroke="#4F46E5" stroke-width="4" rx="4"/>
-            <circle cx="85" cy="85" r="8" fill="#EF4444"/>
-          </svg>`;
-        } else if (step.visual === "punched-center-corner") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
-            <circle cx="52" cy="48" r="8" fill="#EF4444"/>
-          </svg>`;
-        } else if (step.visual === "punched-outer-corner") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
-            <circle cx="88" cy="12" r="8" fill="#EF4444"/>
-          </svg>`;
-        } else if (step.visual === "punched-edges") {
-          innerSVG = `<svg viewBox="0 0 100 100" style="width:70px;height:70px;">
-            <rect x="50" y="5" width="45" height="45" fill="#A5B4FC" stroke="#4338CA" stroke-width="4" rx="3"/>
-            <circle cx="50" cy="27" r="7" fill="#EF4444"/>
-            <circle cx="72" cy="50" r="7" fill="#EF4444"/>
-          </svg>`;
-        }
+        const innerSVG = foldSheetSVG(step.sheet);
 
         box.innerHTML = `
           <div class="sheet-preview">${innerSVG}</div>
@@ -2761,7 +3157,7 @@
 
     function checkFoldingAnswer(chosenIdx, answerIdx, explanation) {
       if (chosenIdx === answerIdx) {
-        triggerVictory("空間對稱大師！答對了！", explanation, currentLevel === foldingLevels.length - 1);
+        triggerVictory("空間對稱大師！答對了！", explanation, isLastQuestion());
       } else {
         soundError();
         speakText("想一想紙張展開時，孔洞會往哪邊鏡像翻開？再試一次！");
@@ -2771,70 +3167,14 @@
     /* =========================================================
        MODULE 7: GEAR TRANSMISSION (齒輪連動推理 - 資優題型)
        ========================================================= */
-    const gearsLevels = [
-      {
-        prompt: "【雙齒輪咬合】：齒輪 1 正順時針轉 (↷)，齒輪 2 會往哪個方向轉？",
-        gears: [
-          { x: 180, y: 130, r: 60, teeth: 12, dir: 1, label: "1" },
-          { x: 300, y: 130, r: 60, teeth: 12, dir: -1, label: "2 ★" }
-        ],
-        targetGearIndex: 1,
-        answer: "ccw",
-        rule: "兩個齒輪互相咬合時，旋轉方向必定相反！"
-      },
-      {
-        prompt: "【三齒輪串聯】：齒輪 1 順時針轉，最右邊的齒輪 3 (★) 往哪轉？",
-        gears: [
-          { x: 120, y: 130, r: 50, teeth: 10, dir: 1, label: "1" },
-          { x: 220, y: 130, r: 50, teeth: 10, dir: -1, label: "2" },
-          { x: 320, y: 130, r: 50, teeth: 10, dir: 1, label: "3 ★" }
-        ],
-        targetGearIndex: 2,
-        answer: "cw",
-        rule: "第1個順時針 ➔ 第2個逆時針 ➔ 第3個又變回順時針！"
-      },
-      {
-        prompt: "【大小齒輪咬合】：齒輪 1 順時針轉，大齒輪 2 (★) 往哪個方向轉？",
-        gears: [
-          { x: 140, y: 130, r: 40, teeth: 8, dir: 1, label: "1" },
-          { x: 250, y: 130, r: 70, teeth: 14, dir: -1, label: "2 ★" }
-        ],
-        targetGearIndex: 1,
-        answer: "ccw",
-        rule: "不管齒輪是大是小，只要互相咬合，方向就一定是相反的！"
-      },
-      {
-        prompt: "【四齒輪長火車】：齒輪 1 順時針轉，請推理最後一個齒輪 4 (★) 的方向！",
-        gears: [
-          { x: 90, y: 130, r: 40, teeth: 8, dir: 1, label: "1" },
-          { x: 170, y: 130, r: 40, teeth: 8, dir: -1, label: "2" },
-          { x: 250, y: 130, r: 40, teeth: 8, dir: 1, label: "3" },
-          { x: 330, y: 130, r: 40, teeth: 8, dir: -1, label: "4 ★" }
-        ],
-        targetGearIndex: 3,
-        answer: "ccw",
-        rule: "偶數個咬合齒輪（2、4、6...），最後一個的方向必定與第1個相反！"
-      },
-      {
-        prompt: "【資優幾何三角齒輪鏈】：齒輪 1 順時針轉，經過 2 號，齒輪 3 (★) 往哪轉？",
-        gears: [
-          { x: 150, y: 170, r: 50, teeth: 10, dir: 1, label: "1" },
-          { x: 230, y: 80,  r: 50, teeth: 10, dir: -1, label: "2" },
-          { x: 310, y: 170, r: 50, teeth: 10, dir: 1, label: "3 ★" }
-        ],
-        targetGearIndex: 2,
-        answer: "cw",
-        rule: "即使排列成三角拐彎，奇數第 3 個齒輪依然與第 1 個同方向旋轉！"
-      }
-    ];
-
+    
     let gearAnimId = null;
     let gearAngle = 0;
 
     function loadGearsLevel() {
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
-      const data = gearsLevels[currentLevel];
-      document.getElementById('gearsLevelBadge').textContent = `第 ${currentLevel + 1} / ${gearsLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('gearsLevelBadge').textContent = levelBadgeText();
       document.getElementById('gearsPrompt').textContent = data.prompt;
       document.getElementById('gearTargetText').textContent = `請問標記 ★ 的「${data.gears[data.targetGearIndex].label}」齒輪旋轉方向是？`;
 
@@ -2846,7 +3186,10 @@
     function startGearAnimation() {
       const canvas = document.getElementById('gearCanvas');
       const ctx = canvas.getContext('2d');
-      const data = gearsLevels[currentLevel];
+      const data = currentQuestion;
+      // 順時針箭頭畫在齒輪 1 遠離齒輪 2 的那一側，避免被蓋住
+      const [g1, g2] = data.gears;
+      const arrowAngle = Math.atan2(g1.y - g2.y, g1.x - g2.x);
 
       function loop() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2857,7 +3200,7 @@
           const isTarget = idx === data.targetGearIndex;
           const isSource = idx === 0;
 
-          drawSingleGear(ctx, gear.x, gear.y, gear.r, gear.teeth, currentRotation, isSource, isTarget, gear.label);
+          drawSingleGear(ctx, gear.x, gear.y, gear.r, gear.teeth, currentRotation, isSource, isTarget, gear.label, arrowAngle);
         });
 
         gearAnimId = requestAnimationFrame(loop);
@@ -2865,7 +3208,7 @@
       loop();
     }
 
-    function drawSingleGear(ctx, cx, cy, r, teeth, angle, isSource, isTarget, label) {
+    function drawSingleGear(ctx, cx, cy, r, teeth, angle, isSource, isTarget, label, arrowAngle = 0) {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(angle);
@@ -2929,25 +3272,27 @@
       ctx.fillText(label, cx, cy);
 
       if (isSource) {
+        ctx.translate(cx, cy);
+        ctx.rotate(arrowAngle);
         ctx.strokeStyle = "#DC2626";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 24, -Math.PI / 3, Math.PI / 3, false);
+        ctx.arc(0, 0, r + 24, -Math.PI / 3, Math.PI / 3, false);
         ctx.stroke();
         ctx.fillStyle = "#DC2626";
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(Math.PI / 3) * (r + 24), cy + Math.sin(Math.PI / 3) * (r + 24));
-        ctx.lineTo(cx + Math.cos(Math.PI / 3) * (r + 24) - 8, cy + Math.sin(Math.PI / 3) * (r + 24) - 12);
-        ctx.lineTo(cx + Math.cos(Math.PI / 3) * (r + 24) + 10, cy + Math.sin(Math.PI / 3) * (r + 24) - 4);
+        ctx.moveTo(Math.cos(Math.PI / 3) * (r + 24), Math.sin(Math.PI / 3) * (r + 24));
+        ctx.lineTo(Math.cos(Math.PI / 3) * (r + 24) - 8, Math.sin(Math.PI / 3) * (r + 24) - 12);
+        ctx.lineTo(Math.cos(Math.PI / 3) * (r + 24) + 10, Math.sin(Math.PI / 3) * (r + 24) - 4);
         ctx.fill();
       }
       ctx.restore();
     }
 
     function checkGearAnswer(chosen) {
-      const data = gearsLevels[currentLevel];
+      const data = currentQuestion;
       if (chosen === data.answer) {
-        triggerVictory("齒輪力學大師！答對了！", data.rule, currentLevel === gearsLevels.length - 1);
+        triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
       } else {
         soundError();
         speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
@@ -2957,67 +3302,10 @@
     /* =========================================================
        MODULE 8: RAVEN'S MATRIX (瑞文氏九宮矩陣 - 資優題型)
        ========================================================= */
-    const ravenLevels = [
-      {
-        prompt: "【形狀九宮格】：每行、每列都有圓形、三角形、正方形！問號是誰？",
-        grid: [
-          "🔵", "🔺", "🟩",
-          "🔺", "🟩", "🔵",
-          "🟩", "🔵", "?"
-        ],
-        answer: "🔺",
-        options: ["🔺", "🔵", "🟩", "⭐"],
-        rule: "拉丁方陣規律：每一橫排和直排，三種圖形都剛好出現一次！"
-      },
-      {
-        prompt: "【顏色與形狀雙重規律】：橫排形狀相同，直排顏色相同！問號是誰？",
-        grid: [
-          "🔴", "🟢", "🟡",
-          "❤️", "💚", "💛",
-          "🟥", "🟩", "?"
-        ],
-        answer: "🟨",
-        options: ["🟨", "🟥", "🟦", "💛"],
-        rule: "第3行直排全是黃色家族（🟡、💛、🟨），而第3橫排都是正方形！"
-      },
-      {
-        prompt: "【數量遞增矩陣】：看一看每格裡水果的數量變化規律！",
-        grid: [
-          "🍎", "🍎🍎", "🍎🍎🍎",
-          "🍌", "🍌🍌", "🍌🍌🍌",
-          "🍓", "🍓🍓", "?"
-        ],
-        answer: "🍓🍓🍓",
-        options: ["🍓🍓🍓", "🍓", "🍓🍓", "🍌🍌🍌"],
-        rule: "每行都是從 1 個、2 個增加到 3 個！所以問號處有 3 顆草莓！"
-      },
-      {
-        prompt: "【方向旋轉推理】：時鐘指針每向右一格，就順時針旋轉 90 度！",
-        grid: [
-          "⬆️", "➡️", "⬇️",
-          "➡️", "⬇️", "⬅️",
-          "⬇️", "⬅️", "?"
-        ],
-        answer: "⬆️",
-        options: ["⬆️", "⬇️", "➡️", "↗️"],
-        rule: "指針順時針旋轉：向下 ➔ 向左 ➔ 轉回向上 (⬆️)！"
-      },
-      {
-        prompt: "【資優色彩混合】：每一橫排，第 1 格顏色 ＋ 第 2 格顏色 ＝ 第 3 格！",
-        grid: [
-          "🔴", "🔵", "🟣",
-          "🔵", "🟡", "🟢",
-          "🔴", "🟡", "?"
-        ],
-        answer: "🟠",
-        options: ["🟠", "🟣", "🟢", "🟤"],
-        rule: "三原色混合：紅＋藍＝紫、藍＋黃＝綠、紅＋黃＝溫暖的橘色 (🟠)！"
-      }
-    ];
-
+    
     function loadRavenLevel() {
-      const data = ravenLevels[currentLevel];
-      document.getElementById('ravenLevelBadge').textContent = `第 ${currentLevel + 1} / ${ravenLevels.length} 關`;
+      const data = currentQuestion;
+      document.getElementById('ravenLevelBadge').textContent = levelBadgeText();
       document.getElementById('ravenPrompt').textContent = data.prompt;
 
       const gridContainer = document.getElementById('ravenGrid');
@@ -3025,7 +3313,7 @@
 
       data.grid.forEach(cell => {
         const el = document.createElement('div');
-        el.className = 'raven-cell';
+        el.className = data.multi ? 'raven-cell multi' : 'raven-cell';
         if (cell === "?") {
           el.classList.add('raven-cell-target');
           el.textContent = "？";
@@ -3039,7 +3327,7 @@
       choicesBox.innerHTML = "";
       data.options.forEach(opt => {
         const btn = document.createElement('button');
-        btn.className = 'raven-opt-btn';
+        btn.className = data.multi ? 'raven-opt-btn multi' : 'raven-opt-btn';
         btn.textContent = opt;
         btn.onclick = () => checkRavenChoice(opt, data.answer, data.rule);
         choicesBox.appendChild(btn);
@@ -3057,7 +3345,7 @@
           target.style.borderColor = "#10B981";
           target.style.color = "#15803D";
         }
-        triggerVictory("瑞文氏資優思維達人！", rule, currentLevel === ravenLevels.length - 1);
+        triggerVictory("瑞文氏資優思維達人！", rule, isLastQuestion());
       } else {
         soundError();
         speakText("橫著看一看，豎著看一看，注意顏色、形狀或數量的雙向規律喔！");
