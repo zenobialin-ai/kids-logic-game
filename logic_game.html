@@ -1081,6 +1081,25 @@
       box-shadow: 0 3px 0 #10B981;
     }
 
+    .adapt-toggle {
+      border: 3px dashed #CBD5E1;
+      background: #F8FAFC;
+      color: #64748B;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+
+    .adapt-toggle.active {
+      border-color: #818CF8;
+      background: #EEF2FF;
+      color: #3730A3;
+    }
+
     .adapt-note {
       margin-top: 12px;
       padding: 10px 14px;
@@ -1239,7 +1258,7 @@
         <button class="diff-btn" data-diff="easy" onclick="setDifficulty('easy')">🌱 簡單</button>
         <button class="diff-btn" data-diff="normal" onclick="setDifficulty('normal')">🌿 普通</button>
         <button class="diff-btn" data-diff="hard" onclick="setDifficulty('hard')">🌳 挑戰</button>
-        <button class="diff-btn" id="adaptiveBtn" onclick="toggleAdaptive()">🤖 自動調整：開</button>
+        <button class="adapt-toggle" id="adaptiveBtn" onclick="toggleAdaptive()">🤖 自動調整：開</button>
         <button class="mistake-btn" onclick="openMistakeBook()">📖 錯題本 <span class="mistake-count" id="mistakeCount">0</span></button>
       </div>
 
@@ -1696,15 +1715,20 @@
     }
 
     function updateMenuProgressBadges() {
-      for (const mod in userProgress.completed) {
+      const completed = userProgress.completed || {};
+      for (const mod in MODULE_INFO) {
         const el = document.getElementById(`badge-${mod}`);
-        if (el) {
-          const done = userProgress.completed[mod] || 0;
-          if (done > 0) {
-            el.innerHTML = `⭐ 已破 ${done}/5 關`;
-            el.style.background = "#FEF08A";
-            el.style.color = "#854D0E";
-          }
+        if (!el) continue;
+        if (!el.dataset.original) el.dataset.original = el.textContent;
+        const done = Number(completed[mod]) || 0;
+        let text = done > 0 ? `⭐ 已破 ${done}/5 關` : el.dataset.original;
+        // 自動調整後實際出題的難度和家長選的不同時，讓家長在選單上看得到
+        const tier = getModuleAdaptiveTier(mod);
+        if (tier && tier !== getDifficulty()) text += ` · 🤖${DIFFICULTIES[tier].label}`;
+        el.textContent = text;
+        if (done > 0) {
+          el.style.background = "#FEF08A";
+          el.style.color = "#854D0E";
         }
       }
       updateDifficultyButtons();
@@ -1721,7 +1745,7 @@
           const jsonStr = decodeURIComponent(escape(atob(saveParam)));
           const decoded = JSON.parse(jsonStr);
           if (decoded && typeof decoded.stars === 'number') {
-            userProgress = decoded;
+            userProgress = keepLocalSettings(decoded);
             starsEarned = userProgress.stars || 0;
             saveToLocalStorage();
             setTimeout(() => {
@@ -1746,6 +1770,17 @@
       }
       document.getElementById('starCount').textContent = starsEarned;
       updateMenuProgressBadges();
+    }
+
+    // 舊版同步碼沒有 adaptive 欄位時，沿用本機的設定
+    function keepLocalSettings(imported) {
+      let local = userProgress;
+      try {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+        if (saved && typeof saved === 'object') local = saved;
+      } catch (e) {}
+      if (!hasOwn(imported, 'adaptive') && hasOwn(local, 'adaptive')) imported.adaptive = local.adaptive;
+      return imported;
     }
 
     function getSyncSaveCode() {
@@ -1837,7 +1872,8 @@
         const jsonStr = decodeURIComponent(escape(atob(input)));
         const parsed = JSON.parse(jsonStr);
         if (parsed && typeof parsed.stars === 'number') {
-          userProgress = parsed;
+          userProgress = keepLocalSettings(parsed);
+          adaptStreaks = {};
           starsEarned = userProgress.stars || 0;
           document.getElementById('starCount').textContent = starsEarned;
           saveToLocalStorage();
@@ -1890,11 +1926,11 @@
       if (view) view.classList.add('active');
 
       roundSeen = new Set();
-      correctStreak = 0;
-      wrongStreak = 0;
       retryMistakeId = mistake ? mistake.id : null;
       if (mistake) {
         questionWrongAttempts = 0;
+        questionCountedWrong = false;
+        pendingAdaptMsg = '';
         currentQuestion = mistake.question;
         MODULE_LOADERS[modName]();
       } else {
@@ -1973,6 +2009,7 @@
         note.className = 'adapt-note';
         note.textContent = adaptMsg;
         document.getElementById('modalMsg').appendChild(note);
+        speakText(adaptMsg.replace(/^\S+\s/, ''));
       }
       modal.classList.add('active');
     }
@@ -2007,58 +2044,69 @@
     let roundSeen = new Set();
 
     function getDifficulty() {
-      return DIFFICULTIES[userProgress.difficulty] ? userProgress.difficulty : 'normal';
+      return Object.prototype.hasOwnProperty.call(DIFFICULTIES, userProgress.difficulty) ? userProgress.difficulty : 'normal';
     }
 
     /* ADAPTIVE DIFFICULTY (自適應難度)
-       起點是家長選的難度；一題第一次就答對算「答對」，同一題錯 2 次以上算「答錯」
-       連續答對 3 題升一級、連續答錯 2 題降一級。調整後的難度依題型記住，家長改難度時重來 */
+       起點是家長選的難度；一題第一次就答對算「答對」，同一題錯到門檻（齒輪 1 次、其他 2 次）算「答錯」
+       連續答對 3 題升一級、連續答錯 2 題降一級。連續計數依題型跨輪延續；調整後的難度依題型記住
+       家長改難度或切換自動調整時全部重來 */
     const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
     const ADAPT_UP_STREAK = 3;
     const ADAPT_DOWN_STREAK = 2;
-    const ADAPT_WRONG_ATTEMPTS = 2;
-    let correctStreak = 0;
-    let wrongStreak = 0;
+    const DOUBLE_TAP_MS = 800;
+    let adaptStreaks = {};        // { 題型: { correct, wrong } }，只存在記憶體
+    let questionCountedWrong = false;
+    let pendingAdaptMsg = '';
+    let lastWrongAt = 0;
 
     const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+
+    // 齒輪只有兩個選項，選錯一次後剩下的必定是對的，所以錯 1 次就算答錯
+    function wrongThreshold(module) {
+      return module === 'gears' ? 1 : 2;
+    }
 
     function isAdaptiveOn() {
       return userProgress.adaptive !== false;
     }
 
-    // 目前實際出題用的難度
-    function getActiveDifficulty() {
-      if (!isAdaptiveOn() || !currentModule) return getDifficulty();
-      const tier = hasOwn(userProgress.adaptiveTier, currentModule) ? userProgress.adaptiveTier[currentModule] : null;
-      return hasOwn(DIFFICULTIES, tier) ? tier : getDifficulty();
+    function getModuleAdaptiveTier(module) {
+      if (!isAdaptiveOn()) return null;
+      const tier = hasOwn(userProgress.adaptiveTier, module) ? userProgress.adaptiveTier[module] : null;
+      return hasOwn(DIFFICULTIES, tier) ? tier : null;
     }
 
-    // 答對一題後呼叫；回傳要顯示給孩子的升降級訊息（沒有變化回傳空字串）
-    function adaptAfterQuestion() {
-      if (!isAdaptiveOn() || !currentModule) return '';
-      if (questionWrongAttempts === 0) {
-        correctStreak++;
-        wrongStreak = 0;
-      } else if (questionWrongAttempts >= ADAPT_WRONG_ATTEMPTS) {
-        wrongStreak++;
-        correctStreak = 0;
-      } else {
-        correctStreak = 0;
-        wrongStreak = 0;
-      }
+    // 目前實際出題用的難度
+    function getActiveDifficulty() {
+      return (currentModule && getModuleAdaptiveTier(currentModule)) || getDifficulty();
+    }
+
+    function resetAdaptive() {
+      userProgress.adaptiveTier = {};
+      adaptStreaks = {};
+    }
+
+    // 記錄一題的結果（'correct' / 'wrong' / 'neutral'），需要時調整難度；回傳要給孩子看的訊息
+    function applyAdaptOutcome(outcome) {
+      const streak = adaptStreaks[currentModule] || (adaptStreaks[currentModule] = { correct: 0, wrong: 0 });
+      streak.correct = outcome === 'correct' ? streak.correct + 1 : 0;
+      streak.wrong = outcome === 'wrong' ? streak.wrong + 1 : 0;
 
       const idx = DIFFICULTY_ORDER.indexOf(getActiveDifficulty());
       let next = idx;
-      if (correctStreak >= ADAPT_UP_STREAK && idx < DIFFICULTY_ORDER.length - 1) next = idx + 1;
-      if (wrongStreak >= ADAPT_DOWN_STREAK && idx > 0) next = idx - 1;
-      if (correctStreak >= ADAPT_UP_STREAK || wrongStreak >= ADAPT_DOWN_STREAK) {
-        correctStreak = 0;
-        wrongStreak = 0;
+      if (streak.correct >= ADAPT_UP_STREAK) next = Math.min(idx + 1, DIFFICULTY_ORDER.length - 1);
+      if (streak.wrong >= ADAPT_DOWN_STREAK) next = Math.max(idx - 1, 0);
+      if (streak.correct >= ADAPT_UP_STREAK || streak.wrong >= ADAPT_DOWN_STREAK) {
+        streak.correct = 0;
+        streak.wrong = 0;
       }
-      if (next === idx) return '';
+      if (idx < 0 || next === idx) return '';
 
       const tier = DIFFICULTY_ORDER[next];
-      if (!userProgress.adaptiveTier || typeof userProgress.adaptiveTier !== 'object') userProgress.adaptiveTier = {};
+      if (!userProgress.adaptiveTier || typeof userProgress.adaptiveTier !== 'object' || Array.isArray(userProgress.adaptiveTier)) {
+        userProgress.adaptiveTier = {};
+      }
       userProgress.adaptiveTier[currentModule] = tier;
       saveToLocalStorage();
       const label = DIFFICULTIES[tier].label;
@@ -2068,9 +2116,38 @@
         : `💪 我們先回到「${label}」多練習，熟練了再升級！`;
     }
 
+    function canAdapt() {
+      return isAdaptiveOn() && currentModule && !retryMistakeId;
+    }
+
+    // 所有答錯都從這裡進來：計次、記錄錯題、錯到門檻的當下就算一次「答錯」（之後離開也算數）
+    function onWrongAnswer(wrongText) {
+      const now = Date.now();
+      if (now - lastWrongAt < DOUBLE_TAP_MS) return; // 小朋友連點同一個按鈕只算一次
+      lastWrongAt = now;
+      questionWrongAttempts++;
+      recordMistake(wrongText);
+      if (canAdapt() && !questionCountedWrong && questionWrongAttempts >= wrongThreshold(currentModule)) {
+        questionCountedWrong = true;
+        pendingAdaptMsg = applyAdaptOutcome('wrong') || pendingAdaptMsg;
+      }
+    }
+
+    // 答對時呼叫；回傳升降級訊息（沒有變化回傳空字串）
+    function adaptAfterQuestion() {
+      if (!canAdapt()) return '';
+      let msg = pendingAdaptMsg;
+      if (!questionCountedWrong) {
+        msg = applyAdaptOutcome(questionWrongAttempts === 0 ? 'correct' : 'neutral') || msg;
+      }
+      pendingAdaptMsg = '';
+      return msg;
+    }
+
     function toggleAdaptive() {
       soundClick();
       userProgress.adaptive = !isAdaptiveOn();
+      resetAdaptive(); // 重新打開時從家長選的難度開始，不套用以前的調整
       saveToLocalStorage();
       showToast(isAdaptiveOn() ? "🤖 自動調整難度：開（會依答題表現升降級）" : "🤖 自動調整難度：關（固定在選好的難度）");
     }
@@ -2086,7 +2163,7 @@
       if (!DIFFICULTIES[diff]) return;
       soundClick();
       userProgress.difficulty = diff;
-      userProgress.adaptiveTier = {}; // 家長重新選難度，自動調整從這個難度重新開始
+      resetAdaptive(); // 家長重新選難度，自動調整從這個難度重新開始
       saveToLocalStorage();
       updateDifficultyButtons();
       showToast(`${DIFFICULTIES[diff].icon} 難度切換為「${DIFFICULTIES[diff].label}」`);
@@ -2127,6 +2204,8 @@
 
     function loadCurrentQuestion() {
       questionWrongAttempts = 0;
+      questionCountedWrong = false;
+      pendingAdaptMsg = '';
       currentQuestion = generateQuestion(currentModule);
       MODULE_LOADERS[currentModule]();
     }
@@ -2857,7 +2936,6 @@
     // 同一題答錯多次只記一筆，更新次數與最後一次的錯法
     function recordMistake(wrongText) {
       if (!currentModule || !currentQuestion) return;
-      questionWrongAttempts++;
       const key = questionKey(currentQuestion);
       const list = loadMistakes();
       const time = new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -3024,7 +3102,7 @@
         triggerVictory("規律破解成功！", "你敏銳的觀察力找到了圖形的秩序！", isLastQuestion());
       } else {
         soundError();
-        recordMistake(`選了 ${chosen}`);
+        onWrongAnswer(`選了 ${chosen}`);
         speakText("再看仔細一點唷！想想看前面圖案的排隊規律是什麼！");
       }
     }
@@ -3079,7 +3157,7 @@
         triggerVictory("智慧代換大師！", `答對了！就是 ${answer} 個！你懂得用代換方法解決難題！`, isLastQuestion());
       } else {
         soundError();
-        recordMistake(`選了 ${chosen} 個`);
+        onWrongAnswer(`選了 ${chosen} 個`);
         speakText("想一想，一個可以換幾個？再加在一起算算看！");
       }
     }
@@ -3200,7 +3278,7 @@
         triggerVictory("透視大師！答對了！", `總共確實是 ${total} 個積木！你連躲在底部的都算到了！`, isLastQuestion());
       } else {
         soundError();
-        recordMistake(`數成 ${chosen} 個`);
+        onWrongAnswer(`數成 ${chosen} 個`);
         speakText(chosen < total ? "不只這些喔！底層有被壓在下面的積木，打開透視鏡看看！" : "比這個少一點點喔，再數一次試試看！");
       }
     }
@@ -3355,7 +3433,7 @@
         if (hitWall || hitObs) {
           clearInterval(mazeTimer);
           soundError();
-          recordMistake(hitWall ? '撞到外牆' : '撞到石頭');
+          onWrongAnswer(hitWall ? '撞到外牆' : '撞到石頭');
           isRunningMaze = false;
           document.getElementById('btnRunCode').disabled = false;
           speakText(hitWall ? "哎呀！撞到迷宮外牆了！請修正路線！" : "哎呀！撞到大石頭障礙了！再試一次！");
@@ -3375,7 +3453,7 @@
         triggerVictory("恭喜奪得寶藏！", "你的程式演算法指令非常精準！成功帶領機器人過關！", isLastQuestion());
       } else {
         soundError();
-        recordMistake('沒走到寶箱');
+        onWrongAnswer('沒走到寶箱');
         speakText("機器人還沒走到寶箱位置喔，路線還差幾步，加油！");
       }
     }
@@ -3501,7 +3579,7 @@
         triggerVictory("推理大偵探過關！", "太厲害了！你完全破解了所有線索，安排得一清二楚！", isLastQuestion());
       } else {
         soundError();
-        recordMistake(`排成 ${deductionPlacements.join('')}`);
+        onWrongAnswer(`排成 ${deductionPlacements.join('')}`);
         speakText("好像有小動物走錯房間囉！再對照一次上面的偵探線索看看！");
       }
     }
@@ -3587,7 +3665,7 @@
         triggerVictory("空間對稱大師！答對了！", explanation, isLastQuestion());
       } else {
         soundError();
-        recordMistake(`選了選項 ${String.fromCharCode(65 + chosenIdx)}`);
+        onWrongAnswer(`選了選項 ${String.fromCharCode(65 + chosenIdx)}`);
         speakText("想一想紙張展開時，孔洞會往哪邊鏡像翻開？再試一次！");
       }
     }
@@ -3723,7 +3801,7 @@
         triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
       } else {
         soundError();
-        recordMistake(null); // 只有兩個選項，寫出上次選什麼就等於公布答案
+        onWrongAnswer(null); // 只有兩個選項，寫出上次選什麼就等於公布答案
         speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
       }
     }
@@ -3777,7 +3855,7 @@
         triggerVictory("瑞文氏資優思維達人！", rule, isLastQuestion());
       } else {
         soundError();
-        recordMistake(`選了 ${chosen}`);
+        onWrongAnswer(`選了 ${chosen}`);
         speakText("橫著看一看，豎著看一看，注意顏色、形狀或數量的雙向規律喔！");
       }
     }
