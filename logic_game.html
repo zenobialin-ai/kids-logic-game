@@ -1173,9 +1173,50 @@
     .raven-cell.multi { font-size: 20px; }
     .raven-opt-btn.multi { width: auto; min-width: 80px; padding: 0 8px; font-size: 20px; }
 
+    /* 平板也是觸控：選單與頁首按鈕至少 40px 高 */
+    .sync-btn, .diff-btn, .adapt-toggle, .mistake-btn { min-height: 40px; }
+
     /* RESPONSIVE */
     @media (max-width: 600px) {
-      .brand-title { font-size: var(--font-title); }
+      /* 頁首：標題縮小不折行，按鈕只留圖示 */
+      header { padding: 10px 12px; }
+      .brand { gap: 6px; }
+      .brand-icon { font-size: 26px; }
+      .brand-title { font-size: 15px; white-space: nowrap; }
+      .header-stats { gap: 4px; flex-shrink: 0; }
+      .stat-badge { padding: 3px 8px; font-size: 15px; gap: 4px; }
+      .sync-btn { padding: 6px 10px; min-height: 40px; }
+      /* 小朋友的手指：可點的東西至少 40px */
+      .sound-btn, .home-btn { width: 40px; height: 40px; font-size: 18px; }
+
+      main { padding: 12px; }
+      .game-view { padding: 16px; }
+      .speak-btn { padding: 8px 10px; flex-shrink: 0; min-height: 40px; }
+
+      /* 難度列：三個難度一排，自動調整和錯題本一排 */
+      .difficulty-bar { gap: 8px; padding: 12px; }
+      .difficulty-label { display: none; }
+      .diff-btn, .mistake-btn, .adapt-toggle { padding: 6px 12px; font-size: 15px; min-height: 40px; }
+      .adapt-toggle, .mistake-btn { margin-left: 0; }
+
+      /* 積木：透視鏡按鈕放到畫布上方，不蓋住積木 */
+      .canvas-wrap { flex-direction: column; gap: 8px; }
+      .xray-btn { position: static; font-size: 15px; padding: 6px 14px; min-height: 40px; }
+
+      /* 摺紙：步驟改成兩欄、加上編號代替箭頭（折行後箭頭會掛在行尾）；3 個步驟時最後一步置中 */
+      .fold-steps-row { display: grid; grid-template-columns: repeat(2, auto); justify-content: center; gap: 12px 20px; counter-reset: fold-step; }
+      .fold-steps-row[data-count="3"] .fold-step-box:last-child { grid-column: 1 / -1; justify-self: center; }
+      .step-arrow { display: none; }
+      .fold-step-text { text-align: center; max-width: 130px; }
+      .fold-step-text::before { counter-increment: fold-step; content: counter(fold-step) ". "; }
+
+      /* 迷宮按鈕文字不要折成「清/空」；放不下時整顆按鈕換行 */
+      .btn-run, .btn-clear { white-space: nowrap; }
+      .action-btn-group { flex-wrap: wrap; justify-content: flex-end; }
+      .unfold-choices-grid { gap: 12px; }
+      .unfold-choice-card { padding: 10px; }
+      .unfold-svg-sheet { width: 90px; height: 90px; }
+
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
@@ -1185,6 +1226,33 @@
       .animal-token { width: 56px; height: 56px; font-size: 30px; }
       .raven-cell { width: 70px; height: 70px; font-size: 32px; }
       .raven-opt-btn { width: 68px; height: 68px; font-size: 34px; }
+    }
+
+    /* 遊戲標題列：名稱和關卡標籤可以折行（601–720px 也會擠，所以範圍比手機大一點） */
+    @media (max-width: 720px) {
+      .game-header { gap: 8px; align-items: flex-start; }
+      .game-title-box { flex-wrap: wrap; gap: 6px 8px; }
+      .game-title { font-size: 18px; }
+      .level-badge { white-space: nowrap; font-size: 15px; padding: 3px 10px; }
+    }
+
+    /* 按鈕只留圖示：480px 以下才需要，600px 左右還放得下文字 */
+    @media (max-width: 480px) {
+      .btn-label { display: none; }
+    }
+
+    /* 窄手機：標題會碰到右邊按鈕，只留火箭圖示 */
+    @media (max-width: 390px) {
+      .brand-title { display: none; }
+    }
+
+    /* 很窄的手機（例如 iPhone SE 第一代 320px） */
+    @media (max-width: 360px) {
+      .difficulty-bar { gap: 6px; padding: 10px 6px; }
+      .diff-btn { padding: 6px 10px; }
+      .maze-board.compact .maze-cell { width: 38px; height: 38px; font-size: 20px; }
+      .sync-import-row { flex-wrap: wrap; }
+      .sync-import-row input { min-width: 0; }
     }
     .sync-btn {
       background: linear-gradient(135deg, #6366F1, #8B5CF6);
@@ -1242,9 +1310,9 @@
         <span>⭐</span>
         <span id="starCount">0</span>
       </div>
-      <button class="sync-btn" onclick="openSyncModal()" title="跨裝置同步與分享進度">📲 同步/分享</button>
-      <button class="sound-btn" id="soundToggle" onclick="toggleAudio()" title="音效開關">🔊</button>
-      <button class="home-btn" onclick="goHome()" title="回首頁選單">🏠</button>
+      <button class="sync-btn" onclick="openSyncModal()" title="跨裝置同步與分享進度" aria-label="同步/分享"><span aria-hidden="true">📲</span> <span class="btn-label">同步/分享</span></button>
+      <button class="sound-btn" id="soundToggle" onclick="toggleAudio()" title="音效開關" aria-label="音效開關">🔊</button>
+      <button class="home-btn" onclick="goHome()" title="回首頁選單" aria-label="回首頁選單">🏠</button>
     </div>
   </header>
 
@@ -1345,8 +1413,8 @@
           <div class="game-title">規律魔法陣</div>
           <span class="level-badge" id="patternLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="patternPrompt">請仔細看圖形的順序，找出問號處應該放什麼！</div>
@@ -1363,8 +1431,8 @@
           <div class="game-title">神奇智慧天平</div>
           <span class="level-badge" id="balanceLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="balancePrompt">看一看天平的平衡秘密，推理問號是幾顆？</div>
@@ -1384,8 +1452,8 @@
           <div class="game-title">立體透視積木</div>
           <span class="level-badge" id="blocksLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="blocksPrompt">這裡一共有幾個積木？注意有些積木躲在底層支撐喔！</div>
@@ -1407,17 +1475,17 @@
           <div class="game-title">小機器人尋寶</div>
           <span class="level-badge" id="mazeLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="mazePrompt">規劃好路線指令，引導機器人安全拿到金色寶箱！</div>
       <div class="maze-container">
         <div class="maze-board" id="mazeBoard"></div>
         <div class="program-deck">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <span style="font-weight: 800; color: #475569; font-size: var(--font-content);">指令程式列（點擊指令卡可移除）：</span>
-            <span id="cmdStepCount" style="font-size: var(--font-content); font-weight:700; color:#6366F1;">0 步</span>
+            <span id="cmdStepCount" style="font-size: var(--font-content); font-weight:700; color:#6366F1; white-space:nowrap;">0 步</span>
           </div>
           <div class="cmd-slots" id="cmdSlots">
             <span style="color:#94A3B8; font-size: var(--font-content); margin:auto;">點擊下方按鈕加入動作指令</span>
@@ -1446,8 +1514,8 @@
           <div class="game-title">動物好友排排坐</div>
           <span class="level-badge" id="deductionLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀線索
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀線索" aria-label="朗讀線索">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀線索</span>
         </button>
       </div>
       <div class="prompt-box" id="deductionPrompt">根據偵探線索，把小動物放到正確的房間裡！</div>
@@ -1468,8 +1536,8 @@
           <div class="game-title">摺紙打孔透視 (資優題)</div>
           <span class="level-badge" id="foldingLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="foldingPrompt">一張正方形色紙照著箭頭摺疊並剪下孔洞，展開後會是哪一張？</div>
@@ -1488,8 +1556,8 @@
           <div class="game-title">齒輪連動旋轉 (資優題)</div>
           <span class="level-badge" id="gearsLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="gearsPrompt">齒輪互相咬合！當第 1 個齒輪如箭頭轉動，最後一個齒輪會往哪轉？</div>
@@ -1511,8 +1579,8 @@
           <div class="game-title">瑞文氏九宮矩陣 (資優題)</div>
           <span class="level-badge" id="ravenLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="ravenPrompt">橫著看有規律，豎著看也有規律！問號處該填入哪一個？</div>
@@ -1562,7 +1630,7 @@
       <!-- SECTION 2: 手動代碼匯出 / 匯入 -->
       <div style="background:#F8FAFC; border:2px solid #E2E8F0; border-radius:18px; padding:14px 16px; margin-bottom:14px;">
         <div style="font-weight:900; color:#334155; font-size:16px; margin-bottom:6px;">📋 手動匯入 / 匯出進度碼</div>
-        <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <div class="sync-import-row" style="display:flex; gap:8px; margin-bottom:8px;">
           <input type="text" id="syncCodeInput" placeholder="在另一台裝置貼上進度代碼..." style="flex:1; padding:8px 12px; border-radius:10px; border:2px solid #CBD5E1; font-size:14px; font-family:monospace;">
           <button onclick="importSyncCode()" style="background:#10B981; color:#FFF; border:none; padding:8px 14px; border-radius:10px; font-weight:800; font-size:14px; cursor:pointer;">📥 載入進度</button>
         </div>
@@ -3626,6 +3694,7 @@
 
       const stepsRow = document.getElementById('foldingStepsRow');
       stepsRow.innerHTML = "";
+      stepsRow.dataset.count = data.steps.length;
 
       data.steps.forEach((step, idx) => {
         const box = document.createElement('div');
