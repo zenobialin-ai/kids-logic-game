@@ -848,6 +848,7 @@
       pointer-events: none;
     }
     .pipes-container .action-btn-group { justify-content: center; }
+    .pipe-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .pipe-tip { font-weight: 800; color: #64748B; font-size: var(--font-content); text-align: center; }
 
     .btn-run {
@@ -1579,7 +1580,7 @@
 
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
       .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
-      .pipe-board { --pipe-cell: 54px; --pipe-edge: 38px; --pipe-gap: 3px; padding: 8px; }
+      .pipe-board { --pipe-cell: 52px; --pipe-edge: 34px; --pipe-gap: 3px; padding: 8px; }
       .pipe-board.compact { --pipe-cell: 48px; --pipe-edge: 34px; }
       .house-slot { width: 85px; min-height: 120px; }
       .house-content { width: 60px; height: 60px; font-size: 32px; }
@@ -1615,7 +1616,8 @@
       .difficulty-bar { gap: 6px; padding: 10px 6px; }
       .diff-btn { padding: 6px 10px; }
       .maze-board.compact .maze-cell { width: 38px; height: 38px; font-size: 20px; }
-      .pipe-board.compact { --pipe-cell: 42px; --pipe-edge: 28px; padding: 6px; }
+      .pipe-board { --pipe-cell: 48px; --pipe-edge: 30px; padding: 6px; }
+      .pipe-board.compact { --pipe-cell: 42px; --pipe-edge: 28px; }
       .sync-import-row { flex-wrap: wrap; }
       .sync-import-row input { min-width: 0; }
     }
@@ -1951,6 +1953,7 @@
       <div class="pipes-container">
         <div class="pipe-board" id="pipeBoard"></div>
         <div class="pipe-tip">點水管可以轉方向，接好了再打開水龍頭！</div>
+        <div class="pipe-status" id="pipeStatus" role="status" aria-live="polite"></div>
         <div class="action-btn-group">
           <button class="btn-clear" onclick="resetPipes()">🔄 恢復原狀</button>
           <button class="btn-run" id="btnPipeRun" onclick="runPipes()">🚰 打開水龍頭！</button>
@@ -3240,7 +3243,7 @@
         if (r < 0 || c < 0 || r >= q.size) return { wet, reached: false };
         const tile = q.tiles[r][c];
         const open = tile ? pipeOpenings(tile.t, rots[r][c]) : [];
-        if (!open.includes(from)) return { wet, reached: false };
+        if (!open.includes(from)) return { wet, reached: false, blocked: tile ? { r, c } : null };
         wet.push({ r, c, from });
         const out = open.find(d => d !== from);
         r += PIPE_DIRS[out][0];
@@ -3713,7 +3716,7 @@
       pipes: q => {
         const inRange = v => Number.isInteger(v) && v >= 0 && v < q.size;
         const okTile = t => t === null || (!!t && hasOwn(PIPE_SHAPES, t.t) && Number.isInteger(t.rot) && t.rot >= 0 && t.rot <= 3);
-        return Number.isInteger(q.size) && q.size >= 2 && q.size <= 6 && inRange(q.src) && inRange(q.dst) &&
+        return Number.isInteger(q.size) && q.size >= 3 && q.size <= 5 && inRange(q.src) && inRange(q.dst) &&
           isStr(q.animal) && isStr(q.animalName) && isArr(q.tiles, row => isArr(row, okTile) && row.length === q.size) &&
           q.tiles.length === q.size && solvePipes(q) !== null;
       },
@@ -4755,6 +4758,7 @@
     }
 
     function clearPipeWater() {
+      document.getElementById('pipeStatus').textContent = '';
       document.querySelectorAll('#pipeBoard .wet, #pipeBoard .leak').forEach(el => el.classList.remove('wet', 'rev', 'leak'));
     }
 
@@ -4805,11 +4809,15 @@
         pipeTimer = null;
         pipeRunning = false;
         document.getElementById('btnPipeRun').disabled = false;
+        // 💦 標在擋住水的那根水管；水流到空地或棋盤外，就標在最後一根有水的水管（它的出口方向不對）
         const last = flow.wet[flow.wet.length - 1];
-        (last ? document.getElementById(`pipe-${last.r}-${last.c}`) : document.getElementById('pipeSource')).classList.add('leak');
+        const leakAt = flow.blocked || last;
+        (leakAt ? document.getElementById(`pipe-${leakAt.r}-${leakAt.c}`) : document.getElementById('pipeSource')).classList.add('leak');
         soundError();
         onWrongAnswer('水在半路漏出來');
-        speakText("哎呀！水漏出來了！看看水停在哪裡，把那裡的水管轉一轉！");
+        const msg = "哎呀！水漏出來了！看看💦附近的水管，哪一根要轉一轉？";
+        document.getElementById('pipeStatus').textContent = msg;
+        speakText(msg);
       };
       pipeTimer = setTimeout(step, PIPE_STEP_MS);
     }
