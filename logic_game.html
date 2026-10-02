@@ -1183,7 +1183,8 @@
       background: linear-gradient(135deg, #DCFCE7, #E0F2FE);
       display: none;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
+      overflow-y: auto;      /* 矮螢幕或手機橫放時可以捲到解鎖按鈕 */
       z-index: 3000;
       padding: 16px;
     }
@@ -1191,6 +1192,7 @@
     .eye-lock.active { display: flex; }
 
     .eye-lock-card {
+      margin: auto;
       background: #FFF;
       border-radius: 30px;
       padding: 28px 24px;
@@ -1234,6 +1236,17 @@
     }
 
     .parent-gate-btn { padding: 10px 22px; font-size: 16px; }
+    .parent-gate-msg { min-height: 22px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #DC2626; }
+    .modal-overlay.scrollable { overflow-y: auto; align-items: flex-start; padding: 16px 0; }
+    .modal-overlay.scrollable .modal-card { margin: auto; }
+
+    @media (max-height: 600px) {
+      .eye-lock-card { padding: 18px 16px; }
+      .eye-lock-title { font-size: 22px; }
+      .eye-ex { padding: 10px; }
+      .eye-ex-icon { font-size: 48px; }
+      .eye-ex-count { font-size: 30px; min-height: 36px; }
+    }
 
     .parent-row {
       display: flex;
@@ -1255,7 +1268,7 @@
       border-radius: 12px;
       padding: 6px 12px;
       min-width: 44px;
-      min-height: 40px;
+      min-height: 44px;
       font-family: inherit;
       font-size: 16px;
       font-weight: 800;
@@ -1762,7 +1775,7 @@
   <div class="eye-lock" id="eyeLock">
     <div class="eye-lock-card">
       <div class="eye-lock-title">👀 眼睛休息時間到囉！</div>
-      <div class="eye-lock-sub">今天已經玩了 <strong id="eyeLockMinutes">0</strong> 分鐘，跟著做護眼小體操吧！</div>
+      <div class="eye-lock-sub">這次已經玩了 <strong id="eyeLockMinutes">0</strong> 分鐘，跟著做護眼小體操吧！</div>
       <div class="eye-ex">
         <div class="eye-ex-icon" id="eyeExIcon">🌳</div>
         <div class="eye-ex-text" id="eyeExText"></div>
@@ -1774,27 +1787,29 @@
         <div class="parent-gate-label">請家長算出答案：<strong id="eyeGateQ"></strong></div>
         <div class="parent-gate-row">
           <input type="number" inputmode="numeric" id="eyeGateInput" class="parent-gate-input" aria-label="答案"
-                 onkeydown="if (event.key === 'Enter') checkParentAnswer('eyeGateInput', 'eyeGateQ')">
-          <button class="modal-btn parent-gate-btn" onclick="checkParentAnswer('eyeGateInput', 'eyeGateQ')">解鎖</button>
+                 onkeydown="if (event.key === 'Enter') checkParentAnswer('eyeGate')">
+          <button class="modal-btn parent-gate-btn" onclick="checkParentAnswer('eyeGate')">解鎖</button>
         </div>
+        <div class="parent-gate-msg" id="eyeGateMsg" role="alert"></div>
       </div>
     </div>
   </div>
 
   <!-- PARENT SETTINGS -->
-  <div class="modal-overlay" id="parentModal">
+  <div class="modal-overlay scrollable" id="parentModal">
     <div class="modal-card" style="max-width: 460px; text-align: left; padding: 28px 24px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <div style="font-size:var(--font-title); font-weight:900; color:#1E293B;">⚙️ 家長設定</div>
-        <button onclick="closeParentSettings()" aria-label="關閉" style="border:none; background:#F1F5F9; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
+        <button onclick="closeParentSettings()" aria-label="關閉" style="border:none; background:#F1F5F9; border-radius:50%; width:40px; height:40px; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
       </div>
       <div class="parent-gate" id="parentGateBox">
         <div class="parent-gate-label">請家長算出答案：<strong id="parentGateQ"></strong></div>
         <div class="parent-gate-row">
           <input type="number" inputmode="numeric" id="parentGateInput" class="parent-gate-input" aria-label="答案"
-                 onkeydown="if (event.key === 'Enter') checkParentAnswer('parentGateInput', 'parentGateQ')">
-          <button class="modal-btn parent-gate-btn" onclick="checkParentAnswer('parentGateInput', 'parentGateQ')">確定</button>
+                 onkeydown="if (event.key === 'Enter') checkParentAnswer('parentGate')">
+          <button class="modal-btn parent-gate-btn" onclick="checkParentAnswer('parentGate')">確定</button>
         </div>
+        <div class="parent-gate-msg" id="parentGateMsg" role="alert"></div>
       </div>
       <div id="parentSettingsBox" style="display:none;">
         <div class="parent-row">
@@ -1808,14 +1823,14 @@
             <button class="eye-limit-btn" data-min="15" onclick="setEyeLimit(15)">15</button>
             <button class="eye-limit-btn" data-min="20" onclick="setEyeLimit(20)">20</button>
             <button class="eye-limit-btn" data-min="30" onclick="setEyeLimit(30)">30</button>
-            分鐘
+            <span style="white-space:nowrap;">分鐘</span>
           </span>
         </div>
         <div class="parent-row">
-          <span class="parent-row-label">今天已玩 <strong id="eyeUsedToday">0</strong> 分鐘</span>
-          <button class="eye-limit-btn" onclick="resetEyeTimer()">重新計時</button>
+          <span class="parent-row-label">這次已玩 <strong id="eyeUsedToday">0</strong> 分鐘</span>
+          <button class="eye-toggle" onclick="resetEyeTimer()">重新計時</button>
         </div>
-        <div class="parent-note">只計算在題目畫面中的時間，停在選單不算。時間到時會讓孩子做完手上這一題再休息。</div>
+        <div class="parent-note">只計算在題目畫面中的時間，停在選單或彈出視窗時不算。時間到時會讓孩子做完手上這一題再休息；家長解鎖後重新計時，每天也會自動重新計時。</div>
       </div>
     </div>
   </div>
@@ -4190,6 +4205,7 @@
     const EYE_LIMITS = [10, 15, 20, 30];
     const EYE_GRACE_MS = 3 * 60 * 1000;   // 時間到後最多再給 3 分鐘做完這一題，避免卡在一題一直不鎖
     const EYE_WARN_MS = 60 * 1000;        // 剩 1 分鐘時提醒
+    const GATE_COOLDOWN_MS = 30 * 1000;   // 家長算式連錯 3 次，等 30 秒才能再答（避免孩子亂猜）
     const EYE_EXERCISES = [
       { icon: '🌳', text: '看看窗外最遠的地方', seconds: 20 },
       { icon: '😉', text: '用力眨眨眼睛 10 下', seconds: 10 },
@@ -4202,29 +4218,64 @@
       return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     }
 
-    function loadEyeState() {
-      const state = { enabled: true, limitMin: 20, usedMs: 0, day: todayKey(), locked: false };
+    // rev：家長動作（解鎖、改設定、重新計時）的時間戳；多個分頁時以較新的家長動作為準
+    function parseEyeState(raw) {
+      const state = { enabled: true, limitMin: 20, usedMs: 0, day: todayKey(), locked: false, rev: 0 };
       try {
-        const saved = JSON.parse(localStorage.getItem(EYE_KEY) || 'null');
+        const saved = JSON.parse(raw || 'null');
         if (saved && typeof saved === 'object') {
           if (typeof saved.enabled === 'boolean') state.enabled = saved.enabled;
           if (EYE_LIMITS.includes(saved.limitMin)) state.limitMin = saved.limitMin;
           if (isNum(saved.usedMs) && saved.usedMs >= 0) state.usedMs = saved.usedMs;
           if (isStr(saved.day)) state.day = saved.day;
           if (saved.locked === true) state.locked = true;
+          if (isNum(saved.rev) && saved.rev >= 0) state.rev = saved.rev;
         }
       } catch (e) {}
       return state;
     }
 
-    let eyeState = loadEyeState();
+    function readStoredEye() {
+      try {
+        return parseEyeState(localStorage.getItem(EYE_KEY));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    let eyeState = readStoredEye() || parseEyeState(null);
     let eyeLastTick = performance.now();
     let eyeOverSince = null;
     let eyeWarned = false;
     let eyeExerciseTimer = null;
-    let parentGate = null;      // { a, b, onPass }
+    const parentGates = {};     // 每個算式表單各自的狀態：{ a, b, onPass, tries, cooldownUntil }
+
+    // 合併別的分頁存的狀態：家長動作較新的那邊為準；否則「鎖住」與「用掉的時間」取較嚴格的
+    function mergeStoredEye() {
+      const stored = readStoredEye();
+      if (!stored) return;
+      if (stored.rev > eyeState.rev) {
+        eyeState = stored;
+        eyeOverSince = null;
+        eyeWarned = false;
+        return;
+      }
+      if (stored.rev === eyeState.rev && stored.day === eyeState.day) {
+        eyeState.locked = eyeState.locked || stored.locked;
+        eyeState.usedMs = Math.max(eyeState.usedMs, stored.usedMs);
+      }
+    }
 
     function saveEyeState() {
+      mergeStoredEye();
+      try {
+        localStorage.setItem(EYE_KEY, JSON.stringify(eyeState));
+      } catch (e) {}
+    }
+
+    // 家長動作：直接以這個分頁的狀態為準
+    function saveEyeStateAsParent() {
+      eyeState.rev = Date.now();
       try {
         localStorage.setItem(EYE_KEY, JSON.stringify(eyeState));
       } catch (e) {}
@@ -4238,6 +4289,11 @@
       return eyeState.enabled && eyeState.usedMs >= eyeLimitMs();
     }
 
+    function eyeNotice(text) {
+      showToast(text);
+      speakText(text.replace(/^\S+\s/, ''));
+    }
+
     function eyeTick() {
       const now = performance.now();
       const elapsed = Math.min(now - eyeLastTick, 2000); // 裝置休眠回來不要一次加一大段
@@ -4246,35 +4302,55 @@
       if (eyeState.day !== todayKey()) {   // 新的一天重新計時（鎖住的話仍要家長解鎖）
         eyeState.day = todayKey();
         eyeState.usedMs = 0;
+        eyeOverSince = null;
         eyeWarned = false;
         saveEyeState();
+        updateEyeLockMinutes();
       }
       if (!eyeState.enabled || eyeState.locked) return;
+      // 只算在題目畫面中的時間：選單、背景分頁、任何彈出視窗（過關、同步、設定…）都不算
       if (!currentModule || document.visibilityState !== 'visible') return;
+      if (document.querySelector('.modal-overlay.active')) return;
 
       eyeState.usedMs += elapsed;
       const left = eyeLimitMs() - eyeState.usedMs;
       if (!eyeWarned && left > 0 && left <= EYE_WARN_MS) {
         eyeWarned = true;
-        showToast("⏰ 再玩 1 分鐘，就要讓眼睛休息囉！");
+        eyeNotice("⏰ 再玩 1 分鐘，就要讓眼睛休息囉！");
       }
       if (left <= 0) {
         if (eyeOverSince === null) {
           eyeOverSince = now;
-          showToast("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
+          eyeNotice("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
         } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active')) {
           goHome();
           lockEyes();
         }
       }
       saveEyeState();
+      if (eyeState.locked) lockEyes();   // 別的分頁已經鎖住了
+    }
+
+    function updateEyeLockMinutes() {
+      document.getElementById('eyeLockMinutes').textContent = Math.floor(eyeState.usedMs / 60000);
+    }
+
+    // 鎖住時，畫面上其他東西都不能點、也不能用 Tab 碰到
+    function setPageInert(on) {
+      document.querySelectorAll('header, main, .modal-overlay').forEach(el => {
+        if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+      });
     }
 
     function lockEyes() {
+      const wasLocked = document.getElementById('eyeLock').classList.contains('active');
       eyeState.locked = true;
       saveEyeState();
+      if (wasLocked) return;
+      document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      setPageInert(true);
       document.getElementById('eyeLock').classList.add('active');
-      document.getElementById('eyeLockMinutes').textContent = Math.round(eyeState.usedMs / 60000);
+      updateEyeLockMinutes();
       document.getElementById('eyeUnlockBox').style.display = 'none';
       startEyeExercises();
     }
@@ -4314,37 +4390,54 @@
       }, 1000);
     }
 
-    // 家長算式：兩位數加法而且要進位，例如 37 + 48
-    function newParentGate(onPass) {
+    // 家長算式：兩位數加法而且要進位，例如 37 + 48；每個表單各自出題
+    function newParentGate(key, onPass) {
       let a, b;
       do {
         a = randInt(15, 69);
         b = randInt(15, 39);
       } while ((a % 10) + (b % 10) < 10);
-      parentGate = { a, b, onPass, tries: 0 };
+      const prev = parentGates[key];
+      parentGates[key] = { a, b, onPass, tries: 0, cooldownUntil: prev ? prev.cooldownUntil : 0 };
       return `${a} + ${b} = ?`;
     }
 
-    function checkParentAnswer(inputId, questionId) {
-      const input = document.getElementById(inputId);
-      if (!parentGate) return;
-      if (Number(input.value) === parentGate.a + parentGate.b) {
-        const onPass = parentGate.onPass;
-        parentGate = null;
+    function setGateMessage(key, text) {
+      document.getElementById(key + 'Msg').textContent = text;
+    }
+
+    function checkParentAnswer(key) {
+      const gate = parentGates[key];
+      const input = document.getElementById(key + 'Input');
+      if (!gate) return;
+      const wait = gate.cooldownUntil - Date.now();
+      if (wait > 0) {
+        setGateMessage(key, `請等 ${Math.ceil(wait / 1000)} 秒再試一次`);
+        return;
+      }
+      if (Number(input.value) === gate.a + gate.b) {
+        delete parentGates[key];
         input.value = '';
-        onPass();
+        setGateMessage(key, '');
+        gate.onPass();
         return;
       }
       soundError();
       input.value = '';
-      parentGate.tries++;
-      if (parentGate.tries >= 3) document.getElementById(questionId).textContent = newParentGate(parentGate.onPass);
-      showToast("❌ 答案不對喔");
+      gate.tries++;
+      if (gate.tries >= 3) {
+        document.getElementById(key + 'Q').textContent = newParentGate(key, gate.onPass);
+        parentGates[key].cooldownUntil = Date.now() + GATE_COOLDOWN_MS;
+        setGateMessage(key, `答錯 3 次，已經換一題。請等 ${GATE_COOLDOWN_MS / 1000} 秒再試。`);
+      } else {
+        setGateMessage(key, `答案不對喔（還可以再試 ${3 - gate.tries} 次）`);
+      }
     }
 
     function showEyeUnlock() {
       document.getElementById('eyeUnlockBox').style.display = 'block';
-      document.getElementById('eyeGateQ').textContent = newParentGate(unlockEyes);
+      document.getElementById('eyeGateQ').textContent = newParentGate('eyeGate', unlockEyes);
+      setGateMessage('eyeGate', '');
       document.getElementById('eyeGateInput').focus();
     }
 
@@ -4354,23 +4447,30 @@
       eyeState.usedMs = 0;
       eyeOverSince = null;
       eyeWarned = false;
-      saveEyeState();
-      document.getElementById('eyeLock').classList.remove('active');
+      saveEyeStateAsParent();
+      hideEyeLock();
       showToast("🔓 已解鎖，重新開始計時");
+    }
+
+    function hideEyeLock() {
+      clearInterval(eyeExerciseTimer);
+      setPageInert(false);
+      document.getElementById('eyeLock').classList.remove('active');
     }
 
     function openParentSettings() {
       soundClick();
       document.getElementById('parentGateBox').style.display = 'block';
       document.getElementById('parentSettingsBox').style.display = 'none';
-      document.getElementById('parentGateQ').textContent = newParentGate(showParentSettings);
+      document.getElementById('parentGateQ').textContent = newParentGate('parentGate', showParentSettings);
+      setGateMessage('parentGate', '');
       document.getElementById('parentModal').classList.add('active');
       document.getElementById('parentGateInput').focus();
     }
 
     function closeParentSettings() {
       soundClick();
-      parentGate = null;
+      delete parentGates.parentGate;
       document.getElementById('parentModal').classList.remove('active');
     }
 
@@ -4383,7 +4483,7 @@
     function renderParentSettings() {
       document.getElementById('eyeEnabledBtn').textContent = eyeState.enabled ? '開' : '關';
       document.getElementById('eyeEnabledBtn').classList.toggle('active', eyeState.enabled);
-      document.querySelectorAll('.eye-limit-btn').forEach(btn => {
+      document.querySelectorAll('.eye-limit-btn[data-min]').forEach(btn => {
         btn.classList.toggle('active', Number(btn.dataset.min) === eyeState.limitMin);
         btn.disabled = !eyeState.enabled;
       });
@@ -4393,7 +4493,7 @@
     function toggleEyeCare() {
       soundClick();
       eyeState.enabled = !eyeState.enabled;
-      saveEyeState();
+      saveEyeStateAsParent();
       renderParentSettings();
     }
 
@@ -4403,7 +4503,7 @@
       eyeState.limitMin = min;
       eyeOverSince = null;
       eyeWarned = false;
-      saveEyeState();
+      saveEyeStateAsParent();
       renderParentSettings();
     }
 
@@ -4412,7 +4512,7 @@
       eyeState.usedMs = 0;
       eyeOverSince = null;
       eyeWarned = false;
-      saveEyeState();
+      saveEyeStateAsParent();
       renderParentSettings();
       showToast("⏱️ 已重新計時");
     }
@@ -4421,6 +4521,18 @@
     document.addEventListener('visibilitychange', () => {
       eyeLastTick = performance.now();
       if (document.visibilityState === 'hidden') saveEyeState();
+    });
+    // 別的分頁鎖住或解鎖時，這個分頁跟著改
+    window.addEventListener('storage', e => {
+      if (e.key !== EYE_KEY) return;
+      const wasLocked = eyeState.locked;
+      mergeStoredEye();
+      if (eyeState.locked && !wasLocked) {
+        goHome();
+        lockEyes();
+      } else if (!eyeState.locked && document.getElementById('eyeLock').classList.contains('active')) {
+        hideEyeLock();
+      }
     });
 
     loadSavedProgress();
