@@ -1724,12 +1724,10 @@
         let text = done > 0 ? `⭐ 已破 ${done}/5 關` : el.dataset.original;
         // 自動調整後實際出題的難度和家長選的不同時，讓家長在選單上看得到
         const tier = getModuleAdaptiveTier(mod);
-        if (tier && tier !== getDifficulty()) text += ` · 🤖${DIFFICULTIES[tier].label}`;
+        if (tier && tier !== getDifficulty()) text += ` · 🤖 自動調整為${DIFFICULTIES[tier].label}`;
         el.textContent = text;
-        if (done > 0) {
-          el.style.background = "#FEF08A";
-          el.style.color = "#854D0E";
-        }
+        el.style.background = done > 0 ? "#FEF08A" : "";
+        el.style.color = done > 0 ? "#854D0E" : "";
       }
       updateDifficultyButtons();
       updateAdaptiveButton();
@@ -1751,6 +1749,12 @@
             setTimeout(() => {
               showToast("🎉 成功同步跨裝置進度！目前已累積 " + starsEarned + " 顆星！");
             }, 500);
+            // 匯入後把 ?save= 從網址拿掉，不然每次重新整理都會再匯入一次、蓋掉之後的進度
+            try {
+              const cleanUrl = new URL(window.location.href);
+              cleanUrl.searchParams.delete('save');
+              history.replaceState(null, '', cleanUrl.toString());
+            } catch (e) {}
           }
         } catch(e) {
           console.warn("URL save decode failed", e);
@@ -1903,6 +1907,8 @@
 
     function goHome() {
       retryMistakeId = null;
+      if (pendingAdaptMsg && currentModule) pendingAdaptNotice[currentModule] = pendingAdaptMsg;
+      pendingAdaptMsg = '';
       if (mazeTimer) clearInterval(mazeTimer);
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
       window.speechSynthesis && window.speechSynthesis.cancel();
@@ -1927,6 +1933,10 @@
 
       roundSeen = new Set();
       retryMistakeId = mistake ? mistake.id : null;
+      // 只用 toast：接著載入題目時會朗讀題目，語音會被蓋掉
+      const notice = pendingAdaptNotice[modName];
+      delete pendingAdaptNotice[modName];
+      if (notice && !mistake) showToast(notice);
       if (mistake) {
         questionWrongAttempts = 0;
         questionCountedWrong = false;
@@ -1986,7 +1996,8 @@
 
       let adaptMsg = '';
       if (currentModule && !retryMistakeId) {
-        userProgress.completed[currentModule] = Math.max(userProgress.completed[currentModule] || 0, currentLevel + 1);
+        if (!userProgress.completed || typeof userProgress.completed !== 'object') userProgress.completed = {};
+        userProgress.completed[currentModule] = Math.max(Number(userProgress.completed[currentModule]) || 0, currentLevel + 1);
         saveToLocalStorage();
         adaptMsg = adaptAfterQuestion();
       }
@@ -2058,7 +2069,8 @@
     let adaptStreaks = {};        // { 題型: { correct, wrong } }，只存在記憶體
     let questionCountedWrong = false;
     let pendingAdaptMsg = '';
-    let lastWrongAt = 0;
+    let lastWrong = { text: undefined, at: -Infinity };
+    let pendingAdaptNotice = {}; // 題目中途降級後孩子就離開了：下次進這個題型時再告訴他
 
     const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
 
@@ -2122,9 +2134,10 @@
 
     // 所有答錯都從這裡進來：計次、記錄錯題、錯到門檻的當下就算一次「答錯」（之後離開也算數）
     function onWrongAnswer(wrongText) {
-      const now = Date.now();
-      if (now - lastWrongAt < DOUBLE_TAP_MS) return; // 小朋友連點同一個按鈕只算一次
-      lastWrongAt = now;
+      const now = performance.now();
+      // 小朋友連點同一個按鈕只算一次；快速點了「不同」的錯誤選項仍各算一次
+      if (wrongText === lastWrong.text && now - lastWrong.at < DOUBLE_TAP_MS) return;
+      lastWrong = { text: wrongText, at: now };
       questionWrongAttempts++;
       recordMistake(wrongText);
       if (canAdapt() && !questionCountedWrong && questionWrongAttempts >= wrongThreshold(currentModule)) {
