@@ -1506,6 +1506,10 @@
 
     /* 很窄的手機（例如 iPhone SE 第一代 320px） */
     @media (max-width: 360px) {
+      .num-weight { width: 40px; height: 40px; font-size: 20px; }
+      .num-pan { min-width: 96px; gap: 4px; padding: 6px; }
+      .num-scale { padding-top: 16px; }
+      .num-stand { height: 40px; }
       .difficulty-bar { gap: 6px; padding: 10px 6px; }
       .diff-btn { padding: 6px 10px; }
       .maze-board.compact .maze-cell { width: 38px; height: 38px; font-size: 20px; }
@@ -2671,6 +2675,8 @@
       const { options, answerIdx, ...rest } = question;
       // 找不同：同一組物品＋同一個答案就是同一題（可能同時符合兩條規則、解說不同）
       if (Array.isArray(rest.items)) return JSON.stringify({ items: [...rest.items].sort(), answer: rest.answer });
+      // 數字天平：兩盤一樣就是同一題，可選的砝碼不同不算
+      if (rest.mode === 'number') return JSON.stringify({ left: rest.left, right: rest.right, slots: rest.slots });
       return JSON.stringify(rest);
     }
 
@@ -2826,7 +2832,8 @@
           left = [randInt(2, 8), randInt(2, 8)];
           const sum = left[0] + left[1];
           if (sum > 14) return null;
-          right = [randInt(Math.max(1, sum - 9), sum - 1)];
+          right = [randInt(Math.max(1, sum - 9), Math.min(9, sum - 1))];
+          if (left.includes(right[0])) return null;   // 不然照抄左邊的另一個數字就答對了
           slots = 1;
         } else {
           left = [randInt(4, 9), randInt(4, 9)];
@@ -2861,6 +2868,18 @@
           weights
         };
       });
+    }
+
+    function isValidNumberBalance(q) {
+      const small = v => Number.isInteger(v) && v >= 1 && v <= 20;
+      if (!isArr(q.left, small) || !isArr(q.right, small) || !isArr(q.weights, small)) return false;
+      if (q.left.length < 1 || q.left.length > 2 || q.right.length < 1 || q.right.length > 2) return false;
+      if (!Number.isInteger(q.slots) || q.slots < 1 || q.slots > 2) return false;
+      if (q.weights.length < q.slots || q.weights.length > 6 || new Set(q.weights).size !== q.weights.length) return false;
+      const need = q.left.reduce((a, b) => a + b, 0) - q.right.reduce((a, b) => a + b, 0);
+      // 至少要有一種放法是平衡的
+      if (q.slots === 1) return q.weights.includes(need);
+      return q.weights.some((a, i) => q.weights.some((b, j) => j > i && a + b === need));
     }
 
     function genBalance(diff) {
@@ -3407,8 +3426,7 @@
     const QUESTION_VALIDATORS = {
       pattern: q => isArr(q.sequence, isStr) && isStr(q.answer) && isArr(q.options, isStr),
       balance: q => q.mode === 'number'
-        ? isArr(q.left, isNum) && isArr(q.right, isNum) && Number.isInteger(q.slots) && q.slots >= 1 && q.slots <= 3 &&
-          isArr(q.weights, isNum) && q.weights.length >= q.slots && q.left.length <= 4 && q.right.length <= 4
+        ? isValidNumberBalance(q)
         : isArr(q.clues, c => c && isStr(c.left) && isStr(c.right)) && isStr(q.targetLeft) &&
         isStr(q.targetItem) && isNum(q.answer) && isArr(q.options, isNum),
       blocks: q => isArr(q.grid, row => isArr(row, h => Number.isInteger(h) && h >= 0 && h <= 5) && row.length > 0 && row.length <= 4) &&
@@ -3980,8 +3998,12 @@
 
     /* 數字天平：點砝碼放進右盤空格，天平跟著傾斜；空格放滿就檢查 */
     let numberPlaced = [];   // 放進空格的砝碼（weights 的索引）
+    let numberLocked = false; // 答錯後退回砝碼的那 1.2 秒內不能操作
+    let numberResetTimer = null;
 
     function loadNumberBalance(data) {
+      clearTimeout(numberResetTimer);
+      numberLocked = false;
       numberPlaced = [];
       renderNumberBalance();
       speakText(data.prompt);
@@ -3995,7 +4017,7 @@
       const leftSum = sumOf(data.left);
       const rightSum = sumOf(data.right) + sumOf(placedValues);
       // 重的那邊往下，最多傾斜 14 度
-      const tilt = Math.max(-14, Math.min(14, (rightSum - leftSum) * 3));
+      const tilt = Math.max(-14, Math.min(14, (rightSum - leftSum) * 1.5));
       document.getElementById('numBeam').style.transform = `rotate(${tilt}deg)`;
 
       const block = (n, cls) => `<span class="num-weight ${cls}">${n}</span>`;
@@ -4008,7 +4030,12 @@
           slot.className = 'num-weight placed';
           slot.textContent = data.weights[numberPlaced[k]];
           slot.setAttribute('aria-label', `拿回砝碼 ${slot.textContent}`);
-          slot.onclick = () => { soundClick(); numberPlaced.splice(k, 1); renderNumberBalance(); };
+          slot.onclick = () => {
+            if (numberLocked) return;
+            soundClick();
+            numberPlaced.splice(k, 1);
+            renderNumberBalance();
+          };
         } else {
           slot.className = 'num-weight empty';
           slot.textContent = '?';
@@ -4031,7 +4058,7 @@
 
     function placeNumberWeight(i) {
       const data = currentQuestion;
-      if (numberPlaced.length >= data.slots) return;
+      if (numberLocked || numberPlaced.length >= data.slots) return;
       soundClick();
       numberPlaced.push(i);
       renderNumberBalance();
@@ -4039,15 +4066,20 @@
 
       const placedValues = numberPlaced.map(k => data.weights[k]);
       if (sumOf(data.right) + sumOf(placedValues) === sumOf(data.left)) {
+        numberLocked = true;
         triggerVictory("天平平衡了！", `${data.left.join(' + ')} = ${[...data.right, ...placedValues].join(' + ')}，兩邊一樣重！`, isLastQuestion());
         return;
       }
       soundError();
       onWrongAnswer(`放了 ${placedValues.join(' 和 ')}`);
       const heavier = sumOf(data.right) + sumOf(placedValues) > sumOf(data.left) ? '右邊太重了' : '右邊太輕了';
+      showToast(`⚖️ ${heavier}，再算算看！`);
       speakText(`${heavier}，再算算看！`);
-      setTimeout(() => {
+      numberLocked = true;
+      clearTimeout(numberResetTimer);
+      numberResetTimer = setTimeout(() => {
         if (currentQuestion !== data) return;
+        numberLocked = false;
         numberPlaced = [];
         renderNumberBalance();
       }, 1200);
