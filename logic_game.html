@@ -262,7 +262,8 @@
     }
 
     .monster-card svg { width: 100%; height: 100%; }
-    .monster-card.crossed { opacity: 0.3; box-shadow: none; }
+    .monster-card.crossed { box-shadow: none; background: #F1F5F9; }
+    .monster-card.crossed svg { opacity: 0.25; }
     .monster-card.crossed::after {
       content: "✖";
       position: absolute;
@@ -1193,8 +1194,9 @@
     }
 
     @media (max-width: 600px) {
-      .monster-grid { grid-template-columns: repeat(3, 76px); gap: 10px; }
-      .monster-card { width: 76px; height: 76px; }
+      .monster-grid { grid-template-columns: repeat(4, 66px); gap: 8px; margin-top: 10px; }
+      .monster-card { width: 66px; height: 66px; }
+      #monsterClues .clue-item { padding: 8px 10px; font-size: 16px; }
       .sort-baskets { gap: 8px; }
       .choice-btn.sort-item { width: 60px; height: 60px; font-size: 32px; }
       .sort-basket-items .choice-btn.sort-item { width: 48px; height: 48px; font-size: 26px; }
@@ -1205,6 +1207,8 @@
       .choice-btn.oddone-item { width: 60px; height: 60px; font-size: 32px; }
       .oddone-items { gap: 8px; max-width: 212px; }
       .oddone-items.oddone-four { max-width: 144px; }
+      .monster-grid { grid-template-columns: repeat(4, 58px); gap: 6px; }
+      .monster-card { width: 58px; height: 58px; }
     }
 
     /* MISTAKE BOOK */
@@ -2362,9 +2366,10 @@
       } else if (currentModule === 'gears') {
         promptText = document.getElementById('gearsPrompt').innerText;
       } else if (currentModule === 'oddone') {
-        promptText = document.getElementById('oddonePrompt').innerText;
-        const clues = [...document.querySelectorAll('#monsterClues .clue-item')].map(el => el.innerText);
-        if (clues.length) promptText += '。線索：' + clues.join('。');
+        const q = currentQuestion;
+        promptText = q.prompt;
+        if (q.mode === 'monster') promptText += ' 線索：' + q.clues.join('');
+        if (q.mode === 'sort') promptText += ' 兩個籃子是：' + q.baskets.map(b => b.replace(/^\S+\s/, '')).join('、');
       } else if (currentModule === 'raven') {
         promptText = document.getElementById('ravenPrompt').innerText;
       }
@@ -2471,7 +2476,10 @@
 
     // 齒輪只有兩個選項，選錯一次後剩下的必定是對的，所以錯 1 次就算答錯
     function wrongThreshold(module) {
-      return module === 'gears' ? 1 : 2;
+      if (module === 'gears') return 1;
+      // 分類只有兩個籃子，放錯的東西換另一個籃子就一定對
+      if (module === 'oddone' && currentQuestion && currentQuestion.mode === 'sort') return 1;
+      return 2;
     }
 
     function isAdaptiveOn() {
@@ -3297,17 +3305,26 @@
         (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
       raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule),
       oddone: q => {
+        const nonEmpty = v => isStr(v) && v.length > 0;
         if (q.mode === 'sort') {
-          return isArr(q.items, isStr) && q.items.length >= 4 && q.items.length <= 10 && new Set(q.items).size === q.items.length &&
-            isArr(q.baskets, isStr) && q.baskets.length === 2 &&
-            isArr(q.answer, b => b === 0 || b === 1) && q.answer.length === q.items.length;
+          return isArr(q.items, nonEmpty) && q.items.length >= 4 && q.items.length <= 10 && new Set(q.items).size === q.items.length &&
+            isArr(q.baskets, nonEmpty) && q.baskets.length === 2 &&
+            isArr(q.answer, b => b === 0 || b === 1) && q.answer.length === q.items.length &&
+            q.answer.includes(0) && q.answer.includes(1);
         }
         if (q.mode === 'monster') {
-          return isArr(q.monsters, m => m && hasOwn(MONSTER_COLORS, m.color) && (m.horns === 0 || m.horns === 1) && [1, 2, 3].includes(m.eyes)) &&
-            q.monsters.length >= 3 && q.monsters.length <= 12 &&
-            Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.monsters.length && isArr(q.clues, isStr);
+          const okMonster = m => m && hasOwn(MONSTER_COLORS, m.color) && (m.horns === 0 || m.horns === 1) && [1, 2, 3].includes(m.eyes);
+          const okRule = r => r && ['color', 'horns', 'eyes'].includes(r.attr) && typeof r.not === 'boolean';
+          if (!isArr(q.monsters, okMonster) || q.monsters.length < 3 || q.monsters.length > 12) return false;
+          if (new Set(q.monsters.map(m => `${m.color}${m.horns}${m.eyes}`)).size !== q.monsters.length) return false;
+          if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer >= q.monsters.length) return false;
+          if (!isArr(q.clues, nonEmpty) || !isArr(q.rules, okRule) || q.rules.length < 1 || q.rules.length !== q.clues.length) return false;
+          // 重新確認剛好只有答案那隻符合全部線索
+          const fits = q.monsters.map((m, i) => q.rules.every(r => monsterClueHolds(r, m)) ? i : -1).filter(i => i >= 0);
+          return fits.length === 1 && fits[0] === q.answer;
         }
-        return isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 &&
+        if (q.mode !== undefined && q.mode !== 'odd') return false;
+        return isArr(q.items, nonEmpty) && q.items.length >= 3 && q.items.length <= 8 &&
           new Set(q.items).size === q.items.length && q.items.includes(q.answer) && isStr(q.rule);
       }
     };
@@ -3644,7 +3661,7 @@
         return {
           mode: 'sort',
           prompt: rule.mixed
-            ? "把東西放進正確的籃子！不要只看是什麼喔！"
+            ? "先點東西，再點籃子。看清楚籃子上寫什麼，不要只看是什麼喔！"
             : "把東西放進正確的籃子！先點東西，再點籃子。",
           items: items.map(it => it.e),
           baskets: rule.groups.map(g => SORT_LABELS[rule.attr][g]),
@@ -3669,7 +3686,7 @@
     function monsterClueText(clue) {
       if (clue.attr === 'color') return `神秘怪獸${clue.not ? '不是' : '是'}${MONSTER_COLORS[clue.value]}的。`;
       if (clue.attr === 'horns') return (clue.value === 1) !== !!clue.not ? '神秘怪獸頭上有角。' : '神秘怪獸頭上沒有角。';
-      return `神秘怪獸${clue.not ? '不是' : '有'} ${clue.value} 隻眼睛。`;
+      return clue.not ? `神秘怪獸的眼睛不是 ${clue.value} 隻。` : `神秘怪獸剛好有 ${clue.value} 隻眼睛。`;
     }
 
     function genMonster(diff) {
@@ -3707,14 +3724,20 @@
           prompt: "聽線索，把「不是」神秘怪獸的點掉，剩下的就是牠！",
           monsters,
           answer,
-          clues: clues.map(monsterClueText)
+          clues: clues.map(monsterClueText),
+          rules: clues.map(c => ({ attr: c.attr, value: c.value, not: !!c.not }))
         };
       });
     }
 
-    // 找不同小偵探的三種玩法
+    // 找不同小偵探的三種玩法：每一輪 5 題保證三種都會出現
+    let detectiveModePlan = [];
     function genDetective(diff) {
-      const mode = pick(['odd', 'sort', 'monster']);
+      if (currentLevel === 0 || detectiveModePlan.length !== ROUND_SIZE) {
+        const modes = ['odd', 'sort', 'monster'];
+        detectiveModePlan = shuffle([...modes, ...Array.from({ length: ROUND_SIZE - modes.length }, () => pick(modes))]);
+      }
+      const mode = detectiveModePlan[currentLevel] || pick(['odd', 'sort', 'monster']);
       if (mode === 'sort') return genSort(diff);
       if (mode === 'monster') return genMonster(diff);
       return { mode: 'odd', ...genOddOneOut(diff) };
@@ -4590,6 +4613,11 @@
         btn.onclick = (e) => {
           e.stopPropagation();
           soundClick();
+          if (sortPlacement[i] !== null && sortSelected !== null) {
+            // 手上拿著東西時點到籃子裡的東西，當作是點那個籃子
+            dropIntoBasket(sortPlacement[i]);
+            return;
+          }
           if (sortPlacement[i] !== null) {      // 點籃子裡的東西：拿回來
             sortPlacement[i] = null;
             sortSelected = null;
@@ -4605,6 +4633,7 @@
 
     function dropIntoBasket(basket) {
       if (sortSelected === null) {
+        showToast("👆 先點一個東西，再點籃子喔！");
         speakText("先點一個東西，再點籃子喔！");
         return;
       }
@@ -4687,8 +4716,12 @@
         return;
       }
       soundError();
-      onWrongAnswer(`剩下${monsterName(data.monsters[left[0]])}`);
-      speakText("神秘怪獸被你點掉了喔！全部重來，再對照一次線索！");
+      const leftover = data.monsters[left[0]];
+      onWrongAnswer(`剩下${monsterName(leftover)}`);
+      const broken = (data.rules || []).findIndex(r => !monsterClueHolds(r, leftover));
+      const why = broken >= 0 ? `剩下的這隻不對，因為線索說：${data.clues[broken]}` : '剩下的這隻不是神秘怪獸。';
+      showToast(`❌ ${why}`);
+      speakText(`${why}全部重來，再對照一次線索！`);
       monsterCrossed = data.monsters.map(() => false);
       renderMonsters();
     }
