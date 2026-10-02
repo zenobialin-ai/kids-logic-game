@@ -511,6 +511,58 @@
       border: 2px solid #F59E0B;
     }
 
+    .num-scale {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 0 0;
+    }
+
+    .num-beam {
+      width: min(460px, 92%);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 8px solid #B45309;
+      border-radius: 4px;
+      padding: 0 6px;
+      transition: transform 0.5s ease;
+    }
+
+    .num-pan {
+      min-width: 120px;
+      min-height: 64px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      align-items: flex-end;
+      background: #FEF3C7;
+      border: 3px solid #F59E0B;
+      border-bottom: none;
+      border-radius: 16px 16px 0 0;
+      padding: 8px;
+    }
+
+    .num-stand { width: 16px; height: 60px; background: #B45309; border-radius: 0 0 8px 8px; }
+
+    .num-weight {
+      width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px 12px 6px 6px;
+      font-size: 24px;
+      font-weight: 900;
+      font-family: inherit;
+    }
+
+    .num-weight.fixed { background: #475569; color: #FFF; }
+    .num-weight.placed { background: #0EA5E9; color: #FFF; border: none; cursor: pointer; }
+    .num-weight.empty { background: #FFF; color: #94A3B8; border: 3px dashed #94A3B8; }
+    .choice-btn.num-weight-btn { font-weight: 900; }
+
     .scale-equal {
       color: #D97706;
       font-size: 32px;
@@ -1686,12 +1738,25 @@
         </button>
       </div>
       <div class="prompt-box" id="balancePrompt">看一看天平的平衡秘密，推理問號是幾顆？</div>
-      <div class="balance-container">
-        <div class="clue-scales" id="balanceClues"></div>
-        <div class="target-scale-box" id="balanceTarget"></div>
+      <div id="balanceSwapArea">
+        <div class="balance-container">
+          <div class="clue-scales" id="balanceClues"></div>
+          <div class="target-scale-box" id="balanceTarget"></div>
+        </div>
+        <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin: 16px 0 12px;">點選答案數量：</div>
+        <div class="options-grid" id="balanceOptions"></div>
       </div>
-      <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin: 16px 0 12px;">點選答案數量：</div>
-      <div class="options-grid" id="balanceOptions"></div>
+      <div id="numberBalanceArea" style="display:none;">
+        <div class="num-scale">
+          <div class="num-beam" id="numBeam">
+            <div class="num-pan" id="numLeftPan"></div>
+            <div class="num-pan" id="numRightPan"></div>
+          </div>
+          <div class="num-stand"></div>
+        </div>
+        <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin: 16px 0 12px;">點砝碼放到右邊：</div>
+        <div class="options-grid" id="numWeights"></div>
+      </div>
     </div>
 
     <!-- MODULE 3: 3D BLOCKS -->
@@ -2748,7 +2813,59 @@
       hard:   ['chain', 'chain-double', 'reverse']
     };
 
+    /* 數字天平：左右兩盤的砝碼數字加起來要一樣重 */
+    function genNumberBalance(diff) {
+      return generateUntil(() => {
+        let left, right, slots;
+        if (diff === 'easy') {
+          const a = randInt(4, 9);
+          left = [a];
+          right = [randInt(1, a - 1)];
+          slots = 1;
+        } else if (diff === 'normal') {
+          left = [randInt(2, 8), randInt(2, 8)];
+          const sum = left[0] + left[1];
+          if (sum > 14) return null;
+          right = [randInt(Math.max(1, sum - 9), sum - 1)];
+          slots = 1;
+        } else {
+          left = [randInt(4, 9), randInt(4, 9)];
+          const sum = left[0] + left[1];
+          right = [randInt(2, 6)];
+          slots = 2;
+          if (sum - right[0] < 5 || sum - right[0] > 13) return null;
+        }
+        const missing = left.reduce((a, b) => a + b, 0) - right.reduce((a, b) => a + b, 0);
+
+        let weights;
+        if (slots === 1) {
+          if (missing < 1 || missing > 9) return null;
+          weights = makeOptions(missing, [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(n => Math.abs(n - missing) <= 3)).sort((x, y) => x - y);
+        } else {
+          // 至少有一組兩個不同的砝碼加起來剛好；其他組合只要總和對也算對
+          const p = randInt(Math.max(1, missing - 9), Math.min(9, missing - 1));
+          const q = missing - p;
+          if (p === q || q < 1 || q > 9) return null;
+          const others = sample([1, 2, 3, 4, 5, 6, 7, 8, 9].filter(n => n !== p && n !== q), 3);
+          weights = [p, q, ...others].sort((x, y) => x - y);
+        }
+
+        const say = arr => arr.join(' 和 ');
+        return {
+          mode: 'number',
+          prompt: `左邊是 ${say(left)}，右邊已經有 ${say(right)}，` +
+            (slots === 1 ? '要放上哪一個砝碼，天平才會平衡？' : '要放上哪兩個砝碼，天平才會平衡？'),
+          left,
+          right,
+          slots,
+          weights
+        };
+      });
+    }
+
     function genBalance(diff) {
+      // 約三分之一出數字天平，其餘是原本的代換題
+      if (Math.random() < 1 / 3) return genNumberBalance(diff);
       const kind = pick(BALANCE_KINDS[diff]);
       const [A, B, C] = pickBalanceItems();
       const qty = (n, item) => `${n}${item.u}${item.n}`;
@@ -3289,7 +3406,10 @@
     const isCell = v => v && isNum(v.r) && isNum(v.c);
     const QUESTION_VALIDATORS = {
       pattern: q => isArr(q.sequence, isStr) && isStr(q.answer) && isArr(q.options, isStr),
-      balance: q => isArr(q.clues, c => c && isStr(c.left) && isStr(c.right)) && isStr(q.targetLeft) &&
+      balance: q => q.mode === 'number'
+        ? isArr(q.left, isNum) && isArr(q.right, isNum) && Number.isInteger(q.slots) && q.slots >= 1 && q.slots <= 3 &&
+          isArr(q.weights, isNum) && q.weights.length >= q.slots && q.left.length <= 4 && q.right.length <= 4
+        : isArr(q.clues, c => c && isStr(c.left) && isStr(c.right)) && isStr(q.targetLeft) &&
         isStr(q.targetItem) && isNum(q.answer) && isArr(q.options, isNum),
       blocks: q => isArr(q.grid, row => isArr(row, h => Number.isInteger(h) && h >= 0 && h <= 5) && row.length > 0 && row.length <= 4) &&
         q.grid.length > 0 && q.grid.length <= 4 && isNum(q.total) && isNum(q.padMax) && q.padMax <= 30,
@@ -3817,6 +3937,10 @@
       const data = currentQuestion;
       document.getElementById('balanceLevelBadge').textContent = levelBadgeText();
       document.getElementById('balancePrompt').textContent = data.prompt;
+      const isNumber = data.mode === 'number';
+      document.getElementById('balanceSwapArea').style.display = isNumber ? 'none' : '';
+      document.getElementById('numberBalanceArea').style.display = isNumber ? '' : 'none';
+      if (isNumber) return loadNumberBalance(data);
 
       const cluesContainer = document.getElementById('balanceClues');
       cluesContainer.innerHTML = "";
@@ -3852,6 +3976,81 @@
       });
 
       speakText(data.prompt);
+    }
+
+    /* 數字天平：點砝碼放進右盤空格，天平跟著傾斜；空格放滿就檢查 */
+    let numberPlaced = [];   // 放進空格的砝碼（weights 的索引）
+
+    function loadNumberBalance(data) {
+      numberPlaced = [];
+      renderNumberBalance();
+      speakText(data.prompt);
+    }
+
+    const sumOf = arr => arr.reduce((a, b) => a + b, 0);
+
+    function renderNumberBalance() {
+      const data = currentQuestion;
+      const placedValues = numberPlaced.map(i => data.weights[i]);
+      const leftSum = sumOf(data.left);
+      const rightSum = sumOf(data.right) + sumOf(placedValues);
+      // 重的那邊往下，最多傾斜 14 度
+      const tilt = Math.max(-14, Math.min(14, (rightSum - leftSum) * 3));
+      document.getElementById('numBeam').style.transform = `rotate(${tilt}deg)`;
+
+      const block = (n, cls) => `<span class="num-weight ${cls}">${n}</span>`;
+      document.getElementById('numLeftPan').innerHTML = data.left.map(n => block(n, 'fixed')).join('');
+      const right = document.getElementById('numRightPan');
+      right.innerHTML = data.right.map(n => block(n, 'fixed')).join('');
+      for (let k = 0; k < data.slots; k++) {
+        const slot = document.createElement('button');
+        if (k < numberPlaced.length) {
+          slot.className = 'num-weight placed';
+          slot.textContent = data.weights[numberPlaced[k]];
+          slot.setAttribute('aria-label', `拿回砝碼 ${slot.textContent}`);
+          slot.onclick = () => { soundClick(); numberPlaced.splice(k, 1); renderNumberBalance(); };
+        } else {
+          slot.className = 'num-weight empty';
+          slot.textContent = '?';
+          slot.setAttribute('aria-label', '空格');
+        }
+        right.appendChild(slot);
+      }
+
+      const tray = document.getElementById('numWeights');
+      tray.innerHTML = "";
+      data.weights.forEach((w, i) => {
+        if (numberPlaced.includes(i)) return;
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn num-weight-btn';
+        btn.textContent = w;
+        btn.onclick = () => placeNumberWeight(i);
+        tray.appendChild(btn);
+      });
+    }
+
+    function placeNumberWeight(i) {
+      const data = currentQuestion;
+      if (numberPlaced.length >= data.slots) return;
+      soundClick();
+      numberPlaced.push(i);
+      renderNumberBalance();
+      if (numberPlaced.length < data.slots) return;
+
+      const placedValues = numberPlaced.map(k => data.weights[k]);
+      if (sumOf(data.right) + sumOf(placedValues) === sumOf(data.left)) {
+        triggerVictory("天平平衡了！", `${data.left.join(' + ')} = ${[...data.right, ...placedValues].join(' + ')}，兩邊一樣重！`, isLastQuestion());
+        return;
+      }
+      soundError();
+      onWrongAnswer(`放了 ${placedValues.join(' 和 ')}`);
+      const heavier = sumOf(data.right) + sumOf(placedValues) > sumOf(data.left) ? '右邊太重了' : '右邊太輕了';
+      speakText(`${heavier}，再算算看！`);
+      setTimeout(() => {
+        if (currentQuestion !== data) return;
+        numberPlaced = [];
+        renderNumberBalance();
+      }, 1200);
     }
 
     function checkBalanceChoice(chosen, answer) {
