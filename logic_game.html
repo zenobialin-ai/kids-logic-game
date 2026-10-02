@@ -1081,6 +1081,15 @@
       box-shadow: 0 3px 0 #10B981;
     }
 
+    .adapt-note {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: #EEF2FF;
+      color: #3730A3;
+      font-weight: 800;
+    }
+
     /* MISTAKE BOOK */
     .mistake-btn {
       border: 3px solid #FCA5A5;
@@ -1230,6 +1239,7 @@
         <button class="diff-btn" data-diff="easy" onclick="setDifficulty('easy')">🌱 簡單</button>
         <button class="diff-btn" data-diff="normal" onclick="setDifficulty('normal')">🌿 普通</button>
         <button class="diff-btn" data-diff="hard" onclick="setDifficulty('hard')">🌳 挑戰</button>
+        <button class="diff-btn" id="adaptiveBtn" onclick="toggleAdaptive()">🤖 自動調整：開</button>
         <button class="mistake-btn" onclick="openMistakeBook()">📖 錯題本 <span class="mistake-count" id="mistakeCount">0</span></button>
       </div>
 
@@ -1698,6 +1708,7 @@
         }
       }
       updateDifficultyButtons();
+      updateAdaptiveButton();
       updateMistakeBadge();
     }
 
@@ -1879,6 +1890,8 @@
       if (view) view.classList.add('active');
 
       roundSeen = new Set();
+      correctStreak = 0;
+      wrongStreak = 0;
       retryMistakeId = mistake ? mistake.id : null;
       if (mistake) {
         questionWrongAttempts = 0;
@@ -1935,9 +1948,11 @@
         addStars(3);
       }
 
+      let adaptMsg = '';
       if (currentModule && !retryMistakeId) {
         userProgress.completed[currentModule] = Math.max(userProgress.completed[currentModule] || 0, currentLevel + 1);
         saveToLocalStorage();
+        adaptMsg = adaptAfterQuestion();
       }
 
       const modal = document.getElementById('victoryModal');
@@ -1952,6 +1967,12 @@
         btn.textContent = "完成大挑戰！回首頁 🏆";
       } else {
         btn.textContent = "進入下一關 🚀";
+      }
+      if (adaptMsg) {
+        const note = document.createElement('div');
+        note.className = 'adapt-note';
+        note.textContent = adaptMsg;
+        document.getElementById('modalMsg').appendChild(note);
       }
       modal.classList.add('active');
     }
@@ -1989,10 +2010,83 @@
       return DIFFICULTIES[userProgress.difficulty] ? userProgress.difficulty : 'normal';
     }
 
+    /* ADAPTIVE DIFFICULTY (自適應難度)
+       起點是家長選的難度；一題第一次就答對算「答對」，同一題錯 2 次以上算「答錯」
+       連續答對 3 題升一級、連續答錯 2 題降一級。調整後的難度依題型記住，家長改難度時重來 */
+    const DIFFICULTY_ORDER = ['easy', 'normal', 'hard'];
+    const ADAPT_UP_STREAK = 3;
+    const ADAPT_DOWN_STREAK = 2;
+    const ADAPT_WRONG_ATTEMPTS = 2;
+    let correctStreak = 0;
+    let wrongStreak = 0;
+
+    const hasOwn = (obj, key) => !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+
+    function isAdaptiveOn() {
+      return userProgress.adaptive !== false;
+    }
+
+    // 目前實際出題用的難度
+    function getActiveDifficulty() {
+      if (!isAdaptiveOn() || !currentModule) return getDifficulty();
+      const tier = hasOwn(userProgress.adaptiveTier, currentModule) ? userProgress.adaptiveTier[currentModule] : null;
+      return hasOwn(DIFFICULTIES, tier) ? tier : getDifficulty();
+    }
+
+    // 答對一題後呼叫；回傳要顯示給孩子的升降級訊息（沒有變化回傳空字串）
+    function adaptAfterQuestion() {
+      if (!isAdaptiveOn() || !currentModule) return '';
+      if (questionWrongAttempts === 0) {
+        correctStreak++;
+        wrongStreak = 0;
+      } else if (questionWrongAttempts >= ADAPT_WRONG_ATTEMPTS) {
+        wrongStreak++;
+        correctStreak = 0;
+      } else {
+        correctStreak = 0;
+        wrongStreak = 0;
+      }
+
+      const idx = DIFFICULTY_ORDER.indexOf(getActiveDifficulty());
+      let next = idx;
+      if (correctStreak >= ADAPT_UP_STREAK && idx < DIFFICULTY_ORDER.length - 1) next = idx + 1;
+      if (wrongStreak >= ADAPT_DOWN_STREAK && idx > 0) next = idx - 1;
+      if (correctStreak >= ADAPT_UP_STREAK || wrongStreak >= ADAPT_DOWN_STREAK) {
+        correctStreak = 0;
+        wrongStreak = 0;
+      }
+      if (next === idx) return '';
+
+      const tier = DIFFICULTY_ORDER[next];
+      if (!userProgress.adaptiveTier || typeof userProgress.adaptiveTier !== 'object') userProgress.adaptiveTier = {};
+      userProgress.adaptiveTier[currentModule] = tier;
+      saveToLocalStorage();
+      const label = DIFFICULTIES[tier].label;
+      // 降級用鼓勵的說法，不要讓孩子覺得被懲罰
+      return next > idx
+        ? `🚀 你變厲害了！難度升級到「${label}」！`
+        : `💪 我們先回到「${label}」多練習，熟練了再升級！`;
+    }
+
+    function toggleAdaptive() {
+      soundClick();
+      userProgress.adaptive = !isAdaptiveOn();
+      saveToLocalStorage();
+      showToast(isAdaptiveOn() ? "🤖 自動調整難度：開（會依答題表現升降級）" : "🤖 自動調整難度：關（固定在選好的難度）");
+    }
+
+    function updateAdaptiveButton() {
+      const btn = document.getElementById('adaptiveBtn');
+      if (!btn) return;
+      btn.classList.toggle('active', isAdaptiveOn());
+      btn.textContent = isAdaptiveOn() ? '🤖 自動調整：開' : '🤖 自動調整：關';
+    }
+
     function setDifficulty(diff) {
       if (!DIFFICULTIES[diff]) return;
       soundClick();
       userProgress.difficulty = diff;
+      userProgress.adaptiveTier = {}; // 家長重新選難度，自動調整從這個難度重新開始
       saveToLocalStorage();
       updateDifficultyButtons();
       showToast(`${DIFFICULTIES[diff].icon} 難度切換為「${DIFFICULTIES[diff].label}」`);
@@ -2000,14 +2094,14 @@
 
     function updateDifficultyButtons() {
       const current = getDifficulty();
-      document.querySelectorAll('.diff-btn').forEach(btn => {
+      document.querySelectorAll('.diff-btn[data-diff]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.diff === current);
       });
     }
 
     function levelBadgeText() {
       if (retryMistakeId) return '📖 錯題再挑戰';
-      return `第 ${currentLevel + 1} / ${ROUND_SIZE} 關 · ${DIFFICULTIES[getDifficulty()].label}`;
+      return `第 ${currentLevel + 1} / ${ROUND_SIZE} 關 · ${DIFFICULTIES[getActiveDifficulty()].label}`;
     }
 
     function isLastQuestion() {
@@ -2023,9 +2117,9 @@
     // 同一輪避免出現一模一樣的題目
     function generateQuestion(modName) {
       const generator = QUESTION_GENERATORS[modName];
-      let question = generator(getDifficulty());
+      let question = generator(getActiveDifficulty());
       for (let i = 0; i < 30 && roundSeen.has(questionKey(question)); i++) {
-        question = generator(getDifficulty());
+        question = generator(getActiveDifficulty());
       }
       roundSeen.add(questionKey(question));
       return question;
@@ -2781,7 +2875,7 @@
         list.unshift({
           id: `m_${Date.now()}_${randInt(0, 999)}`,
           module: currentModule,
-          difficulty: getDifficulty(),
+          difficulty: getActiveDifficulty(),
           question: currentQuestion,
           wrongText,
           wrongCount: 1,
