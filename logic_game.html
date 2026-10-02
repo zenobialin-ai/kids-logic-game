@@ -1130,6 +1130,13 @@
       .oddone-items.oddone-four { max-width: 170px; }
     }
 
+    /* 最窄的手機（320px）：按鈕再小一點，仍然排成 3+2 */
+    @media (max-width: 360px) {
+      .choice-btn.oddone-item { width: 60px; height: 60px; font-size: 32px; }
+      .oddone-items { gap: 8px; max-width: 212px; }
+      .oddone-items.oddone-four { max-width: 144px; }
+    }
+
     /* MISTAKE BOOK */
     .mistake-btn {
       border: 3px solid #FCA5A5;
@@ -2497,7 +2504,8 @@
     // 比對題目時不看選項：同一題換了一組錯誤選項仍算同一題
     function questionKey(question) {
       const { options, answerIdx, ...rest } = question;
-      if (Array.isArray(rest.items)) rest.items = [...rest.items].sort();
+      // 找不同：同一組物品＋同一個答案就是同一題（可能同時符合兩條規則、解說不同）
+      if (Array.isArray(rest.items)) return JSON.stringify({ items: [...rest.items].sort(), answer: rest.answer });
       return JSON.stringify(rest);
     }
 
@@ -3365,9 +3373,8 @@
       { e: '🍋', kind: 'fruit', color: 'yellow', shape: 'round' }, { e: '🍏', kind: 'fruit', color: 'green', shape: 'round' },
       { e: '🍇', kind: 'fruit', color: 'purple', shape: 'round' }, { e: '🍊', kind: 'fruit', color: 'orange', shape: 'round' },
       { e: '🥝', kind: 'fruit', color: 'green', shape: 'round' }, { e: '🍈', kind: 'fruit', color: 'green', shape: 'round' },
-      { e: '🍍', kind: 'fruit', color: 'yellow' },
-      // 菇類在台灣六大類食物屬於蔬菜；顏色不一定，不標
-      { e: '🍄', kind: 'veg' },
+      // 鳳梨有綠色葉冠，顏色有爭議，不標
+      { e: '🍍', kind: 'fruit' },
       { e: '🥕', kind: 'veg', color: 'orange', shape: 'long' }, { e: '🥦', kind: 'veg', color: 'green', shape: 'round' },
       { e: '🍆', kind: 'veg', color: 'purple', shape: 'long' }, { e: '🥒', kind: 'veg', color: 'green', shape: 'long' },
       { e: '🐶', kind: 'animal', place: 'land', pet: true }, { e: '🐱', kind: 'animal', place: 'land', pet: true },
@@ -3377,16 +3384,20 @@
       { e: '🦒', kind: 'animal', place: 'land', big: true },
       { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
       { e: '🦈', kind: 'animal', place: 'water' }, { e: '🐳', kind: 'animal', place: 'water', big: true },
-      { e: '🐦', kind: 'animal', place: 'sky' }, { e: '🦋', kind: 'animal', place: 'sky' }, { e: '🐝', kind: 'animal', place: 'sky' },
+      { e: '🦋', kind: 'animal', place: 'sky' }, { e: '🐝', kind: 'animal', place: 'sky' },
       { e: '🦅', kind: 'animal', place: 'sky' },
       // 有明顯顏色的動物：只用在顏色題（沒有 place，避免「瓢蟲算不算會飛」這類爭議）
       { e: '🐞', kind: 'animal', color: 'red' }, { e: '🐤', kind: 'animal', color: 'yellow' }, { e: '🐛', kind: 'animal', color: 'green' },
       { e: '🚗', kind: 'vehicle', place: 'land', color: 'red' }, { e: '🚒', kind: 'vehicle', place: 'land', color: 'red' },
       { e: '🚕', kind: 'vehicle', place: 'land', color: 'yellow' }, { e: '🚌', kind: 'vehicle', place: 'land' },
-      { e: '🚂', kind: 'vehicle', place: 'land' }, { e: '🚑', kind: 'vehicle', place: 'land' }, { e: '🚜', kind: 'vehicle', place: 'land' },
+      { e: '🚑', kind: 'vehicle', place: 'land' },
       { e: '⛵', kind: 'vehicle', place: 'water' }, { e: '🚢', kind: 'vehicle', place: 'water' }, { e: '🚤', kind: 'vehicle', place: 'water' },
       { e: '🚁', kind: 'vehicle', place: 'sky' }, { e: '🚀', kind: 'vehicle', place: 'sky' }
     ];
+    // where：把「在水上」（船）和「在水裡」（魚）分開，給嚴格檢查用
+    ODD_ITEMS.forEach(it => {
+      if (it.place) it.where = it.place === 'water' ? (it.kind === 'vehicle' ? 'onwater' : 'inwater') : it.place;
+    });
     const ODD_ATTRS = ['kind', 'place', 'color', 'big', 'shape'];
     const ODD_NAMES = {
       kind: { fruit: '水果', veg: '蔬菜', animal: '動物', vehicle: '交通工具' },
@@ -3421,11 +3432,13 @@
     // attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品、strict 哪些特徵不能有第二個「只有一個」、check 額外條件
     const ODD_RULES = {
       easy: [
-        { attr: 'kind', pool: it => ['fruit', 'animal', 'vehicle'].includes(it.kind), count: 4, strict: ['place'] }
+        // 動物和交通工具要有 place，不然「唯一會飛／唯一不會飛」的歧義擋不到
+        { attr: 'kind', pool: it => it.kind === 'fruit' || ((it.kind === 'animal' || it.kind === 'vehicle') && !!it.place),
+          count: 4, strict: ['place'] }
       ],
       normal: [
         { attr: 'kind', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 4, strict: ['color'] },
-        { attr: 'color', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 4, strict: ['kind'] },
+        { attr: 'color', pool: it => (it.kind === 'fruit' || it.kind === 'veg') && !!it.color, count: 4, strict: ['kind'] },
         { attr: 'place', pool: it => it.kind === 'animal' && !!it.place && notPet(it), count: 5, strict: [] },
         { attr: 'place', pool: it => it.kind === 'vehicle', count: 4, strict: ['color'] }
       ],
@@ -3434,7 +3447,7 @@
         { attr: 'color', pool: it => !!it.color, count: 5, strict: ['kind', 'place'],
           check: (items, answer) => new Set(items.filter(it => it !== answer).map(it => it.kind)).size >= 2 },
         // 在哪裡，但動物和交通工具混在一起：要忽略「是什麼」，只看在哪裡。例：🦓🐯🚒🚗 + ⛵
-        { attr: 'place', pool: it => !!it.place && notPet(it), count: 5, strict: ['kind', 'color'],
+        { attr: 'place', pool: it => !!it.place && notPet(it), count: 5, strict: ['kind', 'color', 'where'],
           check: (items, answer) => new Set(items.filter(it => it !== answer).map(it => it.kind)).size >= 2 }
       ]
     };
