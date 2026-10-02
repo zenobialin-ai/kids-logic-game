@@ -1081,6 +1081,64 @@
       box-shadow: 0 3px 0 #10B981;
     }
 
+    /* MISTAKE BOOK */
+    .mistake-btn {
+      border: 3px solid #FCA5A5;
+      background: #FEF2F2;
+      color: #B91C1C;
+      font-family: inherit;
+      font-size: var(--font-content);
+      font-weight: 800;
+      padding: 8px 18px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-left: 8px;
+    }
+
+    .mistake-btn:hover { transform: translateY(-2px); }
+
+    .mistake-count {
+      display: none;
+      background: #EF4444;
+      color: #FFF;
+      border-radius: 12px;
+      padding: 0 8px;
+      font-size: 14px;
+      margin-left: 4px;
+    }
+
+    .mistake-list {
+      max-height: 60vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mistake-card {
+      border: 2px solid #E2E8F0;
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: #F8FAFC;
+    }
+
+    .mistake-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .mistake-tag { font-weight: 800; color: #4338CA; word-break: keep-all; }
+    .mistake-time { color: #94A3B8; white-space: nowrap; }
+    .mistake-prompt { font-size: var(--font-content); font-weight: 700; color: #1E293B; margin-bottom: 6px; line-height: 1.5; }
+    .mistake-summary { font-size: 18px; color: #475569; margin-bottom: 6px; word-break: break-all; }
+    .mistake-wrong { font-size: 15px; color: #B91C1C; margin-bottom: 10px; }
+    .mistake-retry { font-size: 15px; padding: 8px 20px; border-radius: 14px; }
+    .mistake-empty { text-align: center; padding: 30px 10px; color: #475569; line-height: 1.8; }
+
     /* 一格裡有多個圖案（數量題）時縮小字級 */
     .pattern-item.multi { width: auto; min-width: 76px; padding: 0 10px; font-size: 24px; }
     .choice-btn.multi { width: auto; min-width: 80px; padding: 0 10px; font-size: 22px; }
@@ -1172,6 +1230,7 @@
         <button class="diff-btn" data-diff="easy" onclick="setDifficulty('easy')">🌱 簡單</button>
         <button class="diff-btn" data-diff="normal" onclick="setDifficulty('normal')">🌿 普通</button>
         <button class="diff-btn" data-diff="hard" onclick="setDifficulty('hard')">🌳 挑戰</button>
+        <button class="mistake-btn" onclick="openMistakeBook()">📖 錯題本 <span class="mistake-count" id="mistakeCount">0</span></button>
       </div>
 
       <!-- SECTION 1: FOUNDATION LOGIC -->
@@ -1495,6 +1554,22 @@
     </div>
   </div>
 
+  <!-- MISTAKE BOOK MODAL -->
+  <div class="modal-overlay" id="mistakeModal">
+    <div class="modal-card" style="max-width: 520px; text-align: left; padding: 28px 24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-size:var(--font-title); font-weight:900; color:#1E293B; display:flex; align-items:center; gap:8px;">
+          <span>📖</span> 我的錯題本
+        </div>
+        <button onclick="closeMistakeBook()" style="border:none; background:#F1F5F9; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
+      </div>
+      <div class="mistake-list" id="mistakeList"></div>
+      <div style="text-align:right; margin-top:14px;">
+        <button id="mistakeClearBtn" onclick="clearMistakeBook()" style="background:#FFF; border:2px solid #CBD5E1; padding:6px 14px; border-radius:10px; font-size:14px; font-weight:700; color:#64748B; cursor:pointer;">🗑️ 清空錯題本</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION -->
   <div class="toast-box" id="toastBox">提示訊息</div>
 
@@ -1623,6 +1698,7 @@
         }
       }
       updateDifficultyButtons();
+      updateMistakeBadge();
     }
 
     function loadSavedProgress() {
@@ -1779,6 +1855,7 @@
     }
 
     function goHome() {
+      retryMistakeId = null;
       if (mazeTimer) clearInterval(mazeTimer);
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
       window.speechSynthesis && window.speechSynthesis.cancel();
@@ -1788,7 +1865,8 @@
       updateMenuProgressBadges();
     }
 
-    function startModule(modName) {
+    // mistake：從錯題本重做時傳入，直接載入當時那一題
+    function startModule(modName, mistake = null) {
       initAudio();
       soundClick();
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
@@ -1801,7 +1879,14 @@
       if (view) view.classList.add('active');
 
       roundSeen = new Set();
-      loadCurrentQuestion();
+      retryMistakeId = mistake ? mistake.id : null;
+      if (mistake) {
+        questionWrongAttempts = 0;
+        currentQuestion = mistake.question;
+        MODULE_LOADERS[modName]();
+      } else {
+        loadCurrentQuestion();
+      }
     }
 
     const MODULE_LOADERS = {
@@ -1842,9 +1927,15 @@
     function triggerVictory(title, msg, isLastLevel = false) {
       soundSuccess();
       launchConfetti();
-      addStars(3);
+      // 錯題重做只給 1 顆星；答對當下就移除錯題，重新整理也不能重複刷星
+      if (retryMistakeId) {
+        addStars(1);
+        resolveMistake(retryMistakeId);
+      } else {
+        addStars(3);
+      }
 
-      if (currentModule) {
+      if (currentModule && !retryMistakeId) {
         userProgress.completed[currentModule] = Math.max(userProgress.completed[currentModule] || 0, currentLevel + 1);
         saveToLocalStorage();
       }
@@ -1854,7 +1945,10 @@
       document.getElementById('modalMsg').textContent = msg || "你具有超級偵探的邏輯頭腦！獲得 3 顆星星 ⭐⭐⭐";
       
       const btn = modal.querySelector('.modal-btn');
-      if (isLastLevel) {
+      if (retryMistakeId) {
+        document.getElementById('modalMsg').textContent = `${msg || ''} 錯題學會了，獲得 1 顆星星 ⭐`.trim();
+        btn.textContent = "學會了！回到錯題本 📖";
+      } else if (isLastLevel) {
         btn.textContent = "完成大挑戰！回首頁 🏆";
       } else {
         btn.textContent = "進入下一關 🚀";
@@ -1865,6 +1959,13 @@
     function nextQuestionOrFinish() {
       const modal = document.getElementById('victoryModal');
       modal.classList.remove('active');
+
+      if (retryMistakeId) {
+        goHome();
+        openMistakeBook();
+        return;
+      }
+
       currentLevel++;
 
       if (currentLevel < ROUND_SIZE) loadCurrentQuestion(); else goHome();
@@ -1905,11 +2006,12 @@
     }
 
     function levelBadgeText() {
+      if (retryMistakeId) return '📖 錯題再挑戰';
       return `第 ${currentLevel + 1} / ${ROUND_SIZE} 關 · ${DIFFICULTIES[getDifficulty()].label}`;
     }
 
     function isLastQuestion() {
-      return currentLevel === ROUND_SIZE - 1;
+      return retryMistakeId !== null || currentLevel === ROUND_SIZE - 1;
     }
 
     // 比對題目時不看選項：同一題換了一組錯誤選項仍算同一題
@@ -1930,8 +2032,13 @@
     }
 
     function loadCurrentQuestion() {
+      questionWrongAttempts = 0;
       currentQuestion = generateQuestion(currentModule);
       MODULE_LOADERS[currentModule]();
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
     }
 
     /* RANDOM HELPERS */
@@ -2564,6 +2671,205 @@
         `三原色混合：紅＋藍＝紫、藍＋黃＝綠、紅＋黃＝橘！所以${RAVEN_COLOR_NAMES[last[0]]}＋${RAVEN_COLOR_NAMES[last[1]]}＝${RAVEN_COLOR_NAMES[last[2]]}！`);
     }
 
+    /* =========================================================
+       MISTAKE BOOK (錯題本)：答錯的題目自動記下來，可以重做同一題
+       刻意不顯示正確答案，避免重做時直接照抄
+       ========================================================= */
+    const MISTAKE_KEY = 'little_logic_mistakes_v1';
+    const MISTAKE_LIMIT = 50;
+    const MODULE_INFO = {
+      pattern:   { icon: '🔮', title: '規律魔法陣' },
+      balance:   { icon: '⚖️', title: '神奇智慧天平' },
+      blocks:    { icon: '🧱', title: '立體透視積木' },
+      maze:      { icon: '🤖', title: '小機器人尋寶' },
+      deduction: { icon: '🏡', title: '動物好友排排坐' },
+      folding:   { icon: '🪞', title: '摺紙打孔透視' },
+      gears:     { icon: '⚙️', title: '齒輪連動旋轉' },
+      raven:     { icon: '🔲', title: '瑞文氏九宮矩陣' }
+    };
+    let retryMistakeId = null;
+    let questionWrongAttempts = 0; // 目前這一題答錯了幾次
+
+    // 錯題從 localStorage 讀回來，資料可能損壞、是舊格式或被竄改；結構不對的直接丟掉
+    const isStr = v => typeof v === 'string';
+    const isNum = v => typeof v === 'number' && isFinite(v);
+    const isArr = (v, check) => Array.isArray(v) && v.every(check);
+    const isCell = v => v && isNum(v.r) && isNum(v.c);
+    const QUESTION_VALIDATORS = {
+      pattern: q => isArr(q.sequence, isStr) && isStr(q.answer) && isArr(q.options, isStr),
+      balance: q => isArr(q.clues, c => c && isStr(c.left) && isStr(c.right)) && isStr(q.targetLeft) &&
+        isStr(q.targetItem) && isNum(q.answer) && isArr(q.options, isNum),
+      blocks: q => isArr(q.grid, row => isArr(row, h => Number.isInteger(h) && h >= 0 && h <= 5) && row.length > 0 && row.length <= 4) &&
+        q.grid.length > 0 && q.grid.length <= 4 && isNum(q.total) && isNum(q.padMax) && q.padMax <= 30,
+      maze: q => Number.isInteger(q.size) && q.size >= 3 && q.size <= 8 && isCell(q.start) && isCell(q.goal) && isArr(q.obstacles, isCell),
+      deduction: q => isArr(q.animals, isStr) && Number.isInteger(q.houses) && q.houses === q.animals.length &&
+        q.houses <= 6 && isArr(q.clues, isStr) && isArr(q.solution, isStr) && q.solution.length === q.houses,
+      folding: q => isArr(q.steps, st => st && isStr(st.text) && st.sheet &&
+          ['x1', 'y1', 'x2', 'y2', 'layers'].every(k => isNum(st.sheet[k])) && isArr(st.sheet.dots, d => d && isNum(d.cx) && isNum(d.cy))) &&
+        q.steps.length > 0 && isArr(q.options, o => o && isArr(o.dots, d => d && isNum(d.cx) && isNum(d.cy))) &&
+        Number.isInteger(q.answerIdx) && q.answerIdx >= 0 && q.answerIdx < q.options.length && isStr(q.explanation),
+      gears: q => isArr(q.gears, g => g && ['x', 'y', 'r', 'teeth', 'dir'].every(k => isNum(g[k])) && isStr(g.label)) &&
+        q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
+        (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
+      raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule)
+    };
+
+    function isValidMistake(m) {
+      return m && Object.prototype.hasOwnProperty.call(QUESTION_VALIDATORS, m.module) &&
+        m.question && isStr(m.question.prompt) && QUESTION_VALIDATORS[m.module](m.question) &&
+        isStr(m.id) && isNum(m.wrongCount) && isStr(m.time) && (m.wrongText === null || isStr(m.wrongText));
+    }
+
+    function loadMistakes() {
+      try {
+        const list = JSON.parse(localStorage.getItem(MISTAKE_KEY) || '[]');
+        return Array.isArray(list) ? list.filter(isValidMistake) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveMistakes(list) {
+      let saved = true;
+      try {
+        localStorage.setItem(MISTAKE_KEY, JSON.stringify(list));
+      } catch (e) {
+        saved = false;
+      }
+      updateMistakeBadge();
+      return saved;
+    }
+
+    // 卡片上的題目摘要，讓同一種題型的錯題分得出來（不透露答案）
+    function mistakeSummary(module, q) {
+      if (module === 'pattern') return q.sequence.map(x => x === '?' ? '❓' : x).join(' ');
+      // 積木只畫出哪些格子有放（俯視），不透露高度，避免洩漏總數
+      if (module === 'blocks') return '俯視：' + q.grid.map(row => row.map(h => h ? '🟨' : '⬜').join('')).join(' / ');
+      if (module === 'maze') return `${q.size}×${q.size} 迷宮：🤖 第 ${q.start.r + 1} 列第 ${q.start.c + 1} 格 → 🎁 第 ${q.goal.r + 1} 列第 ${q.goal.c + 1} 格`;
+      if (module === 'deduction') return `住戶：${q.animals.join(' ')}`;
+      if (module === 'folding') {
+        const where = (v, lo, hi) => v < 40 ? lo : v > 60 ? hi : '中';
+        const holes = q.steps[q.steps.length - 1].sheet.dots.map(d => where(d.cy, '上', '下') + where(d.cx, '左', '右'));
+        return `打洞位置：${holes.join('、') || '無'}`;
+      }
+      if (module === 'gears') {
+        const sizes = q.gears.map(g => g.r >= 55 ? '大' : g.r >= 45 ? '中' : '小').join('');
+        return `${q.gears.length} 個齒輪（${sizes}），問第 ${q.targetGearIndex + 1} 個`;
+      }
+      if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
+      return '';
+    }
+
+    // 同一題答錯多次只記一筆，更新次數與最後一次的錯法
+    function recordMistake(wrongText) {
+      if (!currentModule || !currentQuestion) return;
+      questionWrongAttempts++;
+      const key = questionKey(currentQuestion);
+      const list = loadMistakes();
+      const time = new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const existing = retryMistakeId
+        ? list.find(m => m.id === retryMistakeId)
+        : list.find(m => m.module === currentModule && questionKey(m.question) === key);
+      if (existing) {
+        existing.wrongCount++;
+        existing.wrongText = wrongText;
+        existing.time = time;
+        // 移到最前面：清單依最後答錯時間排序，超過上限時淘汰的是最久沒錯的題目
+        list.splice(list.indexOf(existing), 1);
+        list.unshift(existing);
+      } else {
+        list.unshift({
+          id: `m_${Date.now()}_${randInt(0, 999)}`,
+          module: currentModule,
+          difficulty: getDifficulty(),
+          question: currentQuestion,
+          wrongText,
+          wrongCount: 1,
+          time
+        });
+        if (list.length > MISTAKE_LIMIT) list.pop();
+      }
+      saveMistakes(list);
+    }
+
+    function resolveMistake(id) {
+      if (saveMistakes(loadMistakes().filter(m => m.id !== id))) {
+        showToast("✨ 這題學會了！已從錯題本移除");
+      }
+    }
+
+    function updateMistakeBadge() {
+      const badge = document.getElementById('mistakeCount');
+      if (!badge) return;
+      const count = loadMistakes().length;
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+
+    function openMistakeBook() {
+      soundClick();
+      renderMistakeBook();
+      document.getElementById('mistakeModal').classList.add('active');
+    }
+
+    function closeMistakeBook() {
+      soundClick();
+      document.getElementById('mistakeModal').classList.remove('active');
+    }
+
+    function clearMistakeBook() {
+      if (!confirm('確定要清空錯題本嗎？')) return;
+      saveMistakes([]);
+      renderMistakeBook();
+    }
+
+    function renderMistakeBook() {
+      const list = loadMistakes();
+      const box = document.getElementById('mistakeList');
+      document.getElementById('mistakeClearBtn').style.display = list.length ? 'inline-block' : 'none';
+      if (!list.length) {
+        box.innerHTML = `<div class="mistake-empty">🌟 目前沒有錯題！<br>答錯的題目會自動記在這裡，之後可以再挑戰一次。</div>`;
+        return;
+      }
+
+      box.innerHTML = "";
+      list.forEach(m => {
+        const info = MODULE_INFO[m.module];
+        const diff = Object.prototype.hasOwnProperty.call(DIFFICULTIES, m.difficulty) ? DIFFICULTIES[m.difficulty] : DIFFICULTIES.normal;
+        const card = document.createElement('div');
+        card.className = 'mistake-card';
+        card.innerHTML = `
+          <div class="mistake-head">
+            <span class="mistake-tag">${info.icon} ${info.title} · ${diff.label}</span>
+            <span class="mistake-time"></span>
+          </div>
+          <div class="mistake-prompt"></div>
+          <div class="mistake-summary"></div>
+          <div class="mistake-wrong"></div>
+        `;
+        card.querySelector('.mistake-time').textContent = m.time;
+        card.querySelector('.mistake-prompt').textContent = m.question.prompt;
+        const summary = mistakeSummary(m.module, m.question);
+        card.querySelector('.mistake-summary').textContent = summary;
+        card.querySelector('.mistake-summary').style.display = summary ? 'block' : 'none';
+        card.querySelector('.mistake-wrong').textContent = (m.wrongText ? `上次${m.wrongText}　・　` : '') + `答錯 ${m.wrongCount} 次`;
+
+        const btn = document.createElement('button');
+        btn.className = 'modal-btn mistake-retry';
+        btn.textContent = '🎯 再挑戰一次';
+        btn.onclick = () => retryMistake(m.id);
+        card.appendChild(btn);
+        box.appendChild(card);
+      });
+    }
+
+    function retryMistake(id) {
+      const mistake = loadMistakes().find(m => m.id === id);
+      if (!mistake) return;
+      document.getElementById('mistakeModal').classList.remove('active');
+      startModule(mistake.module, mistake);
+    }
+
     const QUESTION_GENERATORS = {
       pattern: genPattern,
       balance: genBalance,
@@ -2624,6 +2930,7 @@
         triggerVictory("規律破解成功！", "你敏銳的觀察力找到了圖形的秩序！", isLastQuestion());
       } else {
         soundError();
+        recordMistake(`選了 ${chosen}`);
         speakText("再看仔細一點唷！想想看前面圖案的排隊規律是什麼！");
       }
     }
@@ -2643,18 +2950,18 @@
         const card = document.createElement('div');
         card.className = 'scale-card';
         card.innerHTML = `
-          <div class="scale-pan">${clue.left}</div>
+          <div class="scale-pan">${escapeHtml(clue.left)}</div>
           <div class="scale-equal">=</div>
-          <div class="scale-pan">${clue.right}</div>
+          <div class="scale-pan">${escapeHtml(clue.right)}</div>
         `;
         cluesContainer.appendChild(card);
       });
 
       const targetBox = document.getElementById('balanceTarget');
       targetBox.innerHTML = `
-        <div class="scale-pan">${data.targetLeft}</div>
+        <div class="scale-pan">${escapeHtml(data.targetLeft)}</div>
         <div class="scale-equal">=</div>
-        <div class="scale-pan">？ 個 ${data.targetItem}</div>
+        <div class="scale-pan">？ 個 ${escapeHtml(data.targetItem)}</div>
       `;
 
       const optionsBox = document.getElementById('balanceOptions');
@@ -2678,6 +2985,7 @@
         triggerVictory("智慧代換大師！", `答對了！就是 ${answer} 個！你懂得用代換方法解決難題！`, isLastQuestion());
       } else {
         soundError();
+        recordMistake(`選了 ${chosen} 個`);
         speakText("想一想，一個可以換幾個？再加在一起算算看！");
       }
     }
@@ -2798,6 +3106,7 @@
         triggerVictory("透視大師！答對了！", `總共確實是 ${total} 個積木！你連躲在底部的都算到了！`, isLastQuestion());
       } else {
         soundError();
+        recordMistake(`數成 ${chosen} 個`);
         speakText(chosen < total ? "不只這些喔！底層有被壓在下面的積木，打開透視鏡看看！" : "比這個少一點點喔，再數一次試試看！");
       }
     }
@@ -2952,6 +3261,7 @@
         if (hitWall || hitObs) {
           clearInterval(mazeTimer);
           soundError();
+          recordMistake(hitWall ? '撞到外牆' : '撞到石頭');
           isRunningMaze = false;
           document.getElementById('btnRunCode').disabled = false;
           speakText(hitWall ? "哎呀！撞到迷宮外牆了！請修正路線！" : "哎呀！撞到大石頭障礙了！再試一次！");
@@ -2971,6 +3281,7 @@
         triggerVictory("恭喜奪得寶藏！", "你的程式演算法指令非常精準！成功帶領機器人過關！", isLastQuestion());
       } else {
         soundError();
+        recordMistake('沒走到寶箱');
         speakText("機器人還沒走到寶箱位置喔，路線還差幾步，加油！");
       }
     }
@@ -2995,7 +3306,7 @@
       data.clues.forEach(clue => {
         const item = document.createElement('div');
         item.className = 'clue-item';
-        item.innerHTML = `<span>🔍</span> ${clue}`;
+        item.innerHTML = `<span>🔍</span> ${escapeHtml(clue)}`;
         cluesList.appendChild(item);
       });
 
@@ -3096,6 +3407,7 @@
         triggerVictory("推理大偵探過關！", "太厲害了！你完全破解了所有線索，安排得一清二楚！", isLastQuestion());
       } else {
         soundError();
+        recordMistake(`排成 ${deductionPlacements.join('')}`);
         speakText("好像有小動物走錯房間囉！再對照一次上面的偵探線索看看！");
       }
     }
@@ -3138,7 +3450,7 @@
 
         box.innerHTML = `
           <div class="sheet-preview">${innerSVG}</div>
-          <div class="fold-step-text">${step.text}</div>
+          <div class="fold-step-text">${escapeHtml(step.text)}</div>
         `;
         stepsRow.appendChild(box);
 
@@ -3181,6 +3493,7 @@
         triggerVictory("空間對稱大師！答對了！", explanation, isLastQuestion());
       } else {
         soundError();
+        recordMistake(`選了選項 ${String.fromCharCode(65 + chosenIdx)}`);
         speakText("想一想紙張展開時，孔洞會往哪邊鏡像翻開？再試一次！");
       }
     }
@@ -3316,6 +3629,7 @@
         triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
       } else {
         soundError();
+        recordMistake(null); // 只有兩個選項，寫出上次選什麼就等於公布答案
         speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
       }
     }
@@ -3369,6 +3683,7 @@
         triggerVictory("瑞文氏資優思維達人！", rule, isLastQuestion());
       } else {
         soundError();
+        recordMistake(`選了 ${chosen}`);
         speakText("橫著看一看，豎著看一看，注意顏色、形狀或數量的雙向規律喔！");
       }
     }
