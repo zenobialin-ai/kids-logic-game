@@ -1175,7 +1175,43 @@
 
     /* RESPONSIVE */
     @media (max-width: 600px) {
-      .brand-title { font-size: var(--font-title); }
+      /* 頁首：標題縮小不折行，按鈕只留圖示 */
+      header { padding: 10px 12px; }
+      .brand { gap: 6px; }
+      .brand-icon { font-size: 26px; }
+      .brand-title { font-size: 15px; white-space: nowrap; }
+      .header-stats { gap: 4px; flex-shrink: 0; }
+      .stat-badge { padding: 3px 8px; font-size: 15px; gap: 4px; }
+      .sync-btn { padding: 6px 9px; }
+      .sound-btn, .home-btn { width: 34px; height: 34px; font-size: 18px; }
+      .btn-label { display: none; }
+
+      /* 遊戲標題列：名稱和關卡標籤可以折行，朗讀按鈕只留 🔊 */
+      main { padding: 12px; }
+      .game-view { padding: 16px; }
+      .game-header { gap: 8px; align-items: flex-start; }
+      .game-title-box { flex-wrap: wrap; gap: 6px 8px; }
+      .game-title { font-size: 18px; }
+      .level-badge { white-space: nowrap; font-size: 15px; padding: 3px 10px; }
+      .speak-btn { padding: 8px 10px; flex-shrink: 0; }
+
+      /* 難度列：三個難度一排，自動調整和錯題本一排 */
+      .difficulty-bar { gap: 8px; padding: 12px; }
+      .difficulty-label { display: none; }
+      .diff-btn, .mistake-btn { padding: 6px 12px; font-size: 15px; }
+      .adapt-toggle, .mistake-btn { margin-left: 0; }
+
+      /* 積木：透視鏡按鈕放到畫布上方，不蓋住積木 */
+      .canvas-wrap { flex-direction: column; gap: 8px; }
+      .xray-btn { position: static; font-size: 15px; padding: 6px 14px; }
+
+      /* 摺紙：步驟改成兩欄，不顯示箭頭（折行後箭頭會掛在行尾）；選項卡縮小，兩欄放得下 */
+      .fold-steps-row { display: grid; grid-template-columns: repeat(2, auto); justify-content: center; gap: 12px 20px; }
+      .step-arrow { display: none; }
+      .unfold-choices-grid { gap: 12px; }
+      .unfold-choice-card { padding: 10px; }
+      .unfold-svg-sheet { width: 90px; height: 90px; }
+
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
@@ -1185,6 +1221,11 @@
       .animal-token { width: 56px; height: 56px; font-size: 30px; }
       .raven-cell { width: 70px; height: 70px; font-size: 32px; }
       .raven-opt-btn { width: 68px; height: 68px; font-size: 34px; }
+    }
+
+    /* 很窄的手機（例如 iPhone SE 第一代 320px）：只留火箭圖示 */
+    @media (max-width: 360px) {
+      .brand-title { display: none; }
     }
     .sync-btn {
       background: linear-gradient(135deg, #6366F1, #8B5CF6);
@@ -1242,7 +1283,7 @@
         <span>⭐</span>
         <span id="starCount">0</span>
       </div>
-      <button class="sync-btn" onclick="openSyncModal()" title="跨裝置同步與分享進度">📲 同步/分享</button>
+      <button class="sync-btn" onclick="openSyncModal()" title="跨裝置同步與分享進度">📲 <span class="btn-label">同步/分享</span></button>
       <button class="sound-btn" id="soundToggle" onclick="toggleAudio()" title="音效開關">🔊</button>
       <button class="home-btn" onclick="goHome()" title="回首頁選單">🏠</button>
     </div>
@@ -1345,8 +1386,8 @@
           <div class="game-title">規律魔法陣</div>
           <span class="level-badge" id="patternLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="patternPrompt">請仔細看圖形的順序，找出問號處應該放什麼！</div>
@@ -1363,8 +1404,8 @@
           <div class="game-title">神奇智慧天平</div>
           <span class="level-badge" id="balanceLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="balancePrompt">看一看天平的平衡秘密，推理問號是幾顆？</div>
@@ -1384,8 +1425,8 @@
           <div class="game-title">立體透視積木</div>
           <span class="level-badge" id="blocksLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="blocksPrompt">這裡一共有幾個積木？注意有些積木躲在底層支撐喔！</div>
@@ -1407,8 +1448,8 @@
           <div class="game-title">小機器人尋寶</div>
           <span class="level-badge" id="mazeLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="mazePrompt">規劃好路線指令，引導機器人安全拿到金色寶箱！</div>
@@ -1446,8 +1487,8 @@
           <div class="game-title">動物好友排排坐</div>
           <span class="level-badge" id="deductionLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀線索
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀線索</span>
         </button>
       </div>
       <div class="prompt-box" id="deductionPrompt">根據偵探線索，把小動物放到正確的房間裡！</div>
@@ -1468,8 +1509,8 @@
           <div class="game-title">摺紙打孔透視 (資優題)</div>
           <span class="level-badge" id="foldingLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="foldingPrompt">一張正方形色紙照著箭頭摺疊並剪下孔洞，展開後會是哪一張？</div>
@@ -1488,8 +1529,8 @@
           <div class="game-title">齒輪連動旋轉 (資優題)</div>
           <span class="level-badge" id="gearsLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="gearsPrompt">齒輪互相咬合！當第 1 個齒輪如箭頭轉動，最後一個齒輪會往哪轉？</div>
@@ -1511,8 +1552,8 @@
           <div class="game-title">瑞文氏九宮矩陣 (資優題)</div>
           <span class="level-badge" id="ravenLevelBadge">第 1 / 5 關</span>
         </div>
-        <button class="speak-btn" onclick="speakCurrentPrompt()">
-          <span>🔊</span> 朗讀題目
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀">
+          <span>🔊</span> <span class="btn-label">朗讀題目</span>
         </button>
       </div>
       <div class="prompt-box" id="ravenPrompt">橫著看有規律，豎著看也有規律！問號處該填入哪一個？</div>
