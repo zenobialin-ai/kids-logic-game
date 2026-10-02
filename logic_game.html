@@ -211,6 +211,68 @@
 
     .choice-btn.oddone-item { width: 96px; height: 96px; font-size: 50px; }
     .choice-btn.oddone-correct { border-color: #10B981; background: #DCFCE7; }
+    .level-badge.oddone-mode { background: #CCFBF1; color: #0F766E; }
+
+    .sort-tray {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      padding: 18px;
+      background: #F0FDFA;
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+    }
+
+    .choice-btn.sort-item { width: 72px; height: 72px; font-size: 38px; }
+    .choice-btn.sort-item.selected { border-color: #0EA5E9; background: #E0F2FE; transform: translateY(-4px); }
+    .sort-baskets { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .sort-basket {
+      border: 3px dashed #94A3B8;
+      border-radius: 20px;
+      padding: 12px;
+      min-height: 150px;
+      background: #FFFBEB;
+      cursor: pointer;
+    }
+
+    .sort-basket-label { font-weight: 900; font-size: var(--font-content); color: #92400E; text-align: center; margin-bottom: 10px; }
+    .sort-basket-items { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .sort-basket-items .choice-btn.sort-item { width: 56px; height: 56px; font-size: 30px; }
+
+    .monster-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 96px);
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .monster-card {
+      width: 96px;
+      height: 96px;
+      border: 3px solid #CBD5E1;
+      border-radius: 18px;
+      background: #FFF;
+      padding: 4px;
+      cursor: pointer;
+      position: relative;
+      box-shadow: 0 5px 0 #94A3B8;
+    }
+
+    .monster-card svg { width: 100%; height: 100%; }
+    .monster-card.crossed { opacity: 0.3; box-shadow: none; }
+    .monster-card.crossed::after {
+      content: "✖";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 56px;
+      color: #DC2626;
+    }
 
     .menu-card .icon {
       font-size: 52px;
@@ -1130,6 +1192,14 @@
       .oddone-items.oddone-four { max-width: 170px; }
     }
 
+    @media (max-width: 600px) {
+      .monster-grid { grid-template-columns: repeat(3, 76px); gap: 10px; }
+      .monster-card { width: 76px; height: 76px; }
+      .sort-baskets { gap: 8px; }
+      .choice-btn.sort-item { width: 60px; height: 60px; font-size: 32px; }
+      .sort-basket-items .choice-btn.sort-item { width: 48px; height: 48px; font-size: 26px; }
+    }
+
     /* 最窄的手機（320px）：按鈕再小一點，仍然排成 3+2 */
     @media (max-width: 360px) {
       .choice-btn.oddone-item { width: 60px; height: 60px; font-size: 32px; }
@@ -1508,7 +1578,7 @@
         <div class="menu-card card-oddone" onclick="startModule('oddone')">
           <div class="icon">🔍</div>
           <h3>找不同小偵探</h3>
-          <p>哪一個跟大家不一樣？找出藏在裡面的規則！</p>
+          <p>找不同、分類、猜猜誰是神秘怪獸！</p>
           <div class="card-badge" id="badge-oddone">🧩 分類與特徵觀察</div>
         </div>
       </div>
@@ -1570,6 +1640,7 @@
           <span style="font-size: 30px;">🔍</span>
           <div class="game-title">找不同小偵探</div>
           <span class="level-badge" id="oddoneLevelBadge">第 1 / 5 關</span>
+          <span class="level-badge oddone-mode" id="oddoneMode">🔍 找不同</span>
         </div>
         <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
           <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
@@ -1577,6 +1648,25 @@
       </div>
       <div class="prompt-box" id="oddonePrompt">哪一個和其他的不一樣？</div>
       <div class="oddone-items" id="oddoneItems"></div>
+
+      <div id="sortArea" style="display:none;">
+        <div class="sort-tray" id="sortTray"></div>
+        <div class="sort-baskets">
+          <div class="sort-basket" onclick="dropIntoBasket(0)" role="button" aria-labelledby="sortBasketLabel0">
+            <div class="sort-basket-label" id="sortBasketLabel0"></div>
+            <div class="sort-basket-items" id="sortBasket0"></div>
+          </div>
+          <div class="sort-basket" onclick="dropIntoBasket(1)" role="button" aria-labelledby="sortBasketLabel1">
+            <div class="sort-basket-label" id="sortBasketLabel1"></div>
+            <div class="sort-basket-items" id="sortBasket1"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="monsterArea" style="display:none;">
+        <div class="clues-list" id="monsterClues"></div>
+        <div class="monster-grid" id="monsterGrid"></div>
+      </div>
     </div>
 
     <!-- MODULE 2: BALANCE -->
@@ -2273,6 +2363,8 @@
         promptText = document.getElementById('gearsPrompt').innerText;
       } else if (currentModule === 'oddone') {
         promptText = document.getElementById('oddonePrompt').innerText;
+        const clues = [...document.querySelectorAll('#monsterClues .clue-item')].map(el => el.innerText);
+        if (clues.length) promptText += '。線索：' + clues.join('。');
       } else if (currentModule === 'raven') {
         promptText = document.getElementById('ravenPrompt').innerText;
       }
@@ -3204,8 +3296,20 @@
         q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
         (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
       raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule),
-      oddone: q => isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 &&
-        new Set(q.items).size === q.items.length && q.items.includes(q.answer) && isStr(q.rule)
+      oddone: q => {
+        if (q.mode === 'sort') {
+          return isArr(q.items, isStr) && q.items.length >= 4 && q.items.length <= 10 && new Set(q.items).size === q.items.length &&
+            isArr(q.baskets, isStr) && q.baskets.length === 2 &&
+            isArr(q.answer, b => b === 0 || b === 1) && q.answer.length === q.items.length;
+        }
+        if (q.mode === 'monster') {
+          return isArr(q.monsters, m => m && hasOwn(MONSTER_COLORS, m.color) && (m.horns === 0 || m.horns === 1) && [1, 2, 3].includes(m.eyes)) &&
+            q.monsters.length >= 3 && q.monsters.length <= 12 &&
+            Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.monsters.length && isArr(q.clues, isStr);
+        }
+        return isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 &&
+          new Set(q.items).size === q.items.length && q.items.includes(q.answer) && isStr(q.rule);
+      }
     };
 
     function isValidMistake(m) {
@@ -3250,6 +3354,8 @@
         const sizes = q.gears.map(g => g.r >= 55 ? '大' : g.r >= 45 ? '中' : '小').join('');
         return `${q.gears.length} 個齒輪（${sizes}），問第 ${q.targetGearIndex + 1} 個`;
       }
+      if (module === 'oddone' && q.mode === 'monster') return `誰是神秘怪獸：${q.clues.length} 條線索、${q.monsters.length} 隻怪獸`;
+      if (module === 'oddone' && q.mode === 'sort') return `分類：${q.baskets.join(' / ')}　${q.items.join(' ')}`;
       if (module === 'oddone') return q.items.join(' ');
       if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
       return '';
@@ -3503,6 +3609,117 @@
       });
     }
 
+    /* 分類：把物品放進兩個籃子 */
+    const SORT_RULES = {
+      easy: [
+        { attr: 'kind', groups: ['fruit', 'animal'], per: 3, pool: it => it.kind === 'fruit' || (it.kind === 'animal' && !!it.place) },
+        { attr: 'kind', groups: ['animal', 'vehicle'], per: 3, pool: it => !!it.place }
+      ],
+      normal: [
+        { attr: 'kind', groups: ['fruit', 'veg'], per: 3, pool: it => it.kind === 'fruit' || it.kind === 'veg' },
+        { attr: 'place', groups: ['land', 'water'], per: 3, pool: it => it.kind === 'animal' && !!it.place && notPet(it) }
+      ],
+      hard: [
+        // 種類混在一起，要忽略「是什麼」，只看顏色／在哪裡
+        { attr: 'color', groups: ['red', 'yellow'], per: 4, pool: it => !!it.color, mixed: true },
+        { attr: 'place', groups: ['land', 'sky'], per: 4, pool: it => !!it.place && notPet(it), mixed: true }
+      ]
+    };
+    const SORT_LABELS = {
+      kind: { fruit: '🍎 水果', veg: '🥦 蔬菜', animal: '🐾 動物', vehicle: '🚗 交通工具' },
+      place: { land: '🌳 在陸地上', water: '🌊 在水裡', sky: '☁️ 在天上飛' },
+      color: { red: '🔴 紅色的', yellow: '🟡 黃色的' }
+    };
+
+    function genSort(diff) {
+      return generateUntil(() => {
+        const rule = pick(SORT_RULES[diff]);
+        const pool = ODD_ITEMS.filter(rule.pool);
+        const groups = rule.groups.map(g => pool.filter(it => it[rule.attr] === g));
+        if (groups.some(g => g.length < rule.per)) return null;
+        const chosen = groups.map(g => sample(g, rule.per));
+        // 挑戰：同一個籃子裡要有不同種類，不能光看種類分
+        if (rule.mixed && chosen.some(g => new Set(g.map(it => it.kind)).size < 2)) return null;
+        const items = shuffle(chosen.flatMap((g, basket) => g.map(it => ({ e: it.e, basket }))));
+        return {
+          mode: 'sort',
+          prompt: rule.mixed
+            ? "把東西放進正確的籃子！不要只看是什麼喔！"
+            : "把東西放進正確的籃子！先點東西，再點籃子。",
+          items: items.map(it => it.e),
+          baskets: rule.groups.map(g => SORT_LABELS[rule.attr][g]),
+          answer: items.map(it => it.basket)
+        };
+      });
+    }
+
+    /* 誰是神秘怪獸：依線索排除，剩下的就是答案 */
+    const MONSTER_COLORS = { red: '紅色', blue: '藍色', green: '綠色', purple: '紫色' };
+    const MONSTER_RULES = {
+      easy:   { count: 6, clues: [2, 2], negatives: [0, 0] },
+      normal: { count: 8, clues: [2, 3], negatives: [1, 1] },
+      hard:   { count: 9, clues: [3, 3], negatives: [2, 3] }
+    };
+
+    function monsterClueHolds(clue, m) {
+      const value = m[clue.attr];
+      return clue.not ? value !== clue.value : value === clue.value;
+    }
+
+    function monsterClueText(clue) {
+      if (clue.attr === 'color') return `神秘怪獸${clue.not ? '不是' : '是'}${MONSTER_COLORS[clue.value]}的。`;
+      if (clue.attr === 'horns') return (clue.value === 1) !== !!clue.not ? '神秘怪獸頭上有角。' : '神秘怪獸頭上沒有角。';
+      return `神秘怪獸${clue.not ? '不是' : '有'} ${clue.value} 隻眼睛。`;
+    }
+
+    function genMonster(diff) {
+      const rule = MONSTER_RULES[diff];
+      return generateUntil(() => {
+        const all = [];
+        Object.keys(MONSTER_COLORS).forEach(color => [0, 1].forEach(horns => [1, 2, 3].forEach(eyes => all.push({ color, horns, eyes }))));
+        const monsters = sample(all, rule.count);
+        const answer = randInt(0, monsters.length - 1);
+        const target = monsters[answer];
+
+        const candidates = [];
+        Object.keys(MONSTER_COLORS).forEach(c => candidates.push(c === target.color ? { attr: 'color', value: c } : { attr: 'color', value: c, not: true }));
+        candidates.push({ attr: 'horns', value: target.horns });
+        [1, 2, 3].forEach(n => candidates.push(n === target.eyes ? { attr: 'eyes', value: n } : { attr: 'eyes', value: n, not: true }));
+        const usable = candidates.filter(c => rule.negatives[1] > 0 || !c.not);
+
+        const remaining = clues => monsters.filter(m => clues.every(c => monsterClueHolds(c, m))).length;
+        let clues = [];
+        for (const clue of shuffle(usable)) {
+          if (remaining([...clues, clue]) < remaining(clues)) clues.push(clue);
+          if (remaining(clues) === 1) break;
+        }
+        if (remaining(clues) !== 1) return null;
+        for (const clue of shuffle(clues)) {
+          const rest = clues.filter(c => c !== clue);
+          if (remaining(rest) === 1) clues = rest;
+        }
+        const negatives = clues.filter(c => c.not).length;
+        if (clues.length < rule.clues[0] || clues.length > rule.clues[1]) return null;
+        if (negatives < rule.negatives[0] || negatives > rule.negatives[1]) return null;
+
+        return {
+          mode: 'monster',
+          prompt: "聽線索，把「不是」神秘怪獸的點掉，剩下的就是牠！",
+          monsters,
+          answer,
+          clues: clues.map(monsterClueText)
+        };
+      });
+    }
+
+    // 找不同小偵探的三種玩法
+    function genDetective(diff) {
+      const mode = pick(['odd', 'sort', 'monster']);
+      if (mode === 'sort') return genSort(diff);
+      if (mode === 'monster') return genMonster(diff);
+      return { mode: 'odd', ...genOddOneOut(diff) };
+    }
+
     const QUESTION_GENERATORS = {
       pattern: genPattern,
       balance: genBalance,
@@ -3512,7 +3729,7 @@
       folding: genFolding,
       gears: genGears,
       raven: genRaven,
-      oddone: genOddOneOut
+      oddone: genDetective
     };
 
     /* =========================================================
@@ -4313,6 +4530,13 @@
       const data = currentQuestion;
       document.getElementById('oddoneLevelBadge').textContent = levelBadgeText();
       document.getElementById('oddonePrompt').textContent = data.prompt;
+      const mode = data.mode || 'odd';
+      document.getElementById('oddoneItems').style.display = mode === 'odd' ? '' : 'none';
+      document.getElementById('sortArea').style.display = mode === 'sort' ? '' : 'none';
+      document.getElementById('monsterArea').style.display = mode === 'monster' ? '' : 'none';
+      document.getElementById('oddoneMode').textContent = { odd: '🔍 找不同', sort: '🧺 分類', monster: '👾 誰是神秘怪獸' }[mode];
+      if (mode === 'sort') return loadSortQuestion(data);
+      if (mode === 'monster') return loadMonsterQuestion(data);
 
       const box = document.getElementById('oddoneItems');
       box.innerHTML = "";
@@ -4338,6 +4562,135 @@
         onWrongAnswer(`選了 ${chosen}`);
         speakText("再比比看，哪一個跟大家都不一樣？");
       }
+    }
+
+    /* 分類玩法：點東西、再點籃子；全部放好後自動檢查 */
+    let sortPlacement = [];
+    let sortSelected = null;
+
+    function loadSortQuestion(data) {
+      sortPlacement = data.items.map(() => null);
+      sortSelected = null;
+      document.getElementById('sortBasketLabel0').textContent = data.baskets[0];
+      document.getElementById('sortBasketLabel1').textContent = data.baskets[1];
+      renderSort();
+      speakText(data.prompt);
+    }
+
+    function renderSort() {
+      const data = currentQuestion;
+      const tray = document.getElementById('sortTray');
+      const baskets = [document.getElementById('sortBasket0'), document.getElementById('sortBasket1')];
+      tray.innerHTML = "";
+      baskets.forEach(b => { b.innerHTML = ""; });
+      data.items.forEach((item, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn sort-item' + (sortSelected === i ? ' selected' : '');
+        btn.textContent = item;
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          soundClick();
+          if (sortPlacement[i] !== null) {      // 點籃子裡的東西：拿回來
+            sortPlacement[i] = null;
+            sortSelected = null;
+          } else {
+            sortSelected = sortSelected === i ? null : i;
+          }
+          renderSort();
+        };
+        (sortPlacement[i] === null ? tray : baskets[sortPlacement[i]]).appendChild(btn);
+      });
+      tray.style.display = sortPlacement.every(p => p !== null) ? 'none' : '';
+    }
+
+    function dropIntoBasket(basket) {
+      if (sortSelected === null) {
+        speakText("先點一個東西，再點籃子喔！");
+        return;
+      }
+      soundClick();
+      sortPlacement[sortSelected] = basket;
+      sortSelected = null;
+      renderSort();
+      if (sortPlacement.every(p => p !== null)) checkSort();
+    }
+
+    function checkSort() {
+      const data = currentQuestion;
+      const wrong = data.items.map((_, i) => i).filter(i => sortPlacement[i] !== data.answer[i]);
+      if (wrong.length === 0) {
+        triggerVictory("分類小達人！", `每一樣都放對了：${data.baskets[0]}、${data.baskets[1]}！`, isLastQuestion());
+        return;
+      }
+      soundError();
+      onWrongAnswer(`放錯了 ${wrong.map(i => data.items[i]).join(' ')}`);
+      speakText(`有 ${wrong.length} 個放錯籃子了，它們回到上面，再想想看！`);
+      wrong.forEach(i => { sortPlacement[i] = null; });
+      renderSort();
+    }
+
+    /* 誰是神秘怪獸：點怪獸把牠排除，剩一隻時自動檢查 */
+    const MONSTER_FILL = { red: '#EF4444', blue: '#3B82F6', green: '#22C55E', purple: '#A855F7' };
+    let monsterCrossed = [];
+
+    function monsterSVG(m) {
+      const horns = m.horns
+        ? '<polygon points="28,30 34,8 42,28" fill="#FBBF24" stroke="#92400E" stroke-width="2"/><polygon points="58,28 66,8 72,30" fill="#FBBF24" stroke="#92400E" stroke-width="2"/>'
+        : '';
+      const xs = { 1: [50], 2: [38, 62], 3: [32, 50, 68] }[m.eyes];
+      const eyes = xs.map(x => `<circle cx="${x}" cy="48" r="8" fill="#FFF" stroke="#1E293B" stroke-width="2"/><circle cx="${x}" cy="49" r="3.5" fill="#1E293B"/>`).join('');
+      return `<svg viewBox="0 0 100 100" aria-hidden="true">${horns}
+        <ellipse cx="50" cy="60" rx="34" ry="32" fill="${MONSTER_FILL[m.color]}" stroke="#1E293B" stroke-width="3"/>
+        ${eyes}<path d="M38,74 Q50,84 62,74" fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/></svg>`;
+    }
+
+    function monsterName(m) {
+      return `${MONSTER_COLORS[m.color]}、${m.horns ? '有角' : '沒有角'}、${m.eyes} 隻眼睛的怪獸`;
+    }
+
+    function loadMonsterQuestion(data) {
+      monsterCrossed = data.monsters.map(() => false);
+      const clues = document.getElementById('monsterClues');
+      clues.innerHTML = "";
+      data.clues.forEach(text => {
+        const item = document.createElement('div');
+        item.className = 'clue-item';
+        item.textContent = `🔍 ${text}`;
+        clues.appendChild(item);
+      });
+      renderMonsters();
+      speakCurrentPrompt();
+    }
+
+    function renderMonsters() {
+      const grid = document.getElementById('monsterGrid');
+      grid.innerHTML = "";
+      currentQuestion.monsters.forEach((m, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'monster-card' + (monsterCrossed[i] ? ' crossed' : '');
+        btn.setAttribute('aria-label', monsterName(m) + (monsterCrossed[i] ? '（已排除）' : ''));
+        btn.innerHTML = monsterSVG(m);
+        btn.onclick = () => toggleMonster(i);
+        grid.appendChild(btn);
+      });
+    }
+
+    function toggleMonster(i) {
+      soundClick();
+      monsterCrossed[i] = !monsterCrossed[i];
+      renderMonsters();
+      const left = monsterCrossed.map((c, k) => c ? -1 : k).filter(k => k >= 0);
+      if (left.length !== 1) return;
+      const data = currentQuestion;
+      if (left[0] === data.answer) {
+        triggerVictory("找到神秘怪獸了！", `就是牠：${monsterName(data.monsters[data.answer])}！`, isLastQuestion());
+        return;
+      }
+      soundError();
+      onWrongAnswer(`剩下${monsterName(data.monsters[left[0]])}`);
+      speakText("神秘怪獸被你點掉了喔！全部重來，再對照一次線索！");
+      monsterCrossed = data.monsters.map(() => false);
+      renderMonsters();
     }
 
     function checkRavenChoice(chosen, answer, rule) {
