@@ -1279,6 +1279,24 @@
     .eye-limit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .parent-note { font-size: 14px; color: #64748B; margin-top: 12px; line-height: 1.6; }
 
+    .gear-help-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    .gear-help-btn {
+      border: 2px solid #CBD5E1;
+      background: #F8FAFC;
+      color: #475569;
+      border-radius: 14px;
+      padding: 8px 16px;
+      min-height: 40px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .gear-help-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .gear-dir-btn:disabled { opacity: 0.6; cursor: wait; }
+
     /* RESPONSIVE */
     @media (max-width: 600px) {
       /* 頁首：標題縮小不折行，按鈕只留圖示 */
@@ -1672,6 +1690,10 @@
           <button class="gear-dir-btn" onclick="checkGearAnswer('cw')">↷ 順時針轉 (跟時鐘一樣)</button>
           <button class="gear-dir-btn" onclick="checkGearAnswer('ccw')">↶ 逆時針轉 (反過來轉)</button>
         </div>
+        <div class="gear-help-row">
+          <button class="gear-help-btn" id="gearHintBtn" onclick="useGearHint()">🆘 給我提示</button>
+          <button class="gear-help-btn" onclick="openGearIntro()">📖 看範例</button>
+        </div>
       </div>
     </div>
 
@@ -1832,6 +1854,16 @@
         </div>
         <div class="parent-note">只計算在題目畫面中的時間，停在選單或彈出視窗時不算。時間到時會讓孩子做完手上這一題再休息；家長解鎖後重新計時，每天也會自動重新計時。</div>
       </div>
+    </div>
+  </div>
+
+  <!-- GEARS INTRO -->
+  <div class="modal-overlay" id="gearIntroModal">
+    <div class="modal-card">
+      <div class="modal-title">⚙️ 齒輪怎麼轉？</div>
+      <canvas id="gearIntroCanvas" width="300" height="150" style="max-width:100%;"></canvas>
+      <div class="modal-msg">咬在一起的兩個齒輪，轉的方向會<strong>相反</strong>！<br>第 1 顆順時針轉 ↷，第 2 顆就會逆時針轉 ↶。<br>題目裡只有第 1 顆會轉，其他的要你自己推理喔！</div>
+      <button class="modal-btn" onclick="closeGearIntro()">我懂了，開始！</button>
     </div>
   </div>
 
@@ -3938,6 +3970,13 @@
     let gearAnimId = null;
     let gearAngle = 0;
 
+    /* 推理時只有齒輪 1 在轉（不然看動畫就知道答案）；提示一次多轉一顆，最多轉到問號前一顆；
+       答對或答錯後才依序示範全部 */
+    const GEAR_INTRO_KEY = 'little_logic_gears_intro_v1';
+    const GEAR_DEMO_STEP_MS = 700;
+    let gearMoving = 1;      // 從齒輪 1 開始，有幾顆在轉
+    let gearDemoRunning = false;
+
     function loadGearsLevel() {
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
       const data = currentQuestion;
@@ -3945,9 +3984,86 @@
       document.getElementById('gearsPrompt').textContent = data.prompt;
       document.getElementById('gearTargetText').textContent = `請問標記 ★ 的「${data.gears[data.targetGearIndex].label}」齒輪旋轉方向是？`;
 
+      gearMoving = 1;
+      gearDemoRunning = false;
+      setGearButtonsDisabled(false);
+      updateGearHintButton();
       gearAngle = 0;
       startGearAnimation();
-      speakText(data.prompt);
+
+      let seenIntro = false;
+      try { seenIntro = localStorage.getItem(GEAR_INTRO_KEY) === '1'; } catch (e) {}
+      if (!seenIntro) openGearIntro();
+      else speakText(data.prompt);
+    }
+
+    function setGearButtonsDisabled(disabled) {
+      document.querySelectorAll('#view-gears .gear-dir-btn, #view-gears .gear-help-btn').forEach(b => { b.disabled = disabled; });
+      if (!disabled) updateGearHintButton();
+    }
+
+    function updateGearHintButton() {
+      const btn = document.getElementById('gearHintBtn');
+      const left = currentQuestion.targetGearIndex - gearMoving;
+      btn.disabled = left <= 0 || gearDemoRunning;
+      btn.textContent = left > 0 ? '🆘 給我提示' : '🆘 提示用完了';
+    }
+
+    function useGearHint() {
+      const data = currentQuestion;
+      if (gearDemoRunning || gearMoving >= data.targetGearIndex) return;
+      soundClick();
+      gearMoving++;
+      // 用了提示再答對，不算「第一次就答對」（自動調整不會升級），但也不算答錯
+      questionWrongAttempts = Math.max(questionWrongAttempts, 1);
+      const gear = data.gears[gearMoving - 1];
+      speakText(`第 ${gearMoving} 顆齒輪也轉起來了，它往${gear.dir > 0 ? '順時針' : '逆時針'}轉。${gearMoving >= data.targetGearIndex ? '問號那顆要自己想喔！' : ''}`);
+      updateGearHintButton();
+    }
+
+    // 依序讓每一顆齒輪轉起來，做完再呼叫 done（中途離開題目就停止）
+    function runGearDemo(done) {
+      const data = currentQuestion;
+      gearDemoRunning = true;
+      setGearButtonsDisabled(true);
+      const step = () => {
+        if (currentModule !== 'gears' || currentQuestion !== data) return;
+        if (gearMoving < data.gears.length) {
+          gearMoving++;
+          setTimeout(step, GEAR_DEMO_STEP_MS);
+        } else {
+          setTimeout(() => {
+            if (currentModule !== 'gears' || currentQuestion !== data) return;
+            gearDemoRunning = false;
+            done();
+          }, GEAR_DEMO_STEP_MS);
+        }
+      };
+      setTimeout(step, GEAR_DEMO_STEP_MS);
+    }
+
+    function openGearIntro() {
+      document.getElementById('gearIntroModal').classList.add('active');
+      const canvas = document.getElementById('gearIntroCanvas');
+      const ctx = canvas.getContext('2d');
+      let angle = 0;
+      const loop = () => {
+        if (!document.getElementById('gearIntroModal').classList.contains('active')) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        angle += 0.03;
+        drawSingleGear(ctx, 105, 75, 40, 8, angle, true, false, '1', Math.PI);
+        drawSingleGear(ctx, 191, 75, 40, 8, -angle, false, true, '2 ↶');
+        requestAnimationFrame(loop);
+      };
+      loop();
+      speakText('咬在一起的兩個齒輪，轉的方向會相反！題目裡只有第一顆會轉，其他的要你自己推理喔！');
+    }
+
+    function closeGearIntro() {
+      soundClick();
+      try { localStorage.setItem(GEAR_INTRO_KEY, '1'); } catch (e) {}
+      document.getElementById('gearIntroModal').classList.remove('active');
+      if (currentModule === 'gears' && currentQuestion) speakText(currentQuestion.prompt);
     }
 
     function startGearAnimation() {
@@ -3963,7 +4079,7 @@
         gearAngle += 0.03;
 
         data.gears.forEach((gear, idx) => {
-          const currentRotation = gearAngle * gear.dir;
+          const currentRotation = idx < gearMoving ? gearAngle * gear.dir : 0;
           const isTarget = idx === data.targetGearIndex;
           const isSource = idx === 0;
 
@@ -4058,12 +4174,24 @@
 
     function checkGearAnswer(chosen) {
       const data = currentQuestion;
+      if (gearDemoRunning) return;
       if (chosen === data.answer) {
-        triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
+        soundSuccess();
+        speakText("答對了！我們一起看看齒輪怎麼轉！");
+        runGearDemo(() => triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion()));
       } else {
+        // 只有兩個選項，答錯後剩下的一定是對的；所以不讓孩子直接點另一個，而是示範一次再換一題
         soundError();
-        onWrongAnswer(null); // 只有兩個選項，寫出上次選什麼就等於公布答案
-        speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
+        onWrongAnswer(null); // 寫出上次選什麼就等於公布答案
+        speakText("我們一起看看齒輪怎麼轉：咬在一起的齒輪，方向會相反！");
+        runGearDemo(() => {
+          if (retryMistakeId) {        // 錯題重做：同一題再來一次（換題的話，答對會把別題當成學會了）
+            loadGearsLevel();
+            return;
+          }
+          showToast("⚙️ 換一題新的齒輪題，再試試看！");
+          loadCurrentQuestion();
+        });
       }
     }
 
