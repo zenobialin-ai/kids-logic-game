@@ -1692,7 +1692,7 @@
         </div>
         <div class="gear-help-row">
           <button class="gear-help-btn" id="gearHintBtn" onclick="useGearHint()">🆘 給我提示</button>
-          <button class="gear-help-btn" onclick="openGearIntro()">📖 看範例</button>
+          <button class="gear-help-btn" onclick="openGearIntro(true)">📖 看範例</button>
         </div>
       </div>
     </div>
@@ -1862,7 +1862,7 @@
     <div class="modal-card">
       <div class="modal-title">⚙️ 齒輪怎麼轉？</div>
       <canvas id="gearIntroCanvas" width="300" height="150" style="max-width:100%;"></canvas>
-      <div class="modal-msg">咬在一起的兩個齒輪，轉的方向會<strong>相反</strong>！<br>第 1 顆順時針轉 ↷，第 2 顆就會逆時針轉 ↶。<br>題目裡只有第 1 顆會轉，其他的要你自己推理喔！</div>
+      <div class="modal-msg">咬在一起的兩個齒輪，轉的方向會<strong>相反</strong>！<br>A 順時針轉 ↷，B 就會逆時針轉 ↶。<br>題目裡只有第 1 顆會轉，其他的要你自己推理喔！</div>
       <button class="modal-btn" onclick="closeGearIntro()">我懂了，開始！</button>
     </div>
   </div>
@@ -4004,7 +4004,9 @@
 
     function updateGearHintButton() {
       const btn = document.getElementById('gearHintBtn');
-      const left = currentQuestion.targetGearIndex - gearMoving;
+      const target = currentQuestion.targetGearIndex;
+      btn.style.display = target <= 1 ? 'none' : '';   // ★ 是第 2 顆：沒有可以提示的齒輪
+      const left = target - gearMoving;
       btn.disabled = left <= 0 || gearDemoRunning;
       btn.textContent = left > 0 ? '🆘 給我提示' : '🆘 提示用完了';
     }
@@ -4042,7 +4044,9 @@
       setTimeout(step, GEAR_DEMO_STEP_MS);
     }
 
-    function openGearIntro() {
+    function openGearIntro(duringQuestion = false) {
+      // 答題中看範例也算用了提示（2 顆齒輪的題目，範例就等於答案）
+      if (duringQuestion) questionWrongAttempts = Math.max(questionWrongAttempts, 1);
       document.getElementById('gearIntroModal').classList.add('active');
       const canvas = document.getElementById('gearIntroCanvas');
       const ctx = canvas.getContext('2d');
@@ -4051,8 +4055,8 @@
         if (!document.getElementById('gearIntroModal').classList.contains('active')) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         angle += 0.03;
-        drawSingleGear(ctx, 105, 75, 40, 8, angle, true, false, '1', Math.PI);
-        drawSingleGear(ctx, 191, 75, 40, 8, -angle, false, true, '2 ↶');
+        drawSingleGear(ctx, 105, 75, 40, 8, angle, true, false, 'A', Math.PI);
+        drawSingleGear(ctx, 191, 75, 40, 8, -angle + Math.PI / 8, false, false, 'B');
         requestAnimationFrame(loop);
       };
       loop();
@@ -4176,21 +4180,36 @@
       const data = currentQuestion;
       if (gearDemoRunning) return;
       if (chosen === data.answer) {
-        soundSuccess();
+        // 先記分（星星、進度、自動調整），示範完才顯示過關視窗；示範中離開或護眼時間到，答對仍然算數
+        triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
+        const modal = document.getElementById('victoryModal');
+        modal.classList.remove('active');
         speakText("答對了！我們一起看看齒輪怎麼轉！");
-        runGearDemo(() => triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion()));
+        runGearDemo(() => modal.classList.add('active'));
       } else {
         // 只有兩個選項，答錯後剩下的一定是對的；所以不讓孩子直接點另一個，而是示範一次再換一題
         soundError();
         onWrongAnswer(null); // 寫出上次選什麼就等於公布答案
         speakText("我們一起看看齒輪怎麼轉：咬在一起的齒輪，方向會相反！");
         runGearDemo(() => {
-          if (retryMistakeId) {        // 錯題重做：同一題再來一次（換題的話，答對會把別題當成學會了）
-            loadGearsLevel();
+          if (retryMistakeId) {
+            // 錯題重做：示範已經演出答案，同一題再答就是照抄；錯題留著，回錯題本下次再挑戰
+            showToast("📖 這題先留在錯題本，下次再挑戰！");
+            goHome();
+            openMistakeBook();
             return;
           }
-          showToast("⚙️ 換一題新的齒輪題，再試試看！");
-          loadCurrentQuestion();
+          // 換一題 ★ 位置不一樣的（答案只看 ★ 是第幾顆，同位置的話照抄剛才的示範就對了）
+          const adaptMsg = pendingAdaptMsg;
+          let next = generateQuestion('gears');
+          for (let i = 0; i < 40 && next.targetGearIndex === data.targetGearIndex; i++) next = generateQuestion('gears');
+          questionWrongAttempts = 0;
+          questionCountedWrong = false;
+          pendingAdaptMsg = '';
+          currentQuestion = next;
+          loadGearsLevel();
+          showToast(adaptMsg || "⚙️ 換一題新的齒輪題，再試試看！");
+          if (adaptMsg) speakText(adaptMsg.replace(/^\S+\s/, ''));
         });
       }
     }
@@ -4450,7 +4469,7 @@
         if (eyeOverSince === null) {
           eyeOverSince = now;
           eyeNotice("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
-        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active')) {
+        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning) {
           goHome();
           lockEyes();
         }
