@@ -1337,6 +1337,9 @@
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
       .choice-btn.oddone-item { width: 72px; height: 72px; font-size: 38px; }
+      /* 寬度只容得下 3 個（4 個時 2 個），排成 3+2 或 2+2，避免最後一列只剩一個太顯眼 */
+      .oddone-items { gap: 10px; padding: 20px 8px; max-width: 252px; margin-left: auto; margin-right: auto; }
+      .oddone-items.oddone-four { max-width: 170px; }
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
       .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
       .house-slot { width: 85px; min-height: 120px; }
@@ -1963,7 +1966,8 @@
         deduction: 0,
         folding: 0,
         gears: 0,
-        raven: 0
+        raven: 0,
+        oddone: 0
       },
       lastUpdated: Date.now()
     };
@@ -2489,6 +2493,7 @@
     // 比對題目時不看選項：同一題換了一組錯誤選項仍算同一題
     function questionKey(question) {
       const { options, answerIdx, ...rest } = question;
+      if (Array.isArray(rest.items)) rest.items = [...rest.items].sort();
       return JSON.stringify(rest);
     }
 
@@ -3187,7 +3192,8 @@
         q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
         (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
       raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule),
-      oddone: q => isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 && q.items.includes(q.answer) && isStr(q.rule)
+      oddone: q => isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 &&
+        new Set(q.items).size === q.items.length && q.items.includes(q.answer) && isStr(q.rule)
     };
 
     function isValidMistake(m) {
@@ -3347,42 +3353,62 @@
     }
 
     /* --- 9. 找不同小偵探 --- */
-    // 每個物品的特徵：kind 種類、place 住在哪裡（動物與交通工具）、color 顏色（蔬果）
+    // 出題用的特徵：kind 種類、place 在哪裡（動物與交通工具）、color 顏色（蔬果）
+    // 只用來擋歧義的特徵：big 體型特別大、shape 長條形或圓形（蔬果）；pet 寵物只出現在簡單題
     const ODD_ITEMS = [
-      { e: '🍎', kind: 'fruit', color: 'red' }, { e: '🍓', kind: 'fruit', color: 'red' }, { e: '🍒', kind: 'fruit', color: 'red' },
-      { e: '🍌', kind: 'fruit', color: 'yellow' }, { e: '🍋', kind: 'fruit', color: 'yellow' }, { e: '🍐', kind: 'fruit', color: 'green' },
-      { e: '🍇', kind: 'fruit', color: 'purple' }, { e: '🍊', kind: 'fruit', color: 'orange' },
-      { e: '🥕', kind: 'veg', color: 'orange' }, { e: '🥦', kind: 'veg', color: 'green' }, { e: '🌽', kind: 'veg', color: 'yellow' },
-      { e: '🍆', kind: 'veg', color: 'purple' }, { e: '🥒', kind: 'veg', color: 'green' },
-      { e: '🐶', kind: 'animal', place: 'land' }, { e: '🐱', kind: 'animal', place: 'land' }, { e: '🐰', kind: 'animal', place: 'land' },
-      { e: '🐻', kind: 'animal', place: 'land' }, { e: '🦁', kind: 'animal', place: 'land' }, { e: '🐘', kind: 'animal', place: 'land' },
-      { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐙', kind: 'animal', place: 'water' }, { e: '🐳', kind: 'animal', place: 'water' },
-      { e: '🦀', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
+      { e: '🍎', kind: 'fruit', color: 'red', shape: 'round' }, { e: '🍓', kind: 'fruit', color: 'red', shape: 'round' },
+      { e: '🍒', kind: 'fruit', color: 'red', shape: 'round' }, { e: '🍌', kind: 'fruit', color: 'yellow', shape: 'long' },
+      { e: '🍋', kind: 'fruit', color: 'yellow', shape: 'round' }, { e: '🍏', kind: 'fruit', color: 'green', shape: 'round' },
+      { e: '🍇', kind: 'fruit', color: 'purple', shape: 'round' }, { e: '🍊', kind: 'fruit', color: 'orange', shape: 'round' },
+      { e: '🥕', kind: 'veg', color: 'orange', shape: 'long' }, { e: '🥦', kind: 'veg', color: 'green', shape: 'round' },
+      { e: '🥬', kind: 'veg', color: 'green', shape: 'round' }, { e: '🍆', kind: 'veg', color: 'purple', shape: 'long' },
+      { e: '🥒', kind: 'veg', color: 'green', shape: 'long' },
+      { e: '🐶', kind: 'animal', place: 'land', pet: true }, { e: '🐱', kind: 'animal', place: 'land', pet: true },
+      { e: '🐰', kind: 'animal', place: 'land', pet: true },
+      { e: '🦁', kind: 'animal', place: 'land' }, { e: '🐻', kind: 'animal', place: 'land' }, { e: '🐯', kind: 'animal', place: 'land' },
+      { e: '🦓', kind: 'animal', place: 'land' }, { e: '🐘', kind: 'animal', place: 'land', big: true },
+      { e: '🦒', kind: 'animal', place: 'land', big: true },
+      { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐙', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
+      { e: '🦈', kind: 'animal', place: 'water' }, { e: '🐳', kind: 'animal', place: 'water', big: true },
       { e: '🐦', kind: 'animal', place: 'sky' }, { e: '🦋', kind: 'animal', place: 'sky' }, { e: '🐝', kind: 'animal', place: 'sky' },
       { e: '🦅', kind: 'animal', place: 'sky' },
-      { e: '🚗', kind: 'vehicle', place: 'land' }, { e: '🚌', kind: 'vehicle', place: 'land' }, { e: '🚲', kind: 'vehicle', place: 'land' },
-      { e: '🚂', kind: 'vehicle', place: 'land' }, { e: '⛵', kind: 'vehicle', place: 'water' }, { e: '🚢', kind: 'vehicle', place: 'water' },
+      { e: '🚗', kind: 'vehicle', place: 'land' }, { e: '🚌', kind: 'vehicle', place: 'land' }, { e: '🚂', kind: 'vehicle', place: 'land' },
+      { e: '🚑', kind: 'vehicle', place: 'land' }, { e: '🚒', kind: 'vehicle', place: 'land' }, { e: '🚜', kind: 'vehicle', place: 'land' },
+      { e: '⛵', kind: 'vehicle', place: 'water' }, { e: '🚢', kind: 'vehicle', place: 'water' }, { e: '🚤', kind: 'vehicle', place: 'water' },
       { e: '🚁', kind: 'vehicle', place: 'sky' }, { e: '🚀', kind: 'vehicle', place: 'sky' }
     ];
-    const ODD_ATTRS = ['kind', 'place', 'color'];
+    const ODD_ATTRS = ['kind', 'place', 'color', 'big', 'shape'];
     const ODD_NAMES = {
       kind: { fruit: '水果', veg: '蔬菜', animal: '動物', vehicle: '交通工具' },
-      place: { land: '在陸地上', water: '在水裡', sky: '在天上飛' },
       color: { red: '紅色', yellow: '黃色', green: '綠色', purple: '紫色', orange: '橘色' }
     };
-    // 每種難度可用的規則：attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品
+
+    function placeText(item) {
+      if (item.place === 'land') return '在陸地上';
+      if (item.place === 'sky') return '在天上飛';
+      return item.kind === 'vehicle' ? '在水上' : '在水裡';
+    }
+
+    const notPet = it => !it.pet;
+    // attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品、check 額外條件
     const ODD_RULES = {
       easy: [
         { attr: 'kind', pool: it => ['fruit', 'animal', 'vehicle'].includes(it.kind), count: 4 }
       ],
       normal: [
         { attr: 'kind', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 5 },
-        { attr: 'place', pool: it => it.kind === 'animal', count: 5 },
+        { attr: 'color', pool: it => !!it.color, count: 4 },
+        { attr: 'place', pool: it => it.kind === 'animal' && notPet(it), count: 5 },
         { attr: 'place', pool: it => it.kind === 'vehicle', count: 4 }
       ],
       hard: [
-        { attr: 'color', pool: it => !!it.color, count: 4 },
-        { attr: 'place', pool: it => !!it.place, count: 5 }
+        // 動物和交通工具混在一起，要看在哪裡，光看種類找不到
+        { attr: 'place', pool: it => !!it.place && notPet(it), count: 5,
+          check: (items, answer) => oddByAttr(items, 'kind') !== answer },
+        // 只有一個是交通工具（或動物），但大家在不同地方，在哪裡幫不上忙
+        { attr: 'kind', pool: it => !!it.place && notPet(it), count: 5,
+          check: (items, answer) => new Set(items.map(it => it.place)).size >= 3 &&
+            items.some(it => it !== answer && it.place === answer.place) }
       ]
     };
 
@@ -3410,24 +3436,22 @@
         const answer = pick(odds);
         const items = shuffle([...sample(commons, rule.count - 1), answer]);
 
-        // 避免題目有兩種解讀：其他特徵也不能剛好挑出「另一個」不同的物品
+        // 避免題目有兩種解讀：任何特徵（包括體型、形狀）都不能剛好挑出「另一個」不同的物品
         for (const attr of ODD_ATTRS) {
           const other = oddByAttr(items, attr);
           if (other && other !== answer) return null;
         }
-        // 挑戰題：不能光看種類就找到答案
-        if (diff === 'hard' && oddByAttr(items, 'kind') === answer) return null;
+        if (rule.check && !rule.check(items, answer)) return null;
 
-        const name = ODD_NAMES[rule.attr];
-        const explain = rule.attr === 'kind'
-          ? `${answer.e} 是${name[odd]}，其他都是${name[common]}！`
-          : rule.attr === 'place'
-            ? `${answer.e} ${name[odd]}，其他都${name[common]}！`
-            : `${answer.e} 是${name[odd]}的，其他都是${name[common]}的！`;
+        const commonItem = items.find(it => it !== answer);
+        const explain = rule.attr === 'place'
+          ? `${answer.e} ${placeText(answer)}，其他都${placeText(commonItem)}！`
+          : `${answer.e} 是${ODD_NAMES[rule.attr][odd]}${rule.attr === 'color' ? '的' : ''}，` +
+            `其他都是${ODD_NAMES[rule.attr][common]}${rule.attr === 'color' ? '的' : ''}！`;
         return {
           prompt: diff === 'easy'
             ? "哪一個和其他的不一樣？把它找出來！"
-            : "哪一個和其他的不一樣？想想看種類、顏色、住在哪裡！",
+            : "哪一個和其他的不一樣？想想看種類、顏色、在哪裡！",
           items: items.map(it => it.e),
           answer: answer.e,
           rule: explain
@@ -4248,6 +4272,7 @@
 
       const box = document.getElementById('oddoneItems');
       box.innerHTML = "";
+      box.classList.toggle('oddone-four', data.items.length === 4);
       data.items.forEach(item => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn oddone-item';
@@ -4267,7 +4292,7 @@
       } else {
         soundError();
         onWrongAnswer(`選了 ${chosen}`);
-        speakText("再比比看：種類、顏色、住在哪裡，哪一個跟大家都不一樣？");
+        speakText("再比比看：種類、顏色、在哪裡，哪一個跟大家都不一樣？");
       }
     }
 
