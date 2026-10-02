@@ -1134,6 +1134,7 @@
     .mistake-tag { font-weight: 800; color: #4338CA; }
     .mistake-time { color: #94A3B8; white-space: nowrap; }
     .mistake-prompt { font-size: var(--font-content); font-weight: 700; color: #1E293B; margin-bottom: 6px; line-height: 1.5; }
+    .mistake-summary { font-size: 18px; color: #475569; margin-bottom: 6px; word-break: break-all; }
     .mistake-wrong { font-size: 15px; color: #B91C1C; margin-bottom: 10px; }
     .mistake-retry { font-size: 15px; padding: 8px 20px; border-radius: 14px; }
     .mistake-empty { text-align: center; padding: 30px 10px; color: #475569; line-height: 1.8; }
@@ -1925,7 +1926,13 @@
     function triggerVictory(title, msg, isLastLevel = false) {
       soundSuccess();
       launchConfetti();
-      addStars(3);
+      // 錯題重做只給 1 顆星，避免「先答錯再重做」比一次答對拿得多；答對當下就移除，重新整理也不能重複刷星
+      if (retryMistakeId) {
+        addStars(1);
+        resolveMistake(retryMistakeId);
+      } else {
+        addStars(3);
+      }
 
       if (currentModule && !retryMistakeId) {
         userProgress.completed[currentModule] = Math.max(userProgress.completed[currentModule] || 0, currentLevel + 1);
@@ -1938,6 +1945,7 @@
       
       const btn = modal.querySelector('.modal-btn');
       if (retryMistakeId) {
+        document.getElementById('modalMsg').textContent = `${msg || ''} 錯題學會了，獲得 1 顆星星 ⭐`.trim();
         btn.textContent = "學會了！回到錯題本 📖";
       } else if (isLastLevel) {
         btn.textContent = "完成大挑戰！回首頁 🏆";
@@ -1952,7 +1960,6 @@
       modal.classList.remove('active');
 
       if (retryMistakeId) {
-        resolveMistake(retryMistakeId);
         goHome();
         openMistakeBook();
         return;
@@ -2026,6 +2033,10 @@
     function loadCurrentQuestion() {
       currentQuestion = generateQuestion(currentModule);
       MODULE_LOADERS[currentModule]();
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
     }
 
     /* RANDOM HELPERS */
@@ -2676,20 +2687,65 @@
     };
     let retryMistakeId = null;
 
+    // 錯題從 localStorage 讀回來，資料可能損壞、是舊格式或被竄改；結構不對的直接丟掉
+    const isStr = v => typeof v === 'string';
+    const isNum = v => typeof v === 'number' && isFinite(v);
+    const isArr = (v, check) => Array.isArray(v) && v.every(check);
+    const isCell = v => v && isNum(v.r) && isNum(v.c);
+    const QUESTION_VALIDATORS = {
+      pattern: q => isArr(q.sequence, isStr) && isStr(q.answer) && isArr(q.options, isStr),
+      balance: q => isArr(q.clues, c => c && isStr(c.left) && isStr(c.right)) && isStr(q.targetLeft) &&
+        isStr(q.targetItem) && isNum(q.answer) && isArr(q.options, isNum),
+      blocks: q => isArr(q.grid, row => isArr(row, h => Number.isInteger(h) && h >= 0 && h <= 5) && row.length > 0 && row.length <= 4) &&
+        q.grid.length > 0 && q.grid.length <= 4 && isNum(q.total) && isNum(q.padMax) && q.padMax <= 30,
+      maze: q => Number.isInteger(q.size) && q.size >= 3 && q.size <= 8 && isCell(q.start) && isCell(q.goal) && isArr(q.obstacles, isCell),
+      deduction: q => isArr(q.animals, isStr) && Number.isInteger(q.houses) && q.houses === q.animals.length &&
+        q.houses <= 6 && isArr(q.clues, isStr) && isArr(q.solution, isStr) && q.solution.length === q.houses,
+      folding: q => isArr(q.steps, st => st && isStr(st.text) && st.sheet &&
+          ['x1', 'y1', 'x2', 'y2', 'layers'].every(k => isNum(st.sheet[k])) && isArr(st.sheet.dots, d => d && isNum(d.cx) && isNum(d.cy))) &&
+        q.steps.length > 0 && isArr(q.options, o => o && isArr(o.dots, d => d && isNum(d.cx) && isNum(d.cy))) &&
+        Number.isInteger(q.answerIdx) && q.answerIdx >= 0 && q.answerIdx < q.options.length && isStr(q.explanation),
+      gears: q => isArr(q.gears, g => g && ['x', 'y', 'r', 'teeth', 'dir'].every(k => isNum(g[k])) && isStr(g.label)) &&
+        q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
+        (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
+      raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule)
+    };
+
+    function isValidMistake(m) {
+      return m && Object.prototype.hasOwnProperty.call(QUESTION_VALIDATORS, m.module) &&
+        m.question && isStr(m.question.prompt) && QUESTION_VALIDATORS[m.module](m.question) &&
+        isStr(m.id) && isNum(m.wrongCount) && (m.wrongText === null || isStr(m.wrongText));
+    }
+
     function loadMistakes() {
       try {
         const list = JSON.parse(localStorage.getItem(MISTAKE_KEY) || '[]');
-        return Array.isArray(list) ? list.filter(m => m && MODULE_INFO[m.module] && m.question) : [];
+        return Array.isArray(list) ? list.filter(isValidMistake) : [];
       } catch (e) {
         return [];
       }
     }
 
     function saveMistakes(list) {
+      let saved = true;
       try {
         localStorage.setItem(MISTAKE_KEY, JSON.stringify(list));
-      } catch (e) {}
+      } catch (e) {
+        saved = false;
+      }
       updateMistakeBadge();
+      return saved;
+    }
+
+    // 卡片上的題目摘要，讓同一種題型的錯題分得出來（不透露答案）
+    function mistakeSummary(module, q) {
+      if (module === 'pattern') return q.sequence.map(x => x === '?' ? '❓' : x).join(' ');
+      if (module === 'blocks') return `${q.grid.length}×${q.grid[0].length} 的積木堆，最高 ${Math.max(...q.grid.flat())} 層`;
+      if (module === 'maze') return `${q.size}×${q.size} 迷宮，${q.obstacles.length} 顆石頭`;
+      if (module === 'deduction') return `住戶：${q.animals.join(' ')}`;
+      if (module === 'gears') return `${q.gears.length} 個齒輪`;
+      if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
+      return '';
     }
 
     // 同一題答錯多次只記一筆，更新次數與最後一次的錯法
@@ -2703,6 +2759,9 @@
         existing.wrongCount++;
         existing.wrongText = wrongText;
         existing.time = time;
+        // 移到最前面：清單依最後答錯時間排序，超過上限時淘汰的是最久沒錯的題目
+        list.splice(list.indexOf(existing), 1);
+        list.unshift(existing);
       } else {
         list.unshift({
           id: `m_${Date.now()}_${randInt(0, 999)}`,
@@ -2720,8 +2779,9 @@
     }
 
     function resolveMistake(id) {
-      saveMistakes(loadMistakes().filter(m => m.id !== id));
-      showToast("✨ 這題學會了！已從錯題本移除");
+      if (saveMistakes(loadMistakes().filter(m => m.id !== id))) {
+        showToast("✨ 這題學會了！已從錯題本移除");
+      }
     }
 
     function updateMistakeBadge() {
@@ -2770,11 +2830,15 @@
             <span class="mistake-time"></span>
           </div>
           <div class="mistake-prompt"></div>
+          <div class="mistake-summary"></div>
           <div class="mistake-wrong"></div>
         `;
         card.querySelector('.mistake-time').textContent = m.time;
         card.querySelector('.mistake-prompt').textContent = m.question.prompt;
-        card.querySelector('.mistake-wrong').textContent = `上次${m.wrongText}　・　答錯 ${m.wrongCount} 次`;
+        const summary = mistakeSummary(m.module, m.question);
+        card.querySelector('.mistake-summary').textContent = summary;
+        card.querySelector('.mistake-summary').style.display = summary ? 'block' : 'none';
+        card.querySelector('.mistake-wrong').textContent = (m.wrongText ? `上次${m.wrongText}　・　` : '') + `答錯 ${m.wrongCount} 次`;
 
         const btn = document.createElement('button');
         btn.className = 'modal-btn mistake-retry';
@@ -2872,18 +2936,18 @@
         const card = document.createElement('div');
         card.className = 'scale-card';
         card.innerHTML = `
-          <div class="scale-pan">${clue.left}</div>
+          <div class="scale-pan">${escapeHtml(clue.left)}</div>
           <div class="scale-equal">=</div>
-          <div class="scale-pan">${clue.right}</div>
+          <div class="scale-pan">${escapeHtml(clue.right)}</div>
         `;
         cluesContainer.appendChild(card);
       });
 
       const targetBox = document.getElementById('balanceTarget');
       targetBox.innerHTML = `
-        <div class="scale-pan">${data.targetLeft}</div>
+        <div class="scale-pan">${escapeHtml(data.targetLeft)}</div>
         <div class="scale-equal">=</div>
-        <div class="scale-pan">？ 個 ${data.targetItem}</div>
+        <div class="scale-pan">？ 個 ${escapeHtml(data.targetItem)}</div>
       `;
 
       const optionsBox = document.getElementById('balanceOptions');
@@ -3228,7 +3292,7 @@
       data.clues.forEach(clue => {
         const item = document.createElement('div');
         item.className = 'clue-item';
-        item.innerHTML = `<span>🔍</span> ${clue}`;
+        item.innerHTML = `<span>🔍</span> ${escapeHtml(clue)}`;
         cluesList.appendChild(item);
       });
 
@@ -3372,7 +3436,7 @@
 
         box.innerHTML = `
           <div class="sheet-preview">${innerSVG}</div>
-          <div class="fold-step-text">${step.text}</div>
+          <div class="fold-step-text">${escapeHtml(step.text)}</div>
         `;
         stepsRow.appendChild(box);
 
@@ -3551,7 +3615,7 @@
         triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
       } else {
         soundError();
-        recordMistake(chosen === 'cw' ? '選了順時針' : '選了逆時針');
+        recordMistake(null); // 只有兩個選項，寫出上次選什麼就等於公布答案
         speakText("想一想：互相咬合的兩個齒輪，轉的方向必定是「相反」的唷！");
       }
     }
