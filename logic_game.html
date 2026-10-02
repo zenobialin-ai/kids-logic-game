@@ -1123,6 +1123,13 @@
       font-weight: 800;
     }
 
+    /* 找不同：寬度放不下一排時，排成 3+2 或 2+2，避免最後一列只剩一個太顯眼（等於提示答案） */
+    @media (max-width: 700px) {
+      .choice-btn.oddone-item { width: 72px; height: 72px; font-size: 38px; }
+      .oddone-items { gap: 10px; padding: 20px 8px; max-width: 252px; margin-left: auto; margin-right: auto; }
+      .oddone-items.oddone-four { max-width: 170px; }
+    }
+
     /* MISTAKE BOOK */
     .mistake-btn {
       border: 3px solid #FCA5A5;
@@ -1336,10 +1343,7 @@
 
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
-      .choice-btn.oddone-item { width: 72px; height: 72px; font-size: 38px; }
-      /* 寬度只容得下 3 個（4 個時 2 個），排成 3+2 或 2+2，避免最後一列只剩一個太顯眼 */
-      .oddone-items { gap: 10px; padding: 20px 8px; max-width: 252px; margin-left: auto; margin-right: auto; }
-      .oddone-items.oddone-four { max-width: 170px; }
+
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
       .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
       .house-slot { width: 85px; min-height: 120px; }
@@ -3353,27 +3357,33 @@
     }
 
     /* --- 9. 找不同小偵探 --- */
-    // 出題用的特徵：kind 種類、place 在哪裡（動物與交通工具）、color 顏色（蔬果）
-    // 只用來擋歧義的特徵：big 體型特別大、shape 長條形或圓形（蔬果）；pet 寵物只出現在簡單題
+    // 出題用的特徵：kind 種類、place 在哪裡、color 顏色
+    // 只用來擋歧義的特徵：big 體型特別大、shape 長條形或圓形；pet 寵物只出現在簡單題
     const ODD_ITEMS = [
       { e: '🍎', kind: 'fruit', color: 'red', shape: 'round' }, { e: '🍓', kind: 'fruit', color: 'red', shape: 'round' },
       { e: '🍒', kind: 'fruit', color: 'red', shape: 'round' }, { e: '🍌', kind: 'fruit', color: 'yellow', shape: 'long' },
       { e: '🍋', kind: 'fruit', color: 'yellow', shape: 'round' }, { e: '🍏', kind: 'fruit', color: 'green', shape: 'round' },
       { e: '🍇', kind: 'fruit', color: 'purple', shape: 'round' }, { e: '🍊', kind: 'fruit', color: 'orange', shape: 'round' },
+      { e: '🥝', kind: 'fruit', color: 'green', shape: 'round' }, { e: '🍈', kind: 'fruit', color: 'green', shape: 'round' },
+      { e: '🍍', kind: 'fruit', color: 'yellow' },
+      // 菇類在台灣六大類食物屬於蔬菜；顏色不一定，不標
+      { e: '🍄', kind: 'veg' },
       { e: '🥕', kind: 'veg', color: 'orange', shape: 'long' }, { e: '🥦', kind: 'veg', color: 'green', shape: 'round' },
-      { e: '🥬', kind: 'veg', color: 'green', shape: 'round' }, { e: '🍆', kind: 'veg', color: 'purple', shape: 'long' },
-      { e: '🥒', kind: 'veg', color: 'green', shape: 'long' },
+      { e: '🍆', kind: 'veg', color: 'purple', shape: 'long' }, { e: '🥒', kind: 'veg', color: 'green', shape: 'long' },
       { e: '🐶', kind: 'animal', place: 'land', pet: true }, { e: '🐱', kind: 'animal', place: 'land', pet: true },
       { e: '🐰', kind: 'animal', place: 'land', pet: true },
       { e: '🦁', kind: 'animal', place: 'land' }, { e: '🐻', kind: 'animal', place: 'land' }, { e: '🐯', kind: 'animal', place: 'land' },
       { e: '🦓', kind: 'animal', place: 'land' }, { e: '🐘', kind: 'animal', place: 'land', big: true },
       { e: '🦒', kind: 'animal', place: 'land', big: true },
-      { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐙', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
+      { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
       { e: '🦈', kind: 'animal', place: 'water' }, { e: '🐳', kind: 'animal', place: 'water', big: true },
       { e: '🐦', kind: 'animal', place: 'sky' }, { e: '🦋', kind: 'animal', place: 'sky' }, { e: '🐝', kind: 'animal', place: 'sky' },
       { e: '🦅', kind: 'animal', place: 'sky' },
-      { e: '🚗', kind: 'vehicle', place: 'land' }, { e: '🚌', kind: 'vehicle', place: 'land' }, { e: '🚂', kind: 'vehicle', place: 'land' },
-      { e: '🚑', kind: 'vehicle', place: 'land' }, { e: '🚒', kind: 'vehicle', place: 'land' }, { e: '🚜', kind: 'vehicle', place: 'land' },
+      // 有明顯顏色的動物：只用在顏色題（沒有 place，避免「瓢蟲算不算會飛」這類爭議）
+      { e: '🐞', kind: 'animal', color: 'red' }, { e: '🐤', kind: 'animal', color: 'yellow' }, { e: '🐛', kind: 'animal', color: 'green' },
+      { e: '🚗', kind: 'vehicle', place: 'land', color: 'red' }, { e: '🚒', kind: 'vehicle', place: 'land', color: 'red' },
+      { e: '🚕', kind: 'vehicle', place: 'land', color: 'yellow' }, { e: '🚌', kind: 'vehicle', place: 'land' },
+      { e: '🚂', kind: 'vehicle', place: 'land' }, { e: '🚑', kind: 'vehicle', place: 'land' }, { e: '🚜', kind: 'vehicle', place: 'land' },
       { e: '⛵', kind: 'vehicle', place: 'water' }, { e: '🚢', kind: 'vehicle', place: 'water' }, { e: '🚤', kind: 'vehicle', place: 'water' },
       { e: '🚁', kind: 'vehicle', place: 'sky' }, { e: '🚀', kind: 'vehicle', place: 'sky' }
     ];
@@ -3383,33 +3393,55 @@
       color: { red: '紅色', yellow: '黃色', green: '綠色', purple: '紫色', orange: '橘色' }
     };
 
-    function placeText(item) {
-      if (item.place === 'land') return '在陸地上';
-      if (item.place === 'sky') return '在天上飛';
-      return item.kind === 'vehicle' ? '在水上' : '在水裡';
+    // 「在哪裡」的說法：船在水上、魚在水裡，混在一起時說「在水上或水裡」
+    function placeText(group) {
+      const place = group[0].place;
+      if (place === 'land') return '在陸地上';
+      if (place === 'sky') return '在天上飛';
+      const kinds = new Set(group.map(it => it.kind));
+      return kinds.size > 1 ? '在水上或水裡' : kinds.has('vehicle') ? '在水上' : '在水裡';
+    }
+
+    // 這些特徵上，除了答案以外不能有「只有自己一個」的物品，不然孩子會有第二個合理答案
+    // 例：🚑🐟🚒🚢🚁 答案是唯一的動物 🐟，但 🚁 是唯一會飛的，也說得通
+    function hasRivalSingle(items, answer, attrs) {
+      return attrs.some(attr => {
+        const groups = {};
+        items.forEach(it => {
+          const v = it[attr];
+          if (v === undefined) return;
+          (groups[v] = groups[v] || []).push(it);
+        });
+        const values = Object.values(groups);
+        return values.length > 1 && values.some(g => g.length === 1 && g[0] !== answer);
+      });
     }
 
     const notPet = it => !it.pet;
-    // attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品、check 額外條件
+    // attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品、strict 哪些特徵不能有第二個「只有一個」、check 額外條件
     const ODD_RULES = {
       easy: [
-        { attr: 'kind', pool: it => ['fruit', 'animal', 'vehicle'].includes(it.kind), count: 4 }
+        { attr: 'kind', pool: it => ['fruit', 'animal', 'vehicle'].includes(it.kind), count: 4, strict: ['place'] }
       ],
       normal: [
-        { attr: 'kind', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 5 },
-        { attr: 'color', pool: it => !!it.color, count: 4 },
-        { attr: 'place', pool: it => it.kind === 'animal' && notPet(it), count: 5 },
-        { attr: 'place', pool: it => it.kind === 'vehicle', count: 4 }
+        { attr: 'kind', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 4, strict: ['color'] },
+        { attr: 'color', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 4, strict: ['kind'] },
+        { attr: 'place', pool: it => it.kind === 'animal' && !!it.place && notPet(it), count: 5, strict: [] },
+        { attr: 'place', pool: it => it.kind === 'vehicle', count: 4, strict: ['color'] }
       ],
       hard: [
-        // 動物和交通工具混在一起，要看在哪裡，光看種類找不到
-        { attr: 'place', pool: it => !!it.place && notPet(it), count: 5,
-          check: (items, answer) => oddByAttr(items, 'kind') !== answer },
-        // 只有一個是交通工具（或動物），但大家在不同地方，在哪裡幫不上忙
-        { attr: 'kind', pool: it => !!it.place && notPet(it), count: 5,
-          check: (items, answer) => new Set(items.map(it => it.place)).size >= 3 &&
-            items.some(it => it !== answer && it.place === answer.place) }
+        // 顏色題，但種類混在一起：要忽略「是什麼」，只看顏色。例：🍎🍓🚒🚗 + 🍌
+        { attr: 'color', pool: it => !!it.color, count: 5, strict: ['kind', 'place'],
+          check: (items, answer) => new Set(items.filter(it => it !== answer).map(it => it.kind)).size >= 2 },
+        // 在哪裡，但動物和交通工具混在一起：要忽略「是什麼」，只看在哪裡。例：🦓🐯🚒🚗 + ⛵
+        { attr: 'place', pool: it => !!it.place && notPet(it), count: 5, strict: ['kind', 'color'],
+          check: (items, answer) => new Set(items.filter(it => it !== answer).map(it => it.kind)).size >= 2 }
       ]
+    };
+    const ODD_PROMPTS = {
+      easy: "哪一個和其他的不一樣？想想看它們是不是同一類！",
+      normal: "哪一個和其他的不一樣？想想看種類、顏色、在哪裡！",
+      hard: "哪一個和其他的不一樣？不要只看是什麼，想想看顏色和在哪裡！"
     };
 
     // 某個特徵若把物品分成「1 個 vs 其他全部一樣」，回傳那 1 個；否則回傳 null
@@ -3441,17 +3473,16 @@
           const other = oddByAttr(items, attr);
           if (other && other !== answer) return null;
         }
+        if (hasRivalSingle(items, answer, rule.strict)) return null;
         if (rule.check && !rule.check(items, answer)) return null;
 
-        const commonItem = items.find(it => it !== answer);
+        const commonItems = items.filter(it => it !== answer);
         const explain = rule.attr === 'place'
-          ? `${answer.e} ${placeText(answer)}，其他都${placeText(commonItem)}！`
+          ? `${answer.e} ${placeText([answer])}，其他都${placeText(commonItems)}！`
           : `${answer.e} 是${ODD_NAMES[rule.attr][odd]}${rule.attr === 'color' ? '的' : ''}，` +
             `其他都是${ODD_NAMES[rule.attr][common]}${rule.attr === 'color' ? '的' : ''}！`;
         return {
-          prompt: diff === 'easy'
-            ? "哪一個和其他的不一樣？把它找出來！"
-            : "哪一個和其他的不一樣？想想看種類、顏色、在哪裡！",
+          prompt: ODD_PROMPTS[diff],
           items: items.map(it => it.e),
           answer: answer.e,
           rule: explain
@@ -4292,7 +4323,7 @@
       } else {
         soundError();
         onWrongAnswer(`選了 ${chosen}`);
-        speakText("再比比看：種類、顏色、在哪裡，哪一個跟大家都不一樣？");
+        speakText("再比比看，哪一個跟大家都不一樣？");
       }
     }
 
