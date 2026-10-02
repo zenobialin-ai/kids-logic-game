@@ -1927,7 +1927,7 @@
     function triggerVictory(title, msg, isLastLevel = false) {
       soundSuccess();
       launchConfetti();
-      // 錯題重做只給 1 顆星，避免「先答錯再重做」比一次答對拿得多；答對當下就移除，重新整理也不能重複刷星
+      // 錯題重做只給 1 顆星；答對當下就移除錯題，重新整理也不能重複刷星
       if (retryMistakeId) {
         addStars(1);
         resolveMistake(retryMistakeId);
