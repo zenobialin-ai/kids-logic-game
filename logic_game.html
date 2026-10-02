@@ -197,6 +197,20 @@
     .card-folding { border-color: #C084FC; background: linear-gradient(180deg, #FAF5FF 0%, #FFFFFF 100%); }
     .card-gears   { border-color: #FB923C; background: linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 100%); }
     .card-raven   { border-color: #38BDF8; background: linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%); }
+    .card-oddone  { border-color: #2DD4BF; background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%); }
+
+    .oddone-items {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 18px;
+      padding: 30px 16px;
+      background: linear-gradient(135deg, #F0FDFA, #CCFBF1);
+      border-radius: var(--radius-md);
+    }
+
+    .choice-btn.oddone-item { width: 96px; height: 96px; font-size: 50px; }
+    .choice-btn.oddone-correct { border-color: #10B981; background: #DCFCE7; }
 
     .menu-card .icon {
       font-size: 52px;
@@ -1322,6 +1336,7 @@
 
       .pattern-item, .pattern-target { width: 54px; height: 54px; font-size: 28px; }
       .choice-btn { width: 64px; height: 64px; font-size: 32px; }
+      .choice-btn.oddone-item { width: 72px; height: 72px; font-size: 38px; }
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
       .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
       .house-slot { width: 85px; min-height: 120px; }
@@ -1475,6 +1490,13 @@
           <p>依照偵探小線索，推理誰才是住在這間房子！</p>
           <div class="card-badge" id="badge-deduction">🕵️ 條件刪除與演繹邏輯</div>
         </div>
+
+        <div class="menu-card card-oddone" onclick="startModule('oddone')">
+          <div class="icon">🔍</div>
+          <h3>找不同小偵探</h3>
+          <p>哪一個跟大家不一樣？找出藏在裡面的規則！</p>
+          <div class="card-badge" id="badge-oddone">🧩 分類與特徵觀察</div>
+        </div>
       </div>
 
       <!-- SECTION 2: GIFTED & TALENTED EXAM CHALLENGES -->
@@ -1525,6 +1547,22 @@
       <div class="pattern-track" id="patternTrack"></div>
       <div style="text-align: center; font-weight: 800; color: #64748B; font-size: var(--font-content); margin-bottom: 12px;">點選正確的答案：</div>
       <div class="options-grid" id="patternOptions"></div>
+    </div>
+
+    <!-- MODULE 9: ODD ONE OUT -->
+    <div id="view-oddone" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🔍</span>
+          <div class="game-title">找不同小偵探</div>
+          <span class="level-badge" id="oddoneLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()">
+          <span>🔊</span> 朗讀題目
+        </button>
+      </div>
+      <div class="prompt-box" id="oddonePrompt">哪一個和其他的不一樣？</div>
+      <div class="oddone-items" id="oddoneItems"></div>
     </div>
 
     <!-- MODULE 2: BALANCE -->
@@ -2196,7 +2234,8 @@
       deduction: loadDeductionLevel,
       folding: loadFoldingLevel,
       gears: loadGearsLevel,
-      raven: loadRavenLevel
+      raven: loadRavenLevel,
+      oddone: loadOddoneLevel
     };
 
     function speakCurrentPrompt() {
@@ -2217,6 +2256,8 @@
         promptText = document.getElementById('foldingPrompt').innerText;
       } else if (currentModule === 'gears') {
         promptText = document.getElementById('gearsPrompt').innerText;
+      } else if (currentModule === 'oddone') {
+        promptText = document.getElementById('oddonePrompt').innerText;
       } else if (currentModule === 'raven') {
         promptText = document.getElementById('ravenPrompt').innerText;
       }
@@ -3118,7 +3159,8 @@
       deduction: { icon: '🏡', title: '動物好友排排坐' },
       folding:   { icon: '🪞', title: '摺紙打孔透視' },
       gears:     { icon: '⚙️', title: '齒輪連動旋轉' },
-      raven:     { icon: '🔲', title: '瑞文氏九宮矩陣' }
+      raven:     { icon: '🔲', title: '瑞文氏九宮矩陣' },
+      oddone:    { icon: '🔍', title: '找不同小偵探' }
     };
     let retryMistakeId = null;
     let questionWrongAttempts = 0; // 目前這一題答錯了幾次
@@ -3144,7 +3186,8 @@
       gears: q => isArr(q.gears, g => g && ['x', 'y', 'r', 'teeth', 'dir'].every(k => isNum(g[k])) && isStr(g.label)) &&
         q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
         (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
-      raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule)
+      raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule),
+      oddone: q => isArr(q.items, isStr) && q.items.length >= 3 && q.items.length <= 8 && q.items.includes(q.answer) && isStr(q.rule)
     };
 
     function isValidMistake(m) {
@@ -3189,6 +3232,7 @@
         const sizes = q.gears.map(g => g.r >= 55 ? '大' : g.r >= 45 ? '中' : '小').join('');
         return `${q.gears.length} 個齒輪（${sizes}），問第 ${q.targetGearIndex + 1} 個`;
       }
+      if (module === 'oddone') return q.items.join(' ');
       if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
       return '';
     }
@@ -3302,6 +3346,95 @@
       startModule(mistake.module, mistake);
     }
 
+    /* --- 9. 找不同小偵探 --- */
+    // 每個物品的特徵：kind 種類、place 住在哪裡（動物與交通工具）、color 顏色（蔬果）
+    const ODD_ITEMS = [
+      { e: '🍎', kind: 'fruit', color: 'red' }, { e: '🍓', kind: 'fruit', color: 'red' }, { e: '🍒', kind: 'fruit', color: 'red' },
+      { e: '🍌', kind: 'fruit', color: 'yellow' }, { e: '🍋', kind: 'fruit', color: 'yellow' }, { e: '🍐', kind: 'fruit', color: 'green' },
+      { e: '🍇', kind: 'fruit', color: 'purple' }, { e: '🍊', kind: 'fruit', color: 'orange' },
+      { e: '🥕', kind: 'veg', color: 'orange' }, { e: '🥦', kind: 'veg', color: 'green' }, { e: '🌽', kind: 'veg', color: 'yellow' },
+      { e: '🍆', kind: 'veg', color: 'purple' }, { e: '🥒', kind: 'veg', color: 'green' },
+      { e: '🐶', kind: 'animal', place: 'land' }, { e: '🐱', kind: 'animal', place: 'land' }, { e: '🐰', kind: 'animal', place: 'land' },
+      { e: '🐻', kind: 'animal', place: 'land' }, { e: '🦁', kind: 'animal', place: 'land' }, { e: '🐘', kind: 'animal', place: 'land' },
+      { e: '🐟', kind: 'animal', place: 'water' }, { e: '🐙', kind: 'animal', place: 'water' }, { e: '🐳', kind: 'animal', place: 'water' },
+      { e: '🦀', kind: 'animal', place: 'water' }, { e: '🐬', kind: 'animal', place: 'water' },
+      { e: '🐦', kind: 'animal', place: 'sky' }, { e: '🦋', kind: 'animal', place: 'sky' }, { e: '🐝', kind: 'animal', place: 'sky' },
+      { e: '🦅', kind: 'animal', place: 'sky' },
+      { e: '🚗', kind: 'vehicle', place: 'land' }, { e: '🚌', kind: 'vehicle', place: 'land' }, { e: '🚲', kind: 'vehicle', place: 'land' },
+      { e: '🚂', kind: 'vehicle', place: 'land' }, { e: '⛵', kind: 'vehicle', place: 'water' }, { e: '🚢', kind: 'vehicle', place: 'water' },
+      { e: '🚁', kind: 'vehicle', place: 'sky' }, { e: '🚀', kind: 'vehicle', place: 'sky' }
+    ];
+    const ODD_ATTRS = ['kind', 'place', 'color'];
+    const ODD_NAMES = {
+      kind: { fruit: '水果', veg: '蔬菜', animal: '動物', vehicle: '交通工具' },
+      place: { land: '在陸地上', water: '在水裡', sky: '在天上飛' },
+      color: { red: '紅色', yellow: '黃色', green: '綠色', purple: '紫色', orange: '橘色' }
+    };
+    // 每種難度可用的規則：attr 用哪個特徵分辨、pool 從哪些物品挑、count 幾個物品
+    const ODD_RULES = {
+      easy: [
+        { attr: 'kind', pool: it => ['fruit', 'animal', 'vehicle'].includes(it.kind), count: 4 }
+      ],
+      normal: [
+        { attr: 'kind', pool: it => it.kind === 'fruit' || it.kind === 'veg', count: 5 },
+        { attr: 'place', pool: it => it.kind === 'animal', count: 5 },
+        { attr: 'place', pool: it => it.kind === 'vehicle', count: 4 }
+      ],
+      hard: [
+        { attr: 'color', pool: it => !!it.color, count: 4 },
+        { attr: 'place', pool: it => !!it.place, count: 5 }
+      ]
+    };
+
+    // 某個特徵若把物品分成「1 個 vs 其他全部一樣」，回傳那 1 個；否則回傳 null
+    function oddByAttr(items, attr) {
+      const value = it => it[attr] || '∅';
+      const groups = {};
+      items.forEach(it => { (groups[value(it)] = groups[value(it)] || []).push(it); });
+      const sizes = Object.values(groups);
+      if (sizes.length !== 2) return null;
+      const single = sizes.find(g => g.length === 1);
+      return single && items.length > 2 ? single[0] : null;
+    }
+
+    function genOddOneOut(diff) {
+      return generateUntil(() => {
+        const rule = pick(ODD_RULES[diff]);
+        const pool = ODD_ITEMS.filter(rule.pool);
+        const values = [...new Set(pool.map(it => it[rule.attr]))];
+        if (values.length < 2) return null;
+        const [common, odd] = sample(values, 2);
+        const commons = pool.filter(it => it[rule.attr] === common);
+        const odds = pool.filter(it => it[rule.attr] === odd);
+        if (commons.length < rule.count - 1) return null;
+        const answer = pick(odds);
+        const items = shuffle([...sample(commons, rule.count - 1), answer]);
+
+        // 避免題目有兩種解讀：其他特徵也不能剛好挑出「另一個」不同的物品
+        for (const attr of ODD_ATTRS) {
+          const other = oddByAttr(items, attr);
+          if (other && other !== answer) return null;
+        }
+        // 挑戰題：不能光看種類就找到答案
+        if (diff === 'hard' && oddByAttr(items, 'kind') === answer) return null;
+
+        const name = ODD_NAMES[rule.attr];
+        const explain = rule.attr === 'kind'
+          ? `${answer.e} 是${name[odd]}，其他都是${name[common]}！`
+          : rule.attr === 'place'
+            ? `${answer.e} ${name[odd]}，其他都${name[common]}！`
+            : `${answer.e} 是${name[odd]}的，其他都是${name[common]}的！`;
+        return {
+          prompt: diff === 'easy'
+            ? "哪一個和其他的不一樣？把它找出來！"
+            : "哪一個和其他的不一樣？想想看種類、顏色、住在哪裡！",
+          items: items.map(it => it.e),
+          answer: answer.e,
+          rule: explain
+        };
+      });
+    }
+
     const QUESTION_GENERATORS = {
       pattern: genPattern,
       balance: genBalance,
@@ -3310,7 +3443,8 @@
       deduction: genDeduction,
       folding: genFolding,
       gears: genGears,
-      raven: genRaven
+      raven: genRaven,
+      oddone: genOddOneOut
     };
 
     /* =========================================================
@@ -4102,6 +4236,39 @@
       });
 
       speakText(data.prompt);
+    }
+
+    /* =========================================================
+       MODULE 9: ODD ONE OUT (找不同小偵探)
+       ========================================================= */
+    function loadOddoneLevel() {
+      const data = currentQuestion;
+      document.getElementById('oddoneLevelBadge').textContent = levelBadgeText();
+      document.getElementById('oddonePrompt').textContent = data.prompt;
+
+      const box = document.getElementById('oddoneItems');
+      box.innerHTML = "";
+      data.items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn oddone-item';
+        btn.textContent = item;
+        btn.onclick = () => checkOddoneChoice(item, btn);
+        box.appendChild(btn);
+      });
+
+      speakText(data.prompt);
+    }
+
+    function checkOddoneChoice(chosen, btn) {
+      const data = currentQuestion;
+      if (chosen === data.answer) {
+        btn.classList.add('oddone-correct');
+        triggerVictory("找不同小偵探！", data.rule, isLastQuestion());
+      } else {
+        soundError();
+        onWrongAnswer(`選了 ${chosen}`);
+        speakText("再比比看：種類、顏色、住在哪裡，哪一個跟大家都不一樣？");
+      }
     }
 
     function checkRavenChoice(chosen, answer, rule) {
