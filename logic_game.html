@@ -1912,10 +1912,10 @@
       return currentLevel === ROUND_SIZE - 1;
     }
 
-    // 比對題目時忽略選項順序：選項洗牌不同仍算同一題
+    // 比對題目時不看選項：同一題換了一組錯誤選項仍算同一題
     function questionKey(question) {
       const { options, answerIdx, ...rest } = question;
-      return JSON.stringify(rest) + (options ? options.map(o => JSON.stringify(o)).sort().join() : '');
+      return JSON.stringify(rest);
     }
 
     // 同一輪避免出現一模一樣的題目
@@ -2254,9 +2254,9 @@
         return `${name(clue.a)} 住在${where}${clue.i + 1} 號房。`;
       }
       if (clue.type === 'notAt') return `${name(clue.a)} 不住在 ${clue.i + 1} 號房。`;
-      if (clue.type === 'nextLeft') return `${name(clue.a)} 住在${name(clue.b)} 的左邊隔壁。`;
-      if (clue.type === 'nextRight') return `${name(clue.a)} 住在${name(clue.b)} 的右邊隔壁。`;
-      return `${name(clue.a)} 住在${name(clue.b)} 左邊的某一間（不一定是隔壁）。`;
+      if (clue.type === 'nextLeft') return `${name(clue.a)} 住在 ${name(clue.b)} 的左邊隔壁。`;
+      if (clue.type === 'nextRight') return `${name(clue.a)} 住在 ${name(clue.b)} 的右邊隔壁。`;
+      return `${name(clue.a)} 住在 ${name(clue.b)} 左邊的某一間（不一定是隔壁）。`;
     }
 
     function genDeduction(diff) {
@@ -2358,7 +2358,8 @@
         const xs = spots(region.x1, region.x2, axes.includes('x'));
         const ys = spots(region.y1, region.y2, axes.includes('y'));
         const allSpots = xs.flatMap(cx => ys.map(cy => ({ cx, cy })));
-        const punched = sample(allSpots, randInt(rule.holes[0], rule.holes[1]));
+        const punched = sample(allSpots, randInt(rule.holes[0], rule.holes[1]))
+          .sort((a, b) => a.cx - b.cx || a.cy - b.cy); // 固定順序，去重才認得出同一題
         // 兩個洞太近會黏在一起看不清楚
         if (punched.length > 1 && Math.hypot(punched[0].cx - punched[1].cx, punched[0].cy - punched[1].cy) < 30) return null;
         steps.push({ text: '在紅點打洞 ⭕', sheet: { ...region, layers: foldNames.length + 1, dots: punched } });
