@@ -198,6 +198,7 @@
     .card-gears   { border-color: #FB923C; background: linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 100%); }
     .card-raven   { border-color: #38BDF8; background: linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%); }
     .card-oddone  { border-color: #2DD4BF; background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%); }
+    .card-pipes   { border-color: #60A5FA; background: linear-gradient(180deg, #EFF6FF 0%, #FFFFFF 100%); }
 
     .oddone-items {
       display: flex;
@@ -767,6 +768,87 @@
     }
 
     .action-btn-group { display: flex; gap: 10px; }
+
+    /* PIPES SPECIFICS (水管接接樂) */
+    .pipes-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .pipe-board {
+      --pipe-cell: 64px;
+      --pipe-edge: 48px;
+      --pipe-gap: 4px;
+      display: grid;
+      gap: var(--pipe-gap);
+      background: #86EFAC;
+      padding: 10px;
+      border-radius: 18px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .pipe-tile, .pipe-empty { width: var(--pipe-cell); height: var(--pipe-cell); border-radius: 10px; }
+    .pipe-tile {
+      padding: 0;
+      border: none;
+      background: #F0FDF4;
+      cursor: pointer;
+      position: relative;
+      touch-action: manipulation;
+    }
+    .pipe-tile:focus-visible { outline: 3px solid #6366F1; outline-offset: 2px; }
+    .pipe-tile svg { width: 100%; height: 100%; display: block; transition: transform 0.2s ease; }
+    .pipe-empty {
+      background: #BBF7D0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(var(--pipe-cell) * 0.38);
+      opacity: 0.75;
+    }
+
+    .pipe-shell { fill: none; stroke: #64748B; stroke-width: 30; stroke-linejoin: round; }
+    .pipe-water { fill: none; stroke: #E2E8F0; stroke-width: 16; stroke-linejoin: round; transition: stroke 0.2s; }
+    .wet .pipe-water { stroke: #38BDF8; stroke-dasharray: 12 8; animation: pipeFlow 0.6s linear infinite; }
+    .wet.rev .pipe-water { animation-direction: reverse; }
+    @keyframes pipeFlow { to { stroke-dashoffset: -20; } }
+
+    .pipe-edge {
+      width: var(--pipe-edge);
+      height: var(--pipe-cell);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pipe-stub {
+      position: absolute;
+      top: 50%;
+      height: calc(var(--pipe-cell) * 0.3);
+      transform: translateY(-50%);
+      background: #64748B;
+      display: flex;
+      align-items: center;
+    }
+    .pipe-edge.source .pipe-stub { left: 50%; right: calc(var(--pipe-gap) * -1); }
+    .pipe-edge.target .pipe-stub { left: calc(var(--pipe-gap) * -1); right: 50%; }
+    .pipe-stub-water { width: 100%; height: 53%; background: #E2E8F0; transition: background 0.2s; }
+    .pipe-edge.wet .pipe-stub-water { background: #38BDF8; }
+    .pipe-icon { position: relative; font-size: calc(var(--pipe-edge) * 0.66); line-height: 1; }
+    .pipe-edge.target.wet .pipe-icon { animation: bounce 0.5s infinite alternate; }
+    .pipe-tile.leak::after, .pipe-edge.leak::after {
+      content: '💦';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      font-size: 24px;
+      animation: bounce 0.4s infinite alternate;
+      pointer-events: none;
+    }
+    .pipes-container .action-btn-group { justify-content: center; }
+    .pipe-tip { font-weight: 800; color: #64748B; font-size: var(--font-content); text-align: center; }
 
     .btn-run {
       background: #10B981;
@@ -1497,6 +1579,8 @@
 
       .maze-cell { width: 48px; height: 48px; font-size: 24px; }
       .maze-board.compact .maze-cell { width: 42px; height: 42px; font-size: 22px; }
+      .pipe-board { --pipe-cell: 54px; --pipe-edge: 38px; --pipe-gap: 3px; padding: 8px; }
+      .pipe-board.compact { --pipe-cell: 48px; --pipe-edge: 34px; }
       .house-slot { width: 85px; min-height: 120px; }
       .house-content { width: 60px; height: 60px; font-size: 32px; }
       .animal-token { width: 56px; height: 56px; font-size: 30px; }
@@ -1531,6 +1615,7 @@
       .difficulty-bar { gap: 6px; padding: 10px 6px; }
       .diff-btn { padding: 6px 10px; }
       .maze-board.compact .maze-cell { width: 38px; height: 38px; font-size: 20px; }
+      .pipe-board.compact { --pipe-cell: 42px; --pipe-edge: 28px; padding: 6px; }
       .sync-import-row { flex-wrap: wrap; }
       .sync-import-row input { min-width: 0; }
     }
@@ -1658,6 +1743,13 @@
           <h3>找不同小偵探</h3>
           <p>找不同、分類、猜猜誰是神秘怪獸！</p>
           <div class="card-badge" id="badge-oddone">🧩 分類與特徵觀察</div>
+        </div>
+
+        <div class="menu-card card-pipes" onclick="startModule('pipes')">
+          <div class="icon">🚰</div>
+          <h3>水管接接樂</h3>
+          <p>轉一轉水管接成一條路，讓水流到小動物的農場！</p>
+          <div class="card-badge" id="badge-pipes">💧 路徑規劃與方向預判</div>
         </div>
       </div>
 
@@ -1839,6 +1931,29 @@
               <button class="btn-run" id="btnRunCode" onclick="runMazeProgram()">▶️ 出發執行！</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 10: PIPES -->
+    <div id="view-pipes" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🚰</span>
+          <div class="game-title">水管接接樂</div>
+          <span class="level-badge" id="pipesLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt()" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
+        </button>
+      </div>
+      <div class="prompt-box" id="pipesPrompt">轉一轉水管，讓水流到農場！</div>
+      <div class="pipes-container">
+        <div class="pipe-board" id="pipeBoard"></div>
+        <div class="pipe-tip">點水管可以轉方向，接好了再打開水龍頭！</div>
+        <div class="action-btn-group">
+          <button class="btn-clear" onclick="resetPipes()">🔄 恢復原狀</button>
+          <button class="btn-run" id="btnPipeRun" onclick="runPipes()">🚰 打開水龍頭！</button>
         </div>
       </div>
     </div>
@@ -2173,7 +2288,8 @@
         folding: 0,
         gears: 0,
         raven: 0,
-        oddone: 0
+        oddone: 0,
+        pipes: 0
       },
       lastUpdated: Date.now()
     };
@@ -2395,6 +2511,8 @@
       pendingAdaptMsg = '';
       if (mazeTimer) clearInterval(mazeTimer);
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
+      if (pipeTimer) clearTimeout(pipeTimer);
+      pipeRunning = false;
       window.speechSynthesis && window.speechSynthesis.cancel();
       document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
       document.getElementById('view-menu').style.display = 'block';
@@ -2445,7 +2563,8 @@
       folding: loadFoldingLevel,
       gears: loadGearsLevel,
       raven: loadRavenLevel,
-      oddone: loadOddoneLevel
+      oddone: loadOddoneLevel,
+      pipes: loadPipesLevel
     };
 
     function speakCurrentPrompt() {
@@ -2473,6 +2592,8 @@
         if (q.mode === 'sort') promptText += ' 兩個籃子是：' + q.baskets.map(b => b.replace(/^\S+\s/, '')).join('、');
       } else if (currentModule === 'raven') {
         promptText = document.getElementById('ravenPrompt').innerText;
+      } else if (currentModule === 'pipes') {
+        promptText = document.getElementById('pipesPrompt').innerText;
       }
       speakText(promptText);
     }
@@ -3091,6 +3212,120 @@
       });
     }
 
+    /* --- 10. 水管接接樂 --- */
+    // 方向：0 上、1 右、2 下、3 左。直管 I 原本開口朝上下、彎管 L 原本開口朝上右，每點一下順時針轉 90°
+    // 水從左邊第 src 列流進來，要從右邊第 dst 列流出去到農場
+    const PIPE_DIRS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    const PIPE_SHAPES = { I: [0, 2], L: [0, 1] };
+    const PIPE_ANIMALS = [
+      { e: '🐮', n: '小牛' }, { e: '🐷', n: '小豬' }, { e: '🐔', n: '小雞' },
+      { e: '🐑', n: '小羊' }, { e: '🐴', n: '小馬' }, { e: '🐰', n: '小兔子' }
+    ];
+    // path：正確路線經過幾格；decoys：路線以外的格子放多少多餘的水管；clicks：最少要點幾下才接得通
+    const PIPE_RULES = {
+      easy:   { size: 3, path: [3, 5],  decoys: 0,   clicks: [2, 5] },
+      normal: { size: 4, path: [5, 8],  decoys: 0.5, clicks: [4, 9] },
+      hard:   { size: 5, path: [7, 12], decoys: 1,   clicks: [7, 16] }
+    };
+
+    const pipeOpenings = (type, rot) => PIPE_SHAPES[type].map(d => (d + rot) % 4);
+
+    // 照目前的轉向放水：回傳水流過的格子（from 是水從哪一邊流進來），以及有沒有流到農場
+    // 每根水管只有兩個開口，水路是唯一的
+    function tracePipeFlow(q, rots) {
+      let r = q.src, c = 0, from = 3;
+      const wet = [];
+      while (wet.length <= q.size * q.size) {
+        if (c === q.size) return { wet, reached: r === q.dst };
+        if (r < 0 || c < 0 || r >= q.size) return { wet, reached: false };
+        const tile = q.tiles[r][c];
+        const open = tile ? pipeOpenings(tile.t, rots[r][c]) : [];
+        if (!open.includes(from)) return { wet, reached: false };
+        wet.push({ r, c, from });
+        const out = open.find(d => d !== from);
+        r += PIPE_DIRS[out][0];
+        c += PIPE_DIRS[out][1];
+        from = (out + 2) % 4;
+      }
+      return { wet, reached: false };
+    }
+
+    // 最少要點幾下才能讓水流到農場；接不通回傳 null（不一定是出題時的那條路線）
+    function solvePipes(q) {
+      let best = null;
+      const used = new Set();
+      const walk = (r, c, from, clicks) => {
+        if (best !== null && clicks >= best) return;
+        if (c === q.size) {
+          if (r === q.dst) best = clicks;
+          return;
+        }
+        if (r < 0 || c < 0 || r >= q.size || used.has(r * q.size + c)) return;
+        const tile = q.tiles[r][c];
+        if (!tile) return;
+        used.add(r * q.size + c);
+        // 直管轉兩下和原本一樣，只需要試兩種
+        for (let k = 0; k < (tile.t === 'I' ? 2 : 4); k++) {
+          const open = pipeOpenings(tile.t, (tile.rot + k) % 4);
+          if (!open.includes(from)) continue;
+          const out = open.find(d => d !== from);
+          walk(r + PIPE_DIRS[out][0], c + PIPE_DIRS[out][1], (out + 2) % 4, clicks + k);
+        }
+        used.delete(r * q.size + c);
+      };
+      walk(q.src, 0, 3, 0);
+      return best;
+    }
+
+    // 從左邊第 src 列走到右邊第 dst 列、不重複經過的隨機路線
+    function randomPipePath(n, src, dst, [minLen, maxLen]) {
+      const cells = [{ r: src, c: 0 }];
+      const used = new Set([src * n]);
+      let budget = 300;
+      const extend = () => {
+        const last = cells[cells.length - 1];
+        if (last.r === dst && last.c === n - 1) return cells.length >= minLen;
+        if (cells.length >= maxLen || --budget < 0) return false;
+        for (const [dr, dc] of shuffle(PIPE_DIRS)) {
+          const r = last.r + dr, c = last.c + dc;
+          if (r < 0 || c < 0 || r >= n || c >= n || used.has(r * n + c)) continue;
+          cells.push({ r, c });
+          used.add(r * n + c);
+          if (extend()) return true;
+          cells.pop();
+          used.delete(r * n + c);
+        }
+        return false;
+      };
+      return extend() ? cells : null;
+    }
+
+    function genPipes(diff) {
+      const rule = PIPE_RULES[diff];
+      const n = rule.size;
+      return generateUntil(() => {
+        const src = randInt(0, n - 1), dst = randInt(0, n - 1);
+        const path = randomPipePath(n, src, dst, rule.path);
+        if (!path) return null;
+        const dirTo = (a, b) => PIPE_DIRS.findIndex(([dr, dc]) => a.r + dr === b.r && a.c + dc === b.c);
+        const tiles = Array.from({ length: n }, () => Array(n).fill(null));
+        path.forEach((cell, i) => {
+          const from = i === 0 ? 3 : dirTo(cell, path[i - 1]);
+          const out = i === path.length - 1 ? 1 : dirTo(cell, path[i + 1]);
+          tiles[cell.r][cell.c] = { t: (from + 2) % 4 === out ? 'I' : 'L', rot: randInt(0, 3) };
+        });
+        // 路線以外的格子：多放的水管讓孩子要先找出哪一條才是路
+        tiles.forEach(row => row.forEach((t, c) => {
+          if (!t && Math.random() < rule.decoys) row[c] = { t: pick(['I', 'L']), rot: randInt(0, 3) };
+        }));
+        const animal = pick(PIPE_ANIMALS);
+        const q = { prompt: `轉一轉水管，讓水流到${animal.n}的農場！`, size: n, src, dst, animal: animal.e, animalName: animal.n, tiles };
+        const clicks = solvePipes(q);
+        if (clicks === null || clicks < rule.clicks[0] || clicks > rule.clicks[1]) return null;
+        return q;
+      });
+    }
+
     /* --- 5. 動物好友排排坐 --- */
     const DEDUCTION_ANIMALS = [
       { e: '🐰', n: '小白兔' }, { e: '🐻', n: '小熊' }, { e: '🐱', n: '小貓' }, { e: '🦊', n: '小狐狸' },
@@ -3445,7 +3680,8 @@
       folding:   { icon: '🪞', title: '摺紙打孔透視' },
       gears:     { icon: '⚙️', title: '齒輪連動旋轉' },
       raven:     { icon: '🔲', title: '瑞文氏九宮矩陣' },
-      oddone:    { icon: '🔍', title: '找不同小偵探' }
+      oddone:    { icon: '🔍', title: '找不同小偵探' },
+      pipes:     { icon: '🚰', title: '水管接接樂' }
     };
     let retryMistakeId = null;
     let questionWrongAttempts = 0; // 目前這一題答錯了幾次
@@ -3474,6 +3710,13 @@
         q.gears.length >= 2 && Number.isInteger(q.targetGearIndex) && q.targetGearIndex > 0 && q.targetGearIndex < q.gears.length &&
         (q.answer === 'cw' || q.answer === 'ccw') && isStr(q.rule),
       raven: q => isArr(q.grid, isStr) && q.grid.length === 9 && isStr(q.answer) && isArr(q.options, isStr) && isStr(q.rule),
+      pipes: q => {
+        const inRange = v => Number.isInteger(v) && v >= 0 && v < q.size;
+        const okTile = t => t === null || (!!t && hasOwn(PIPE_SHAPES, t.t) && Number.isInteger(t.rot) && t.rot >= 0 && t.rot <= 3);
+        return Number.isInteger(q.size) && q.size >= 2 && q.size <= 6 && inRange(q.src) && inRange(q.dst) &&
+          isStr(q.animal) && isStr(q.animalName) && isArr(q.tiles, row => isArr(row, okTile) && row.length === q.size) &&
+          q.tiles.length === q.size && solvePipes(q) !== null;
+      },
       oddone: q => {
         const nonEmpty = v => isStr(v) && v.length > 0;
         if (q.mode === 'sort') {
@@ -3544,6 +3787,7 @@
       if (module === 'oddone' && q.mode === 'monster') return `誰是神秘怪獸：${q.clues.length} 條線索、${q.monsters.length} 隻怪獸`;
       if (module === 'oddone' && q.mode === 'sort') return `分類：${q.baskets.join(' / ')}　${q.items.join(' ')}`;
       if (module === 'oddone') return q.items.join(' ');
+      if (module === 'pipes') return `${q.size}×${q.size} 水管：🚰 第 ${q.src + 1} 列 → ${q.animal} 第 ${q.dst + 1} 列`;
       if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
       return '';
     }
@@ -3922,7 +4166,8 @@
       folding: genFolding,
       gears: genGears,
       raven: genRaven,
-      oddone: genDetective
+      oddone: genDetective,
+      pipes: genPipes
     };
 
     /* =========================================================
@@ -4421,6 +4666,152 @@
         onWrongAnswer('沒走到寶箱');
         speakText("機器人還沒走到寶箱位置喔，路線還差幾步，加油！");
       }
+    }
+
+    /* =========================================================
+       MODULE 10: PIPES (水管接接樂)
+       ========================================================= */
+
+    const PIPE_PATHS = { I: 'M50 0 V100', L: 'M50 0 V50 H100' };
+    const PIPE_DIR_NAMES = ['上', '右', '下', '左'];
+    const PIPE_STEP_MS = 220;
+    let pipeRots = [];
+    let pipeSpins = [];   // 畫面上累計轉了幾次：一直往順時針轉，不會從 270° 倒轉回 0°
+    let pipeTimer = null;
+    let pipeRunning = false;
+
+    function loadPipesLevel() {
+      if (pipeTimer) clearTimeout(pipeTimer);
+      pipeTimer = null;
+      pipeRunning = false;
+      const q = currentQuestion;
+      document.getElementById('pipesLevelBadge').textContent = levelBadgeText();
+      document.getElementById('pipesPrompt').textContent = q.prompt;
+      resetPipeRotations();
+      speakText(q.prompt);
+    }
+
+    function resetPipeRotations() {
+      pipeRots = currentQuestion.tiles.map(row => row.map(t => t ? t.rot : 0));
+      pipeSpins = pipeRots.map(row => row.slice());
+      document.getElementById('btnPipeRun').disabled = false;
+      renderPipeBoard();
+    }
+
+    function resetPipes() {
+      if (pipeRunning) return;
+      soundClick();
+      resetPipeRotations();
+    }
+
+    function pipeTileLabel(tile, r, c) {
+      const open = pipeOpenings(tile.t, pipeRots[r][c]).sort().map(d => PIPE_DIR_NAMES[d]).join('和');
+      return `第 ${r + 1} 列第 ${c + 1} 格，${tile.t === 'I' ? '直' : '彎'}水管，開口朝${open}`;
+    }
+
+    function pipeEdge(kind) {
+      const q = currentQuestion;
+      const el = document.createElement('div');
+      el.className = 'pipe-edge';
+      if (!kind) return el;
+      el.id = kind === 'source' ? 'pipeSource' : 'pipeTarget';
+      el.classList.add(kind);
+      el.setAttribute('role', 'img');
+      el.setAttribute('aria-label', kind === 'source' ? '水龍頭' : `${q.animalName}的農場`);
+      el.innerHTML = '<div class="pipe-stub"><div class="pipe-stub-water"></div></div><span class="pipe-icon" aria-hidden="true"></span>';
+      el.querySelector('.pipe-icon').textContent = kind === 'source' ? '🚰' : q.animal;
+      return el;
+    }
+
+    function renderPipeBoard() {
+      const q = currentQuestion;
+      const board = document.getElementById('pipeBoard');
+      board.classList.toggle('compact', q.size >= 5);
+      board.style.gridTemplateColumns = `var(--pipe-edge) repeat(${q.size}, var(--pipe-cell)) var(--pipe-edge)`;
+      board.innerHTML = '';
+      for (let r = 0; r < q.size; r++) {
+        board.appendChild(pipeEdge(r === q.src ? 'source' : null));
+        for (let c = 0; c < q.size; c++) {
+          const tile = q.tiles[r][c];
+          if (!tile) {
+            const empty = document.createElement('div');
+            empty.className = 'pipe-empty';
+            empty.setAttribute('aria-hidden', 'true');
+            empty.textContent = '🌿';
+            board.appendChild(empty);
+            continue;
+          }
+          const btn = document.createElement('button');
+          btn.className = 'pipe-tile';
+          btn.id = `pipe-${r}-${c}`;
+          btn.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><path class="pipe-shell" d="${PIPE_PATHS[tile.t]}"/><path class="pipe-water" d="${PIPE_PATHS[tile.t]}"/></svg>`;
+          btn.querySelector('svg').style.transform = `rotate(${pipeSpins[r][c] * 90}deg)`;
+          btn.setAttribute('aria-label', pipeTileLabel(tile, r, c));
+          btn.onclick = () => rotatePipe(r, c);
+          board.appendChild(btn);
+        }
+        board.appendChild(pipeEdge(r === q.dst ? 'target' : null));
+      }
+    }
+
+    function clearPipeWater() {
+      document.querySelectorAll('#pipeBoard .wet, #pipeBoard .leak').forEach(el => el.classList.remove('wet', 'rev', 'leak'));
+    }
+
+    function rotatePipe(r, c) {
+      if (pipeRunning) return;
+      soundClick();
+      pipeRots[r][c] = (pipeRots[r][c] + 1) % 4;
+      pipeSpins[r][c]++;
+      clearPipeWater();
+      const btn = document.getElementById(`pipe-${r}-${c}`);
+      btn.querySelector('svg').style.transform = `rotate(${pipeSpins[r][c] * 90}deg)`;
+      btn.setAttribute('aria-label', pipeTileLabel(currentQuestion.tiles[r][c], r, c));
+    }
+
+    // 打開水龍頭：水一格一格流過接好的水管；流到農場就過關，否則在停下來的地方漏水
+    function runPipes() {
+      if (pipeRunning) return;
+      const q = currentQuestion;
+      const flow = tracePipeFlow(q, pipeRots);
+      clearPipeWater();
+      pipeRunning = true;
+      document.getElementById('btnPipeRun').disabled = true;
+      document.getElementById('pipeSource').classList.add('wet');
+      soundStep();
+
+      let i = 0;
+      const step = () => {
+        if (i < flow.wet.length) {
+          const { r, c, from } = flow.wet[i++];
+          const el = document.getElementById(`pipe-${r}-${c}`);
+          el.classList.add('wet');
+          // 水管圖是從第一個開口畫到第二個；水從第二個開口進來時，流動動畫要倒著跑
+          if (from !== pipeOpenings(q.tiles[r][c].t, pipeRots[r][c])[0]) el.classList.add('rev');
+          soundStep();
+          pipeTimer = setTimeout(step, PIPE_STEP_MS);
+          return;
+        }
+        if (flow.reached) {
+          // 讓小動物喝到水、開心跳一下，再出現過關視窗
+          document.getElementById('pipeTarget').classList.add('wet');
+          pipeTimer = setTimeout(() => {
+            pipeTimer = null;
+            pipeRunning = false;
+            triggerVictory("小小水管工程師！", `水順利流到${q.animalName}的農場了！`, isLastQuestion());
+          }, 700);
+          return;
+        }
+        pipeTimer = null;
+        pipeRunning = false;
+        document.getElementById('btnPipeRun').disabled = false;
+        const last = flow.wet[flow.wet.length - 1];
+        (last ? document.getElementById(`pipe-${last.r}-${last.c}`) : document.getElementById('pipeSource')).classList.add('leak');
+        soundError();
+        onWrongAnswer('水在半路漏出來');
+        speakText("哎呀！水漏出來了！看看水停在哪裡，把那裡的水管轉一轉！");
+      };
+      pipeTimer = setTimeout(step, PIPE_STEP_MS);
     }
 
     /* =========================================================
@@ -5322,7 +5713,7 @@
         if (eyeOverSince === null) {
           eyeOverSince = now;
           eyeNotice("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
-        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning) {
+        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning && !pipeRunning) {
           goHome();
           lockEyes();
         }
