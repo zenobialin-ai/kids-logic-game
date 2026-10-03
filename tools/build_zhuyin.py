@@ -44,7 +44,10 @@ MANUAL = {
     '差': 'ㄔㄚ',
     '子': '˙ㄗ',  # 畫面上都是籃子、房子、孩子這類詞尾
     '東西': 'ㄉㄨㄥ ˙ㄒㄧ',
+    '台': 'ㄊㄞˊ',  # 教育部辭典把「台」當「臺」的異體字，沒有標注音
     '數一數': 'ㄕㄨˇ ㄧ ㄕㄨˇ',
+    '數成': 'ㄕㄨˇ ㄔㄥˊ',
+    '轉動': 'ㄓㄨㄢˋ ㄉㄨㄥˋ',
     '再數': 'ㄗㄞˋ ㄕㄨˇ',
     '奪得': 'ㄉㄨㄛˊ ㄉㄜˊ',
     '空著': 'ㄎㄨㄥˋ ˙ㄓㄜ',
@@ -155,6 +158,8 @@ def build_data(text, moe, review):
 
 
 def main(moe_path):
+    for w, r in MANUAL.items():
+        assert len(r.split()) == len(w), f'MANUAL 的「{w}」有 {len(w)} 個字，注音卻有 {len(r.split())} 組'
     moe = load_moe(moe_path)
     css = open(os.path.join(TOOLS, 'zhuyin.css'), encoding='utf8').read()
     js = open(os.path.join(TOOLS, 'zhuyin.js'), encoding='utf8').read()
@@ -173,8 +178,9 @@ def main(moe_path):
                  + js.replace('__ZHUYIN_DATA__', json.dumps(data, ensure_ascii=False, separators=(',', ':')))
                  + f'  </script>\n  {END}\n')
         if START in html:
-            html = re.sub(r'[ \t]*' + re.escape(START) + r'.*?' + re.escape(END) + r'\n',
-                          lambda m: '  ' + block, html, flags=re.S)
+            html, n = re.subn(r'[ \t]*' + re.escape(START) + r'.*?' + re.escape(END) + r'\n?',
+                              lambda m: '  ' + block, html, flags=re.S)
+            assert n == 1, f'{name}: 找不到完整的注音區塊（{START} … {END}）'
         else:
             html = html.replace('</body>', '  ' + block + '</body>', 1)
         with open(path, 'w', encoding='utf8', newline='') as f:

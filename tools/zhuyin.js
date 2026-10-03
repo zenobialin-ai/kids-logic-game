@@ -8,6 +8,7 @@
       const MAX_WORD = Math.max(1, ...Object.keys(WORDS).map(w => w.length));
       const HAN = /[㐀-䶿一-鿿]/;
       const CLOSE = /^[，。、！？；：」』）》〉…—～,.!?;:)\]]+/;
+      const OPEN = /[「『（《〈(\[]+$/;
       const SKIP = '.zy-w, [data-no-zhuyin], script, style, textarea, input, select, option, title, svg, canvas, code, pre, [contenteditable]';
 
       // 先比對破音詞（取最長），其餘用單字的常用讀音
@@ -53,22 +54,27 @@
         wrap.className = 'zy-w';
         let plain = '';
         let last = null;
-        const flush = () => {
-          // 句尾標點黏在前一個字上，避免換行後出現在行首
-          const p = last && plain.match(CLOSE);
-          if (p) { last.append(p[0]); plain = plain.slice(p[0].length); }
+        // 句尾標點黏在前一個字上、開頭的括號黏在後一個字上，避免換行後標點落單
+        const flush = next => {
+          const c = last && plain.match(CLOSE);
+          if (c) { last.append(c[0]); plain = plain.slice(c[0].length); }
+          const o = next && plain.match(OPEN);
+          if (o) { next.prepend(o[0]); plain = plain.slice(0, -o[0].length); }
           if (plain) { wrap.append(plain); plain = ''; }
         };
         for (let i = 0; i < text.length; i++) {
           if (r[i]) {
-            flush();
-            last = unit(text[i], r[i]);
+            const u = unit(text[i], r[i]);
+            flush(u);
+            last = u;
             wrap.append(last);
           } else {
             plain += text[i];
           }
         }
         flush();
+        // 很短的標籤（例如「1 號房」「資優特訓」）不要從中間斷行
+        if (r.filter(Boolean).length <= 6) wrap.style.whiteSpace = 'nowrap';
         node.replaceWith(wrap);
       }
 
