@@ -6,8 +6,10 @@
   <title>小小邏輯探險家 - 升小一邏輯思維與資優鑑定大挑戰</title>
   <style>
     :root {
-      --font-content: 18px;
-      --font-title: 20px; /* 標題比內容大2號：18 + 2 = 20px */
+      /* --fs：字體大小倍率，由選單上的「字體 － ＋」調整（見 applyFontScale） */
+      --fs: 1;
+      --font-content: calc(18px * var(--fs));
+      --font-title: calc(20px * var(--fs)); /* 標題比內容大2號：18 + 2 = 20px */
       --primary: #4A90E2;
       --primary-dark: #2A68B2;
       --secondary: #FFB300;
@@ -82,7 +84,7 @@
     }
 
     .brand-title {
-      font-size: var(--font-title);
+      font-size: 20px;
       font-weight: 900;
       background: linear-gradient(45deg, #1E40AF, #7C3AED, #DB2777);
       -webkit-background-clip: text;
@@ -101,7 +103,7 @@
       padding: 6px 14px;
       border-radius: 30px;
       font-weight: 800;
-      font-size: var(--font-content);
+      font-size: 18px;
       color: #B45309;
       display: flex;
       align-items: center;
@@ -115,7 +117,7 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      font-size: var(--font-title);
+      font-size: 20px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -158,7 +160,7 @@
     .gifted-ribbon {
       background: linear-gradient(135deg, #8B5CF6, #EC4899);
       color: #FFF;
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       font-weight: 800;
       padding: 4px 12px;
       border-radius: 20px;
@@ -302,7 +304,7 @@
     }
 
     .card-badge {
-      font-size: 16px;
+      font-size: calc(16px * var(--fs));
       font-weight: 700;
       padding: 6px 14px;
       border-radius: 14px;
@@ -909,7 +911,7 @@
     }
 
     .house-roof { font-size: 34px; margin-bottom: 4px; }
-    .house-num { font-size: 16px; font-weight: 800; color: #EA580C; margin-bottom: 8px; }
+    .house-num { font-size: calc(16px * var(--fs)); font-weight: 800; color: #EA580C; margin-bottom: 8px; }
 
     .house-content {
       width: 80px;
@@ -1270,6 +1272,43 @@
       margin: 8px 0 4px;
     }
 
+    /* 字體大小：按鈕本身不跟著放大，放到最大時也按得到 */
+    .font-size-ctrl {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 800;
+      color: #475569;
+    }
+    .font-size-label { font-size: calc(15px * var(--fs)); }
+    .font-size-level {
+      min-width: 3.2em;
+      text-align: center;
+      font-size: calc(15px * var(--fs));
+      color: #1E40AF;
+    }
+    .font-btn {
+      min-width: 48px;
+      height: 40px;
+      border: 3px solid #BFDBFE;
+      border-radius: 20px;
+      background: #EFF6FF;
+      color: #1E40AF;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .font-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* 加了注音後，很短的標籤在一般字級下不要從中間斷行；
+       字放到「特大」以上時放不下，就讓它換行，不要超出畫面 */
+    html:not(.fs-large) .house-num,
+    html:not(.fs-large) .gifted-ribbon { white-space: nowrap; }
+    html.fs-large .btn-run,
+    html.fs-large .btn-clear,
+    html.fs-large .level-badge { white-space: normal; }
+
     .difficulty-label {
       font-size: var(--font-title);
       font-weight: 900;
@@ -1303,7 +1342,7 @@
       background: #F8FAFC;
       color: #64748B;
       font-family: inherit;
-      font-size: 15px;
+      font-size: calc(15px * var(--fs));
       font-weight: 800;
       padding: 6px 14px;
       border-radius: 12px;
@@ -1336,7 +1375,7 @@
     @media (max-width: 600px) {
       .monster-grid { grid-template-columns: repeat(4, 66px); gap: 8px; margin-top: 10px; }
       .monster-card { width: 66px; height: 66px; }
-      #monsterClues .clue-item { padding: 8px 10px; font-size: 16px; }
+      #monsterClues .clue-item { padding: 8px 10px; font-size: calc(16px * var(--fs)); }
       .sort-baskets { gap: 8px; }
       .choice-btn.sort-item { width: 60px; height: 60px; font-size: 32px; }
       .sort-basket-items .choice-btn.sort-item { width: 48px; height: 48px; font-size: 26px; }
@@ -1374,7 +1413,7 @@
       color: #FFF;
       border-radius: 12px;
       padding: 0 8px;
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
       margin-left: 4px;
     }
 
@@ -1398,15 +1437,15 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 6px;
-      font-size: 14px;
+      font-size: calc(14px * var(--fs));
     }
 
     .mistake-tag { font-weight: 800; color: #4338CA; word-break: keep-all; }
     .mistake-time { color: #94A3B8; white-space: nowrap; }
     .mistake-prompt { font-size: var(--font-content); font-weight: 700; color: #1E293B; margin-bottom: 6px; line-height: 1.5; }
-    .mistake-summary { font-size: 18px; color: #475569; margin-bottom: 6px; word-break: break-all; }
-    .mistake-wrong { font-size: 15px; color: #B91C1C; margin-bottom: 10px; }
-    .mistake-retry { font-size: 15px; padding: 8px 20px; border-radius: 14px; }
+    .mistake-summary { font-size: calc(18px * var(--fs)); color: #475569; margin-bottom: 6px; word-break: break-all; }
+    .mistake-wrong { font-size: calc(15px * var(--fs)); color: #B91C1C; margin-bottom: 10px; }
+    .mistake-retry { font-size: calc(15px * var(--fs)); padding: 8px 20px; border-radius: 14px; }
     .mistake-empty { text-align: center; padding: 30px 10px; color: #475569; line-height: 1.8; }
 
     /* 一格裡有多個圖案（數量題）時縮小字級 */
@@ -1444,12 +1483,12 @@
       box-shadow: var(--shadow-md);
     }
 
-    .eye-lock-title { font-size: 26px; font-weight: 900; color: #166534; margin-bottom: 8px; }
+    .eye-lock-title { font-size: calc(26px * var(--fs)); font-weight: 900; color: #166534; margin-bottom: 8px; }
     .eye-lock-sub { font-size: var(--font-content); color: #475569; margin-bottom: 18px; }
     .eye-ex { background: #F0FDF4; border-radius: 22px; padding: 20px 12px; margin-bottom: 16px; }
     .eye-ex-icon { font-size: 72px; animation: float 2.5s ease-in-out infinite; }
-    .eye-ex-text { font-size: 22px; font-weight: 900; color: #1E293B; margin: 8px 0; }
-    .eye-ex-step { font-size: 15px; color: #64748B; }
+    .eye-ex-text { font-size: calc(22px * var(--fs)); font-weight: 900; color: #1E293B; margin: 8px 0; }
+    .eye-ex-step { font-size: calc(15px * var(--fs)); color: #64748B; }
     .eye-ex-count { font-size: 40px; font-weight: 900; color: #16A34A; min-height: 48px; }
 
     .eye-parent-link {
@@ -1459,7 +1498,7 @@
       border-radius: 14px;
       padding: 8px 16px;
       font-family: inherit;
-      font-size: 15px;
+      font-size: calc(15px * var(--fs));
       font-weight: 800;
       cursor: pointer;
     }
@@ -1477,14 +1516,14 @@
       text-align: center;
     }
 
-    .parent-gate-btn { padding: 10px 22px; font-size: 16px; }
-    .parent-gate-msg { min-height: 22px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #DC2626; }
+    .parent-gate-btn { padding: 10px 22px; font-size: calc(16px * var(--fs)); }
+    .parent-gate-msg { min-height: 22px; margin-top: 8px; font-size: calc(15px * var(--fs)); font-weight: 800; color: #DC2626; }
     .modal-overlay.scrollable { overflow-y: auto; align-items: flex-start; padding: 16px 0; }
     .modal-overlay.scrollable .modal-card { margin: auto; }
 
     @media (max-height: 600px) {
       .eye-lock-card { padding: 18px 16px; }
-      .eye-lock-title { font-size: 22px; }
+      .eye-lock-title { font-size: calc(22px * var(--fs)); }
       .eye-ex { padding: 10px; }
       .eye-ex-icon { font-size: 48px; }
       .eye-ex-count { font-size: 30px; min-height: 36px; }
@@ -1512,14 +1551,14 @@
       min-width: 44px;
       min-height: 44px;
       font-family: inherit;
-      font-size: 16px;
+      font-size: calc(16px * var(--fs));
       font-weight: 800;
       cursor: pointer;
     }
 
     .eye-toggle.active, .eye-limit-btn.active { border-color: #10B981; background: #DCFCE7; color: #065F46; }
     .eye-limit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .parent-note { font-size: 14px; color: #64748B; margin-top: 12px; line-height: 1.6; }
+    .parent-note { font-size: calc(14px * var(--fs)); color: #64748B; margin-top: 12px; line-height: 1.6; }
 
     .gear-help-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
@@ -1531,7 +1570,7 @@
       padding: 8px 16px;
       min-height: 40px;
       font-family: inherit;
-      font-size: 16px;
+      font-size: calc(16px * var(--fs));
       font-weight: 800;
       cursor: pointer;
     }
@@ -1559,12 +1598,12 @@
       /* 難度列：三個難度一排，自動調整和錯題本一排 */
       .difficulty-bar { gap: 8px; padding: 12px; }
       .difficulty-label { display: none; }
-      .diff-btn, .mistake-btn, .adapt-toggle { padding: 6px 12px; font-size: 15px; min-height: 40px; }
+      .diff-btn, .mistake-btn, .adapt-toggle { padding: 6px 12px; font-size: calc(15px * var(--fs)); min-height: 40px; }
       .adapt-toggle, .mistake-btn { margin-left: 0; }
 
       /* 積木：透視鏡按鈕放到畫布上方，不蓋住積木 */
       .canvas-wrap { flex-direction: column; gap: 8px; }
-      .xray-btn { position: static; font-size: 15px; padding: 6px 14px; min-height: 40px; }
+      .xray-btn { position: static; font-size: calc(15px * var(--fs)); padding: 6px 14px; min-height: 40px; }
 
       /* 摺紙：步驟改成兩欄、加上編號代替箭頭（折行後箭頭會掛在行尾）；3 個步驟時最後一步置中 */
       .fold-steps-row { display: grid; grid-template-columns: repeat(2, auto); justify-content: center; gap: 12px 20px; counter-reset: fold-step; }
@@ -1598,8 +1637,8 @@
     @media (max-width: 720px) {
       .game-header { gap: 8px; align-items: flex-start; }
       .game-title-box { flex-wrap: wrap; gap: 6px 8px; }
-      .game-title { font-size: 18px; }
-      .level-badge { white-space: nowrap; font-size: 15px; padding: 3px 10px; }
+      .game-title { font-size: calc(18px * var(--fs)); }
+      .level-badge { white-space: nowrap; font-size: calc(15px * var(--fs)); padding: 3px 10px; }
     }
 
     /* 按鈕只留圖示：480px 以下才需要，600px 左右還放得下文字 */
@@ -1633,7 +1672,7 @@
       padding: 6px 14px;
       border-radius: 30px;
       font-weight: 800;
-      font-size: var(--font-content);
+      font-size: 18px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -1701,6 +1740,12 @@
         <button class="diff-btn" data-diff="hard" onclick="setDifficulty('hard')">🌳 挑戰</button>
         <button class="adapt-toggle" id="adaptiveBtn" onclick="toggleAdaptive()">🤖 自動調整：開</button>
         <button class="mistake-btn" onclick="openMistakeBook()">📖 錯題本 <span class="mistake-count" id="mistakeCount">0</span></button>
+        <div class="font-size-ctrl" role="group" aria-label="字體大小">
+          <span class="font-size-label">🔤 字體</span>
+          <button class="font-btn" id="fontDownBtn" onclick="changeFontScale(-1)" aria-label="字變小">A－</button>
+          <span class="font-size-level" id="fontSizeLevel" aria-live="polite">標準</span>
+          <button class="font-btn" id="fontUpBtn" onclick="changeFontScale(1)" aria-label="字變大">A＋</button>
+        </div>
       </div>
 
       <!-- SECTION 1: FOUNDATION LOGIC -->
@@ -2282,6 +2327,37 @@
       utterance.pitch = 1.2;
       window.speechSynthesis.speak(utterance);
     }
+
+    /* 字體大小（每台裝置各自記住，不跟進度一起同步） */
+    const FONT_SCALES = [
+      { scale: 0.9, label: '小' },
+      { scale: 1, label: '標準' },
+      { scale: 1.15, label: '大' },
+      { scale: 1.3, label: '特大' },
+      { scale: 1.5, label: '超大' }
+    ];
+    const FONT_SCALE_KEY = 'little_logic_font_scale';
+    let fontScaleIndex = 1;
+
+    function applyFontScale(index) {
+      fontScaleIndex = Math.max(0, Math.min(FONT_SCALES.length - 1, index));
+      document.documentElement.style.setProperty('--fs', FONT_SCALES[fontScaleIndex].scale);
+      document.documentElement.classList.toggle('fs-large', FONT_SCALES[fontScaleIndex].scale >= 1.3);
+      document.getElementById('fontSizeLevel').textContent = FONT_SCALES[fontScaleIndex].label;
+      document.getElementById('fontDownBtn').disabled = fontScaleIndex === 0;
+      document.getElementById('fontUpBtn').disabled = fontScaleIndex === FONT_SCALES.length - 1;
+    }
+
+    function changeFontScale(step) {
+      applyFontScale(fontScaleIndex + step);
+      try { localStorage.setItem(FONT_SCALE_KEY, String(fontScaleIndex)); } catch (e) {}
+    }
+
+    try {
+      const saved = parseInt(localStorage.getItem(FONT_SCALE_KEY), 10);
+      if (!isNaN(saved)) fontScaleIndex = saved;
+    } catch (e) {}
+    applyFontScale(fontScaleIndex);
 
     /* GLOBAL GAME STATE & CROSS-DEVICE SYNC ENGINE */
     const SAVE_KEY = 'little_logic_save_v1';
@@ -5986,7 +6062,7 @@
     /* 自動注音：把畫面上每個中文字包成「字＋右側注音」，之後動態加入的文字也會自動補上。
        不想加注音的區塊可以加上 data-no-zhuyin 屬性。 */
     (function () {
-      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ之ㄓ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ場ㄔㄤˇ塊ㄎㄨㄞˋ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ測ㄘㄜˋ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ玩ㄨㄢˊ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ符ㄈㄨˊ第ㄉㄧˋ等ㄉㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ著˙ㄓㄜ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ逆ㄋㄧˋ透ㄊㄡˋ這ㄓㄜˋ通ㄊㄨㄥ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銳ㄖㄨㄟˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ難ㄋㄢˊ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
+      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ之ㄓ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ場ㄔㄤˇ塊ㄎㄨㄞˋ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ測ㄘㄜˋ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ玩ㄨㄢˊ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ符ㄈㄨˊ第ㄉㄧˋ等ㄉㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ著˙ㄓㄜ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ逆ㄋㄧˋ透ㄊㄡˋ這ㄓㄜˋ通ㄊㄨㄥ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銳ㄖㄨㄟˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ難ㄋㄢˊ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
       const CHARS = {};
       DATA.chars.replace(/([㐀-䶿一-鿿])([^㐀-䶿一-鿿]+)/g, (m, c, z) => { CHARS[c] = z; });
       const WORDS = DATA.words;
@@ -6058,8 +6134,6 @@
           }
         }
         flush();
-        // 很短的標籤（例如「1 號房」「資優特訓」）不要從中間斷行
-        if (r.filter(Boolean).length <= 6) wrap.style.whiteSpace = 'nowrap';
         node.replaceWith(wrap);
       }
 
