@@ -19,6 +19,7 @@
   - 🔲 瑞文氏九宮矩陣（Raven's 抽象非語言雙維度矩陣推理）
 - **亮點功能**：
   - 🔊 全程中文語音題目朗讀
+  - 🔤 全部中文字自動加上國語課本式注音（字的右邊直排，含破音字判讀）
   - 📲 跨裝置進度同步（支援 URL 傳遞、QR Code 換機掃描、LocalStorage 自動保存）
 
 ### 2. 🌱 蒙特梭利數學樂園 (`montessori_math_game.html`)
@@ -46,3 +47,19 @@
    - 等候約 30 秒至 1 分鐘重新整理，即可取得：
      `https://<你的GitHub帳號>.github.io/<倉庫名稱>/`
    - 直接傳給親友、iPad 或手機，點開即可暢玩！
+
+---
+
+## 🔤 注音怎麼來的？
+
+`logic_game.html` 與 `index.html` 的注音由 `tools/build_zhuyin.py` 產生並直接嵌進網頁（仍然是單一檔案、可離線）。
+讀音以教育部《重編國語辭典修訂本》為準。新增或修改畫面上的中文後，請重新產生：
+
+```bash
+pip install pypinyin
+git clone --depth 1 https://github.com/g0v/moedict-data.git /tmp/moedict-data
+xz -dk /tmp/moedict-data/dict-revised.json.xz
+python3 tools/build_zhuyin.py /tmp/moedict-data/dict-revised.json
+```
+
+讀錯的字或詞請加到 `tools/build_zhuyin.py` 的 `MANUAL`。

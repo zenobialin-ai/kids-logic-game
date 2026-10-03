@@ -1,0 +1,37 @@
+    /* 國語課本式注音：注音直排在字的右邊，二、三、四聲在右側，輕聲在最上方。
+       注音放在 ::before / ::after（data-zy、data-tone），不會混進 textContent、
+       innerText、語音朗讀或複製的文字。 */
+    .zy-u {
+      display: inline-block;
+      margin: 0 0.06em;
+      text-indent: 0;
+      white-space: nowrap;
+    }
+    .zy {
+      position: relative;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 0.08em;
+      font-size: max(0.42em, 9px);
+      font-weight: 700;
+      font-style: normal;
+      line-height: 1.02;
+      letter-spacing: 0;
+      text-align: center;
+      text-shadow: none;
+      opacity: 0.85;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .zy::before {
+      content: attr(data-zy);
+      white-space: pre;
+    }
+    .zy::after {
+      content: attr(data-tone);
+      position: absolute;
+      line-height: 1;
+    }
+    .zy-t::after { left: 100%; bottom: 0.1em; margin-left: 0.05em; }
+    .zy-n { padding-top: 0.7em; }
+    .zy-n::after { top: 0; left: 50%; transform: translateX(-50%); }
