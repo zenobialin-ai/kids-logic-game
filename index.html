@@ -496,8 +496,6 @@
           }
         }
         flush();
-        // 很短的標籤（例如「1 號房」「資優特訓」）不要從中間斷行
-        if (r.filter(Boolean).length <= 6) wrap.style.whiteSpace = 'nowrap';
         node.replaceWith(wrap);
       }
 
