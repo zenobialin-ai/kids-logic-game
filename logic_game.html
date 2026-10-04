@@ -2008,7 +2008,7 @@
       <div class="prompt-box" id="pipesPrompt">轉一轉水管，讓水流到農場！</div>
       <div class="pipes-container">
         <div class="pipe-board" id="pipeBoard"></div>
-        <div class="pipe-tip">點水管可以轉方向，接好了再打開水龍頭！</div>
+        <div class="pipe-tip" id="pipeTip">點水管可以轉方向，接好了再打開水龍頭！</div>
         <div class="pipe-status" id="pipeStatus" role="status" aria-live="polite"></div>
         <div class="action-btn-group">
           <button class="btn-clear" onclick="resetPipes()">🔄 恢復原狀</button>
@@ -3319,10 +3319,11 @@
       { e: '🐑', n: '小羊' }, { e: '🐴', n: '小馬' }, { e: '🐰', n: '小兔子' }
     ];
     // path：正確路線經過幾格；decoys：路線以外的格子放多少多餘的水管；clicks：最少要點幾下才接得通
+    // live：轉水管的當下水就會跟著流（不用按水龍頭）；挑戰關維持「接好再放水」
     const PIPE_RULES = {
-      easy:   { size: 3, path: [3, 5],  decoys: 0,   clicks: [2, 5] },
-      normal: { size: 4, path: [5, 8],  decoys: 0.5, clicks: [4, 9] },
-      hard:   { size: 5, path: [7, 12], decoys: 1,   clicks: [7, 16] }
+      easy:   { size: 3, path: [3, 5],  decoys: 0,   clicks: [2, 5],  live: true },
+      normal: { size: 4, path: [5, 8],  decoys: 0.5, clicks: [4, 9],  live: true },
+      hard:   { size: 5, path: [7, 12], decoys: 1,   clicks: [7, 16], live: false }
     };
 
     const pipeOpenings = (type, rot) => PIPE_SHAPES[type].map(d => (d + rot) % 4);
@@ -3416,7 +3417,7 @@
           if (!t && Math.random() < rule.decoys) row[c] = { t: pick(['I', 'L']), rot: randInt(0, 3) };
         }));
         const animal = pick(PIPE_ANIMALS);
-        const q = { prompt: `轉一轉水管，讓水流到${animal.n}的農場！`, size: n, src, dst, animal: animal.e, animalName: animal.n, tiles };
+        const q = { prompt: `轉一轉水管，讓水流到${animal.n}的農場！`, size: n, src, dst, animal: animal.e, animalName: animal.n, tiles, live: rule.live };
         const clicks = solvePipes(q);
         if (clicks === null || clicks < rule.clicks[0] || clicks > rule.clicks[1]) return null;
         return q;
@@ -4776,14 +4777,28 @@
     let pipeSpins = [];   // 畫面上累計轉了幾次：一直往順時針轉，不會從 270° 倒轉回 0°
     let pipeTimer = null;
     let pipeRunning = false;
+    let pipeClicks = 0;       // 這一題已經轉了幾下
+    let pipeMinClicks = 0;    // 這一題最少要轉幾下
+    let pipeWetLen = 0;       // 目前水流過幾格（用來決定要不要播報給螢幕閱讀器）
+    // 即時水流模式：多轉不超過「最少次數 + 這個數字」，才算一次就接好（亂轉到碰運氣不算答對，免得很快被升級）
+    const PIPE_LIVE_SLACK = 4;
+
+    const isPipeLive = () => !!currentQuestion && currentQuestion.live === true;
 
     function loadPipesLevel() {
       if (pipeTimer) clearTimeout(pipeTimer);
       pipeTimer = null;
       pipeRunning = false;
       const q = currentQuestion;
+      const live = isPipeLive();
+      pipeClicks = 0;
+      pipeMinClicks = solvePipes(q);
       document.getElementById('pipesLevelBadge').textContent = levelBadgeText();
       document.getElementById('pipesPrompt').textContent = q.prompt;
+      document.getElementById('btnPipeRun').style.display = live ? 'none' : '';
+      document.getElementById('pipeTip').textContent = live
+        ? '點水管轉一轉，水會馬上流過去，流到農場就成功了！'
+        : '點水管可以轉方向，接好了再打開水龍頭！';
       resetPipeRotations();
       speakText(q.prompt);
     }
@@ -4793,6 +4808,7 @@
       pipeSpins = pipeRots.map(row => row.slice());
       document.getElementById('btnPipeRun').disabled = false;
       renderPipeBoard();
+      if (isPipeLive()) refreshPipeFlow(false);
     }
 
     function resetPipes() {
@@ -4861,10 +4877,55 @@
       soundClick();
       pipeRots[r][c] = (pipeRots[r][c] + 1) % 4;
       pipeSpins[r][c]++;
-      clearPipeWater();
+      pipeClicks++;
+      if (!isPipeLive()) clearPipeWater();
       const btn = document.getElementById(`pipe-${r}-${c}`);
       btn.querySelector('svg').style.transform = `rotate(${pipeSpins[r][c] * 90}deg)`;
       btn.setAttribute('aria-label', pipeTileLabel(currentQuestion.tiles[r][c], r, c));
+      if (isPipeLive()) refreshPipeFlow(true);
+    }
+
+    // 水管圖是從第一個開口畫到第二個；水從第二個開口進來時，流動動畫要倒著跑
+    function pipeFlowReversed(q, r, c, from) {
+      return from !== pipeOpenings(q.tiles[r][c].t, pipeRots[r][c])[0];
+    }
+
+    // 讓小動物喝到水、開心跳一下，再出現過關視窗
+    function pipeReachFarm() {
+      const q = currentQuestion;
+      document.getElementById('pipeTarget').classList.add('wet');
+      pipeTimer = setTimeout(() => {
+        pipeTimer = null;
+        pipeRunning = false;
+        triggerVictory("小小水管工程師！", `水順利流到${q.animalName}的農場了！`, isLastQuestion());
+      }, 700);
+    }
+
+    // 即時水流（簡單／普通）：每轉一下就照目前的轉向重算水流
+    // 只更新有變的格子，沒變的水管流動動畫不會被打斷；水不會漏，所以不計答錯
+    function refreshPipeFlow(announce) {
+      const q = currentQuestion;
+      const flow = tracePipeFlow(q, pipeRots);
+      const wetAt = new Map(flow.wet.map(w => [`pipe-${w.r}-${w.c}`, w]));
+      document.querySelectorAll('#pipeBoard .pipe-tile').forEach(el => {
+        const w = wetAt.get(el.id);
+        el.classList.toggle('wet', !!w);
+        el.classList.toggle('rev', !!w && pipeFlowReversed(q, w.r, w.c, w.from));
+      });
+      document.getElementById('pipeSource').classList.add('wet');
+      // 螢幕閱讀器：只有水流長度變了、或流到農場才播報，不是每點一下就念一次
+      if (announce && (flow.reached || flow.wet.length !== pipeWetLen)) {
+        const last = flow.wet[flow.wet.length - 1];
+        document.getElementById('pipeStatus').textContent = flow.reached ? `水流到${q.animalName}的農場了！`
+          : last ? `水流到第 ${last.r + 1} 列第 ${last.c + 1} 格就停住了。` : '水還沒有流進水管。';
+      }
+      pipeWetLen = flow.wet.length;
+      if (flow.reached) {
+        pipeRunning = true; // 鎖住轉動，等小動物喝到水
+        // 亂轉很多下才碰巧接通：不算「一次就答對」，連續答對的計數不增加（也不扣）
+        if (pipeClicks > pipeMinClicks + PIPE_LIVE_SLACK) questionWrongAttempts = Math.max(questionWrongAttempts, 1);
+        pipeReachFarm();
+      }
     }
 
     // 打開水龍頭：水一格一格流過接好的水管；流到農場就過關，否則在停下來的地方漏水
@@ -4884,20 +4945,13 @@
           const { r, c, from } = flow.wet[i++];
           const el = document.getElementById(`pipe-${r}-${c}`);
           el.classList.add('wet');
-          // 水管圖是從第一個開口畫到第二個；水從第二個開口進來時，流動動畫要倒著跑
-          if (from !== pipeOpenings(q.tiles[r][c].t, pipeRots[r][c])[0]) el.classList.add('rev');
+          if (pipeFlowReversed(q, r, c, from)) el.classList.add('rev');
           soundStep();
           pipeTimer = setTimeout(step, PIPE_STEP_MS);
           return;
         }
         if (flow.reached) {
-          // 讓小動物喝到水、開心跳一下，再出現過關視窗
-          document.getElementById('pipeTarget').classList.add('wet');
-          pipeTimer = setTimeout(() => {
-            pipeTimer = null;
-            pipeRunning = false;
-            triggerVictory("小小水管工程師！", `水順利流到${q.animalName}的農場了！`, isLastQuestion());
-          }, 700);
+          pipeReachFarm();
           return;
         }
         pipeTimer = null;
