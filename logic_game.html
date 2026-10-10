@@ -1760,7 +1760,7 @@
 
       <!-- CHILD AVATAR（只有 1 位孩子時畫面完全不變） -->
       <div class="child-avatar-row" id="childAvatarRow" style="display:none;">
-        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: true })">
+        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: true, kind: 'play' })">
           <span class="child-avatar-emoji" id="childAvatarEmoji">🐰</span>
           <span class="child-avatar-name" id="childAvatarName"></span>
         </button>
@@ -2535,10 +2535,10 @@
       if (imported) {
         // 啟動流程 2：只有 1 位孩子就跟現在一樣直接匯入；2 位以上只問「要匯入給誰？」
         if (p.children.length === 1) applyImport(imported, activeChildId);
-        else openChildPicker({ title: '要匯入給誰？', onPick: function (id) { applyImport(imported, id); }, cancellable: true });
+        else openChildPicker({ title: '要匯入給誰？', onPick: function (id) { applyImport(imported, id); }, cancellable: true, kind: 'import' });
       } else if (p.askOnOpen && p.children.length >= 2) {
         // 啟動流程 3
-        openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+        openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false, kind: 'play' });
       }
 
       renderChildAvatar();
@@ -2603,7 +2603,10 @@
           }
         }
       } else if (!seen.has('c0')) {
-        children.unshift({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() });
+        // N3：補回來的 c0 圖示不能跟名單上別的孩子重複
+        const used = new Set(children.map(c => c.emoji));
+        const e = used.has(DEFAULT_EMOJI) ? (CHILD_EMOJIS.find(x => !used.has(x)) || DEFAULT_EMOJI) : DEFAULT_EMOJI;
+        children.unshift({ id: 'c0', emoji: e, name: '', slot: '', createdAt: Date.now() });
       }
       children.sort((a, b) => (a.id === 'c0' ? -1 : b.id === 'c0' ? 1 : 0));
       const ids = new Set(children.map(c => c.id));
@@ -2828,11 +2831,11 @@
       const seen = lastSeenAt();
       markSeen();
       if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
-      if (pickerReq) return;   // 「要匯入給誰？」還開著 → 匯入請求優先，不能覆蓋
+      if (pickerReq && pickerReq.kind === 'import') return;   // N1：只有匯入請求優先；「誰要玩？」可以被非取消版取代
       // 先處理「離開太久」：還在題目中就先回首頁（R2 會用 away 結束紀錄）
       if (currentModule) { qlogClose('away'); goHome(); }   // 離開太久 → 紀錄用 away 結束
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));  // 齒輪說明之類的視窗不能還疊在選單上
-      openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+      openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false, kind: 'play' });
     }
 
     function renderChildAvatar() {
@@ -3249,7 +3252,11 @@
       const p = readProfiles();
       if (!p.children.some(c => c.id === activeChildId)) {
         const c = p.children.find(x => x.id === p.active) || p.children[0];
-        showToast('這位孩子被其他分頁刪掉了，換 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + ' 玩囉！');
+        const frag = document.createDocumentFragment();   // N2：自訂名字走 data-no-zhuyin
+        frag.append('這位孩子被其他分頁刪掉了，換 ');
+        frag.append(nameParts(c));
+        frag.append(' 玩囉！');
+        showToast(frag);
         qlogClose('abandoned');
         goHome();
         activeChildId = c.id;
@@ -3382,7 +3389,8 @@
     function showToast(msg) {
       const box = document.getElementById('toastBox');
       if (!box) return;
-      box.textContent = msg;
+      if (typeof msg === 'string') box.textContent = msg;
+      else { box.textContent = ''; box.append(msg); }   // N2：名字要分開 render，才不會被加注音
       box.classList.add('show');
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
