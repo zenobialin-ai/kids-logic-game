@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>語音測試</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #F8FAFC; --card: #FFFFFF; --text: #1E293B; --muted: #64748B; --line: #E2E8F0; --accent: #4F46E5; --ok: #059669; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0F172A; --card: #1E293B; --text: #E2E8F0; --muted: #94A3B8; --line: #334155; --accent: #4F46E5; --ok: #34D399; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 22px; margin: 4px 0 4px; }
+    p.note { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    label { display: block; font-weight: 700; margin-bottom: 6px; }
+    textarea { width: 100%; min-height: 64px; font: inherit; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    button { font: inherit; font-weight: 700; border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 10px; padding: 8px 12px; min-height: 44px; cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #FFF; }
+    button[aria-pressed="true"] { border-color: var(--ok); outline: 2px solid var(--ok); }
+    .voice { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); }
+    .voice:first-child { border-top: none; }
+    .voice > div:first-child { min-width: 0; }
+    .voice button { flex-shrink: 0; white-space: nowrap; }
+    .voice .name { font-weight: 700; overflow-wrap: anywhere; }
+    .voice .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+    .tag { display: inline-block; font-size: 12px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); margin-left: 4px; }
+    .status { color: var(--muted); font-size: 14px; }
+    .empty { color: var(--muted); padding: 8px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🔊 語音測試</h1>
+  <p class="note">列出這台裝置的瀏覽器「實際拿得到」的聲音，每個都可以試聽。遊戲現在用的是最上面的「預設（不指定聲音）」。<br>iPad 上所有瀏覽器用的是同一套系統語音；Siri 的聲音通常不會出現在網頁裡。沒有聲音時，請檢查音量和靜音開關。</p>
+
+  <div class="panel">
+    <label for="sample">試聽句子</label>
+    <textarea id="sample">小朋友，我們一起來玩邏輯遊戲吧！轉一轉水管，讓水流到小羊的農場！</textarea>
+    <div class="row" role="group" aria-label="速度">
+      <span>速度</span>
+      <button data-rate="0.7" aria-pressed="true">慢 0.7</button>
+      <button data-rate="0.85" aria-pressed="false">普通 0.85</button>
+      <button data-rate="1" aria-pressed="false">快 1.0</button>
+    </div>
+    <div class="row" role="group" aria-label="音調">
+      <span>音調</span>
+      <button data-pitch="1.2" aria-pressed="true">遊戲用 1.2</button>
+      <button data-pitch="1" aria-pressed="false">原本 1.0</button>
+    </div>
+    <div class="row">
+      <button id="stopBtn">⏹ 停止</button>
+      <label style="display:flex; gap:6px; align-items:center; margin:0; font-weight:400;">
+        <input type="checkbox" id="showAll"> 也顯示非中文的聲音
+      </label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="voice">
+      <div>
+        <div class="name">預設（不指定聲音）<span class="tag">遊戲現在用這個</span></div>
+        <div class="meta">只設定 lang = zh-TW，由系統決定用哪個聲音</div>
+      </div>
+      <button class="primary" id="defaultBtn">▶ 試聽</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="status" id="status" aria-live="polite">讀取聲音清單中…</div>
+    <div id="list"></div>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="margin-top:0;">
+      <button id="copyBtn">📋 複製聲音清單</button>
+      <button id="reloadBtn">🔄 重新讀取</button>
+    </div>
+    <p class="note" style="margin:8px 0 0;">把複製的清單貼回來，就知道這台裝置有哪些聲音可以選。iPad 的瀏覽器會假裝自己是 Mac，所以請另外寫下「設定 → 一般 → 關於本機」裡的 iPadOS 版本。</p>
+  </div>
+</main>
+
+<script>
+  const supported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  let rate = 0.7;
+  let pitch = 1.2;
+  let voices = [];
+
+  function pickGroup(attr, value) {
+    document.querySelectorAll(`[data-${attr}]`).forEach(b => b.setAttribute('aria-pressed', b.dataset[attr] === value));
+  }
+  document.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => { rate = Number(b.dataset.rate); pickGroup('rate', b.dataset.rate); });
+  document.querySelectorAll('[data-pitch]').forEach(b => b.onclick = () => { pitch = Number(b.dataset.pitch); pickGroup('pitch', b.dataset.pitch); });
+
+  function speak(voice) {
+    if (!supported) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(document.getElementById('sample').value);
+    u.lang = voice ? voice.lang : 'zh-TW';
+    if (voice) u.voice = voice;
+    u.rate = rate;
+    u.pitch = pitch;
+    speechSynthesis.speak(u);
+  }
+
+  function isZh(v) { return /^(zh|cmn|yue)/i.test(v.lang); }
+
+  function render() {
+    const showAll = document.getElementById('showAll').checked;
+    const list = document.getElementById('list');
+    const status = document.getElementById('status');
+    if (!supported) {
+      status.textContent = '這個瀏覽器不支援網頁語音（speechSynthesis）。';
+      return;
+    }
+    voices = speechSynthesis.getVoices();
+    const shown = voices.filter(v => showAll || isZh(v))
+      .sort((a, b) => (a.lang === 'zh-TW' ? -1 : 0) - (b.lang === 'zh-TW' ? -1 : 0) || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+    status.textContent = `共 ${voices.length} 個聲音，中文 ${voices.filter(isZh).length} 個` + (showAll ? '（顯示全部）' : '（只顯示中文）');
+    list.innerHTML = '';
+    if (!shown.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = voices.length ? '沒有中文聲音。' : '還沒拿到聲音清單，請按「重新讀取」，或先按一次上面的試聽再重新讀取。';
+      list.appendChild(empty);
+    }
+    shown.forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'voice';
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = v.name;
+      [v.default ? '系統預設' : '', v.localService ? '本機' : '線上'].filter(Boolean).forEach(t => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = t;
+        name.appendChild(tag);
+      });
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `${v.lang}　${v.voiceURI}`;
+      info.append(name, meta);
+      const btn = document.createElement('button');
+      btn.textContent = '▶ 試聽';
+      btn.setAttribute('aria-label', '試聽 ' + v.name);
+      btn.onclick = () => speak(v);
+      row.append(info, btn);
+      list.appendChild(row);
+    });
+  }
+
+  function copyList() {
+    const all = supported ? speechSynthesis.getVoices() : [];
+    const lines = [
+      `UA: ${navigator.userAgent}`,
+      `platform: ${navigator.platform}　觸控點: ${navigator.maxTouchPoints}（iPad 會大於 0）　語言: ${(navigator.languages || [navigator.language]).join(', ')}`,
+      `共 ${all.length} 個聲音，中文 ${all.filter(isZh).length} 個`
+    ].concat(all.map(v => `${isZh(v) ? '★ ' : ''}${v.name} | ${v.lang} | ${v.localService ? '本機' : '線上'}${v.default ? ' | 預設' : ''} | ${v.voiceURI}`));
+    const text = lines.join('\n');
+    const btn = document.getElementById('copyBtn');
+    const done = () => { btn.textContent = '✅ 已複製'; setTimeout(() => { btn.textContent = '📋 複製聲音清單'; }, 2000); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(() => prompt('請複製：', text));
+    else prompt('請複製：', text);
+  }
+
+  document.getElementById('defaultBtn').onclick = () => speak(null);
+  document.getElementById('stopBtn').onclick = () => supported && speechSynthesis.cancel();
+  document.getElementById('showAll').onchange = render;
+  document.getElementById('reloadBtn').onclick = render;
+  document.getElementById('copyBtn').onclick = copyList;
+  if (supported) speechSynthesis.addEventListener('voiceschanged', render);
+  if (!supported) document.querySelectorAll('[data-rate], [data-pitch], #defaultBtn, #stopBtn').forEach(b => { b.disabled = true; });
+  render();
+  setTimeout(render, 800);   // 有些瀏覽器聲音清單晚到，也不一定觸發 voiceschanged
+</script>
+</body>
+</html>
