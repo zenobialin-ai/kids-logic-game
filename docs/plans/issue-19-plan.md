@@ -112,7 +112,7 @@
   speech:{ available, rateSetting, rate, voiceURI, voiceName, voiceLang, zhVoices, source:'tts' },
   soundOn, tOpen, tShown, tClose, outcome, recovered,
   ev:[[dt, type, data], ...], evTruncated,  // 最多 100 筆，超過就設 evTruncated:true
-  // 以下是關閉時從 ev 算出來的摘要；跟 ev 對不上時以 ev 為準
+  // 計數在事件發生當下累加；evTruncated 為 true 時 ev 不完整，以計數為準
   firstAnswer, wrongCount, wrongDupCount, wrongCountGame, gameReasons,
   tapCount, keyTapCount, pointerDownCount, offMs, activeMs,
   promptSpeech, answeredDuringPrompt, aids, actions:{ submits, resets, rotations, commands },

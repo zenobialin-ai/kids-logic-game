@@ -1760,7 +1760,7 @@
 
       <!-- CHILD AVATAR（只有 1 位孩子時畫面完全不變） -->
       <div class="child-avatar-row" id="childAvatarRow" style="display:none;">
-        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: true })">
+        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: true, kind: 'play' })">
           <span class="child-avatar-emoji" id="childAvatarEmoji">🐰</span>
           <span class="child-avatar-name" id="childAvatarName"></span>
         </button>
@@ -2505,6 +2505,7 @@
 
     function loadSavedProgress() {
       const p = loadProfiles();
+      qlogRecover();   // 別的分頁留著的舊紀錄 → unload
       // 啟動流程 1：一定先讀進他在這台裝置上的進度
       userProgress = readProgressForChild(activeChildId);
       starsEarned = userProgress.stars || 0;
@@ -2534,10 +2535,10 @@
       if (imported) {
         // 啟動流程 2：只有 1 位孩子就跟現在一樣直接匯入；2 位以上只問「要匯入給誰？」
         if (p.children.length === 1) applyImport(imported, activeChildId);
-        else openChildPicker({ title: '要匯入給誰？', onPick: function (id) { applyImport(imported, id); }, cancellable: true });
+        else openChildPicker({ title: '要匯入給誰？', onPick: function (id) { applyImport(imported, id); }, cancellable: true, kind: 'import' });
       } else if (p.askOnOpen && p.children.length >= 2) {
         // 啟動流程 3
-        openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+        openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false, kind: 'play' });
       }
 
       renderChildAvatar();
@@ -2562,7 +2563,8 @@
     let pickerPending = false;   // 護眼鎖住時被關掉 → 解鎖後再跳一次
 
     // R2 會在這裡刪最老的學習紀錄；R1 先放空
-    function freeSpaceHook() {}
+    // R2：真的去刪紀錄（讓進度、錯題本、護眼、名單可以優先寫入）
+    function freeSpaceHook() { qlogFreeSpace(); }
 
     function safeSetItem(key, value) {
       try { localStorage.setItem(key, value); return true; }
@@ -2601,7 +2603,10 @@
           }
         }
       } else if (!seen.has('c0')) {
-        children.unshift({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() });
+        // N3：補回來的 c0 圖示不能跟名單上別的孩子重複
+        const used = new Set(children.map(c => c.emoji));
+        const e = used.has(DEFAULT_EMOJI) ? (CHILD_EMOJIS.find(x => !used.has(x)) || DEFAULT_EMOJI) : DEFAULT_EMOJI;
+        children.unshift({ id: 'c0', emoji: e, name: '', slot: '', createdAt: Date.now() });
       }
       children.sort((a, b) => (a.id === 'c0' ? -1 : b.id === 'c0' ? 1 : 0));
       const ids = new Set(children.map(c => c.id));
@@ -2685,6 +2690,7 @@
       activeChildId = id;
       saveProfiles(p => { p.active = id; return p; });
       clearAdaptiveMemory();
+      qlogActive = null;   // 紀錄不跨孩子
       userProgress = readProgressForChild(id);
       applyProgressToScreen();
       renderChildAvatar();
@@ -2825,11 +2831,11 @@
       const seen = lastSeenAt();
       markSeen();
       if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
-      if (pickerReq) return;   // 「要匯入給誰？」還開著 → 匯入請求優先，不能覆蓋
+      if (pickerReq && pickerReq.kind === 'import') return;   // N1：只有匯入請求優先；「誰要玩？」可以被非取消版取代
       // 先處理「離開太久」：還在題目中就先回首頁（R2 會用 away 結束紀錄）
-      if (currentModule) goHome();
+      if (currentModule) { qlogClose('away'); goHome(); }   // 離開太久 → 紀錄用 away 結束
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));  // 齒輪說明之類的視窗不能還疊在選單上
-      openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+      openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false, kind: 'play' });
     }
 
     function renderChildAvatar() {
@@ -2889,13 +2895,392 @@
       if (btn) btn.textContent = p.askOnOpen ? '開' : '關';
     }
 
+    /* =========================================================
+       R2：學習紀錄核心（schema v1）— 只記錄、不下判定
+       所有函式都包在 try/catch 裡，完全不能改變遊戲行為。
+       ========================================================= */
+    // LOG_BUILD：之後每一個改到出題、作答或語音行為的 PR，都把當時的值 +1（owner 的 PR 也要）
+    const LOG_BUILD = 1;
+    const QLOG_KEY_BASE = 'little_logic_qlog_v1';
+    const QLOG_MAX_PER_SUB = 30;
+    const QLOG_TOTAL_BUDGET = 1000000;   // 所有孩子合計（字元）
+    const QLOG_MAX_PER_CHILD = 400000;
+    const QLOG_MAX_EV = 100;
+    const QLOG_RECOVER_MS = 3 * 60 * 1000;
+    const QLOG_HEARTBEAT_MS = 60 * 1000;
+    const QLOG_SUBS = ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard'];
+    const QLOG_SOURCES = ['first', 'repeat', 'retry', 'afterDemo', 'resume', 'verify'];
+    const QLOG_OUTCOMES = ['correct', 'abandoned', 'replaced', 'retryEnded', 'locked', 'away', 'unload'];
+    const QLOG_EVENT_TYPES = ['t', 'w', 'c', 'a', 'x', 'l', 's', 'o', 'n'];
+    // 提示分級：d 有方向性 / g 一般鼓勵 / r 直接演出答案
+    const QLOG_HINT_GRADE = {
+      'balance.number': 'd', 'blocks': 'd', 'maze': 'd', 'pipes.live': 'd', 'pipes.hard': 'd',
+      'oddone.sort': 'd', 'oddone.monster': 'd',
+      'pattern': 'g', 'balance.swap': 'g', 'deduction': 'g', 'folding': 'g', 'raven': 'g', 'oddone.odd': 'g',
+      'gears': 'r'
+    };
+
+    let qlogTab = Math.random().toString(36).slice(2, 8);   // 這個分頁的身分
+    let qlogActive = null;        // 目前開著的紀錄（記憶體）
+    let qlogRoundId = '';
+    let qlogWriteFailed = {};     // { childId: true }，只在記憶體，不是單筆欄位
+    let qlogEvicting = false;     // 防 safeSetItem → freeSpaceHook → 寫入 的遞迴
+    let qlogOffMs = 0, qlogOffSince = Date.now(), qlogOffNow = false;
+
+    // §3：紀錄 key 一律用 ID（不用 slot 規則），c0 也是 __c0
+    function qlogKey(id) { return QLOG_KEY_BASE + '__' + id; }
+
+    function fnv1a(s) {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+      return h >>> 0;
+    }
+    function qlogId(s) { return fnv1a(s).toString(36); }
+
+    function qlogSub(module, q) {
+      if (module === 'balance') return (q && q.mode === 'number') ? 'balance.number' : 'balance.swap';
+      if (module === 'oddone') return 'oddone.' + ((q && q.mode) || 'odd');
+      if (module === 'pipes') return 'pipes.' + (q && q.live ? 'live' : 'hard');
+      return module;
+    }
+    function qlogForm(module, q) {
+      if (module === 'blocks') return 'pad';
+      if (module === 'balance' && q && q.mode === 'number') return 'multiSlot';
+      if (module === 'oddone' && q && q.mode === 'monster') return 'eliminate';
+      if (module === 'deduction') return 'arrange';
+      return null;
+    }
+    function qlogNOptions(module, q) {
+      if (!q) return null;
+      if (Array.isArray(q.options) && q.options.length) return q.options.length;
+      if (Array.isArray(q.items) && q.items.length) return q.items.length;
+      if (module === 'gears') return 2;
+      if (module === 'deduction') return q.houses || null;
+      return null;
+    }
+    function comb(n, k) {
+      if (k < 0 || k > n) return 0;
+      let r = 1;
+      for (let i = 1; i <= k; i++) r = r * (n - k + i) / i;
+      return Math.round(r);
+    }
+    function qlogChance(module, q) {
+      if (!q) return null;
+      if (module === 'gears') return 1 / 2;
+      if (module === 'maze' || module === 'pipes') return null;
+      if (module === 'oddone') {
+        if (q.mode === 'monster') return q.monsters.length ? 1 / q.monsters.length : null;
+        if (q.mode === 'sort') return Math.pow(1 / 2, q.items.length);
+        return q.items.length ? 1 / q.items.length : null;
+      }
+      if (module === 'blocks') return q.padMax ? 1 / q.padMax : null;
+      if (module === 'deduction') { let f = 1; for (let i = 2; i <= q.houses; i++) f *= i; return f ? 1 / f : null; }
+      if (module === 'balance' && q.mode === 'number') {
+        // 能平衡的組合數 / C(砝碼數, 格數)：同一個砝碼不重複選
+        const need = sumOf(q.left) - sumOf(q.right);
+        const n = q.weights.length, k = q.slots, total = comb(n, k);
+        if (!total) return null;
+        let good = 0;
+        const walk = (start, chosen) => {
+          if (chosen.length === k) { if (chosen.reduce((a, b) => a + q.weights[b], 0) === need) good++; return; }
+          for (let i = start; i <= n - (k - chosen.length); i++) { chosen.push(i); walk(i + 1, chosen); chosen.pop(); }
+        };
+        walk(0, []);
+        return good / total;
+      }
+      return (Array.isArray(q.options) && q.options.length) ? 1 / q.options.length : null;
+    }
+
+    // R2 寫的紀錄沒有 R3 的欄位：那些欄位允許 null 或不存在
+    function isValidLogRecord(r) {
+      if (!r || typeof r !== 'object' || r.v !== 1) return false;
+      if (typeof r.id !== 'string' || !r.id) return false;
+      if (typeof r.tab !== 'string' || !r.tab) return false;
+      if (typeof r.childId !== 'string' || !r.childId) return false;
+      if (!Number.isFinite(r.lastWrite) || !Number.isFinite(r.tOpen)) return false;
+      if (!Object.prototype.hasOwnProperty.call(MODULE_INFO, r.module)) return false;
+      if (!QLOG_SUBS.includes(r.sub)) return false;
+      if (!QLOG_SOURCES.includes(r.source)) return false;
+      if (r.outcome !== null && !QLOG_OUTCOMES.includes(r.outcome)) return false;
+      if (!Array.isArray(r.ev) || r.ev.length > QLOG_MAX_EV) return false;
+      for (const e of r.ev) {
+        if (!Array.isArray(e) || e.length !== 3 || !Number.isFinite(e[0]) || typeof e[1] !== 'string' || !QLOG_EVENT_TYPES.includes(e[1])) return false;
+      }
+      return true;
+    }
+
+    // 整個 key 讀不出來 → 當成空的；單筆格式不合 → 丟掉那一筆、skipped + 1
+    function qlogLoad(childId) {
+      const empty = { v: 1, childId, records: [], dropped: {}, skipped: 0 };
+      let raw = null;
+      try { raw = JSON.parse(localStorage.getItem(qlogKey(childId))); } catch (e) { return empty; }
+      if (!raw || typeof raw !== 'object' || raw.v !== 1 || !Array.isArray(raw.records)) return empty;
+      const recs = raw.records.filter(r => isValidLogRecord(r) && r.childId === childId);
+      const dropped = (raw.dropped && typeof raw.dropped === 'object') ? raw.dropped : {};
+      return { v: 1, childId, records: recs, dropped, skipped: (Number(raw.skipped) || 0) + (raw.records.length - recs.length) };
+    }
+
+    function qlogBudget(childId) {
+      const n = Math.max(1, readProfiles().children.length);
+      return Math.min(QLOG_MAX_PER_CHILD, Math.floor(QLOG_TOTAL_BUDGET / n));
+    }
+
+    // 每組最多 30 筆；超過額度時從筆數最多的那一組開始刪最舊的
+    function qlogEvict(store) {
+      const dropped = store.dropped || {};
+      const bump = (sub, n) => { dropped[sub] = (Number(dropped[sub]) || 0) + n; };
+      for (const sub of QLOG_SUBS) {
+        const rs = store.records.filter(r => r.sub === sub).sort((a, b) => a.tOpen - b.tOpen);
+        if (rs.length > QLOG_MAX_PER_SUB) {
+          const kill = new Set(rs.slice(0, rs.length - QLOG_MAX_PER_SUB));
+          store.records = store.records.filter(r => !kill.has(r));
+          bump(sub, kill.size);
+        }
+      }
+      while (JSON.stringify(store).length > qlogBudget(store.childId)) {
+        const counts = {};
+        for (const r of store.records) counts[r.sub] = (counts[r.sub] || 0) + 1;
+        let top = null;
+        for (const sub in counts) if (!top || counts[sub] > counts[top]) top = sub;
+        if (!top) break;
+        const oldest = store.records.filter(r => r.sub === top).sort((a, b) => a.tOpen - b.tOpen)[0];
+        store.records = store.records.filter(r => r !== oldest);
+        bump(top, 1);
+      }
+      store.dropped = dropped;
+      return store;
+    }
+
+    // M1：寫紀錄失敗只減「這位孩子」最舊的 25% 再試一次（plan §3）；不能動別的孩子
+    // freeSpaceHook（每位孩子刪一半）只給進度、錯題本、護眼、名單用
+    function qlogSave(store, keepId) {
+      if (qlogEvicting) return false;
+      if (!childOnList(store.childId)) return false;   // 寫前確認這位孩子還在名單上
+      qlogEvict(store);
+      const key = qlogKey(store.childId);
+      const write = () => { try { localStorage.setItem(key, JSON.stringify(store)); return true; } catch (e) { return false; } };
+      if (write()) { delete qlogWriteFailed[store.childId]; return true; }   // minor 4：成功就清掉標記
+      const sorted = store.records.slice().sort((a, b) => a.tOpen - b.tOpen);
+      const kill = Math.ceil(store.records.length * 0.25);
+      if (kill > 0) {
+        // N-D：正在寫入的那一筆不能被判給最舊 25% 而刪掉
+        const drop = new Set(sorted.slice(0, kill).filter(r => r.id !== keepId));
+        if (drop.size) {
+          const dropped = store.dropped || {};
+          for (const r of drop) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+          store.dropped = dropped;
+          store.records = store.records.filter(r => !drop.has(r));
+        }
+      }
+      if (write()) { delete qlogWriteFailed[store.childId]; return true; }
+      qlogWriteFailed[store.childId] = true;
+      return false;
+    }
+    // N-A：每次寫入都要更新 lastWrite（跨分頁復原看的是這個時間，不是開題當下）
+    function qlogSaveRecord(r) {
+      r.lastWrite = Date.now();
+      const store = qlogLoad(r.childId);
+      const i = store.records.findIndex(x => x.id === r.id);
+      if (i >= 0) store.records[i] = r; else store.records.push(r);
+      return qlogSave(store, r.id);
+    }
+
+    // 空間不夠：每位孩子的紀錄各刪一半，讓進度、錯題本、護眼、名單可以優先寫入
+    function qlogFreeSpace() {
+      if (qlogEvicting) return;
+      qlogEvicting = true;
+      try {
+        for (const c of readProfiles().children) {
+          const store = qlogLoad(c.id);
+          if (!store.records.length) continue;
+          const keep = Math.floor(store.records.length / 2);
+          const sorted = store.records.slice().sort((a, b) => b.tOpen - a.tOpen);
+          const dropped = store.dropped || {};
+          for (const r of sorted.slice(keep)) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+          store.records = sorted.slice(0, keep);
+          store.dropped = dropped;
+          try { localStorage.setItem(qlogKey(c.id), JSON.stringify(store)); } catch (e) {}
+        }
+      } catch (e) {
+      } finally { qlogEvicting = false; }
+    }
+
+    // offMs：切到背景 + 任何彈出視窗 + 護眼鎖住
+    function qlogIsOff() {
+      return document.visibilityState !== 'visible' ||
+        !!document.querySelector('.modal-overlay.active') ||
+        document.getElementById('eyeLock').classList.contains('active');
+    }
+    function qlogOffTick() {
+      const now = Date.now();
+      if (qlogOffNow) qlogOffMs += now - qlogOffSince;
+      qlogOffNow = qlogIsOff();
+      qlogOffSince = now;
+    }
+
+    function qlogFirstSeen(q) {
+      try {
+        const k = qlogId(questionKey(q));
+        const sub = qlogSub(currentModule, q);   // minor 2：plan §100 是「同一位孩子、同一組子題型」
+        return !qlogLoad(activeChildId).records.some(r => r.qk === k && r.sub === sub);
+      } catch (e) { return true; }
+    }
+
+    function qlogOpen(source) {
+      try {
+        if (!currentModule) return null;
+        if (qlogActive) qlogClose('replaced');   // 上一筆還沒關
+        const q = currentQuestion, childId = activeChildId;
+        const rec = {
+          v: 1, id: qlogId(qlogTab + ':' + Date.now() + ':' + Math.random()), build: LOG_BUILD, tab: qlogTab,
+          lastWrite: Date.now(), childId, module: currentModule, sub: qlogSub(currentModule, q),
+          difficulty: getActiveDifficulty(), parentDifficulty: getDifficulty(), adaptive: isAdaptiveOn(),
+          source, variantOf: null, mistakeId: retryMistakeId || null,
+          round: { id: qlogRoundId || null, level: currentLevel },
+          qk: qlogId(questionKey(q)), summary: mistakeSummary(currentModule, q),
+          form: qlogForm(currentModule, q), nOptions: qlogNOptions(currentModule, q), p: qlogChance(currentModule, q),
+          live: currentModule === 'pipes' ? !!q.live : null,
+          minActions: null,   // minor 3：plan §2 的欄位（R3 才會算）
+          speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: null, source: 'tts' },
+          soundOn: !!audioEnabled,
+          tOpen: Date.now(), tShown: document.querySelector('.game-view.active') ? Date.now() : null,
+          tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
+          firstAnswer: null, wrongCount: 0, wrongDupCount: 0, wrongCountGame: 0, gameReasons: null,
+          tapCount: 0, keyTapCount: 0, pointerDownCount: 0, offMs: null, activeMs: null,
+          promptSpeech: null, answeredDuringPrompt: null, aids: null, actions: null, leaks: null, overRotation: null
+        };
+        qlogActive = rec;
+        qlogOffMs = 0; qlogOffSince = Date.now(); qlogOffNow = qlogIsOff();
+        qlogSaveRecord(rec);
+        return rec;
+      } catch (e) { console.warn('qlogOpen', e); return null; }
+    }
+
+    function qlogEvent(type, data) {
+      try {
+        const r = qlogActive;
+        if (!r || r.outcome !== null) return;   // 已關閉的紀錄再記事件不做任何事
+        const dt = Date.now() - r.tOpen;
+        // M2：計數在事件當下就累加，ev 被截斷時摘要仍正確
+        if (type === 't') {
+          r.tapCount++;
+          if (typeof data === 'string' && data.indexOf('k:') === 0) r.keyTapCount++;
+        } else if (type === 'w') {
+          if (data && data.dup) r.wrongDupCount++;
+          else { r.wrongCount++; r.wrongCountGame++; }   // N-B：復原那條路不會跑 qlogSummarize，這裡就要算
+          if (!r.firstAnswer) r.firstAnswer = { ok: false, dt: dt };
+        } else if (type === 'c' && !r.firstAnswer) {
+          r.firstAnswer = { ok: true, dt: dt };
+        }
+        if (r.ev.length >= QLOG_MAX_EV) { r.evTruncated = true; return; }
+        r.ev.push([dt, type, data === undefined ? null : data]);
+      } catch (e) {}
+    }
+
+    function qlogSummarize(r) {
+      // M2：tapCount / wrongCount / wrongDupCount / wrongCountGame / firstAnswer 已在 qlogEvent 當下累加
+      r.offMs = qlogOffMs;
+      r.activeMs = r.tClose - r.tOpen - r.offMs;
+    }
+
+    function qlogClose(outcome) {
+      try {
+        const r = qlogActive; if (!r || r.outcome !== null) return;   // 已關閉就什麼都不做
+        qlogOffTick();
+        r.tClose = Date.now();
+        r.outcome = outcome;
+        qlogSummarize(r);
+        qlogActive = null;
+        qlogSaveRecord(r);
+      } catch (e) { console.warn('qlogClose', e); }
+    }
+
+    // 載入時掃所有孩子：別的分頁留著的舊紀錄 → 復原成 unload
+    function qlogRecover() {
+      try {
+        const now = Date.now();
+        for (const c of readProfiles().children) {
+          const store = qlogLoad(c.id);
+          let changed = false;
+          for (const r of store.records) {
+            if (r.outcome === null && r.tab !== qlogTab && now - r.lastWrite > QLOG_RECOVER_MS) {
+              r.outcome = 'unload'; r.recovered = true; r.lastWrite = now; changed = true;
+            }
+          }
+          if (changed) qlogSave(store);
+        }
+      } catch (e) { console.warn('qlogRecover', e); }
+    }
+
+    function qlogHeartbeat() {
+      try {
+        if (!qlogActive || qlogActive.outcome !== null) return;
+        if (document.visibilityState !== 'visible') return;
+        qlogOffTick();
+        qlogSaveRecord(qlogActive);
+      } catch (e) {}
+    }
+
+    function qlogEventTarget(el) {
+      let n = el;
+      while (n) {
+        if (n.tagName === 'BUTTON' || typeof n.onclick === 'function') return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+    function qlogEventLabel(el, keyboard) {
+      // minor 1：先放 trim 過的文字、再放 class；按字元切，emoji 不會被切斷
+      const t = (el.textContent || '').trim();
+      const s = el.id || (Array.from(t).slice(0, 12).join('') + ' ' + (el.className || ''));
+      return keyboard ? 'k:' + s : s;
+    }
+    document.addEventListener('click', e => {
+      try {
+        if (!qlogActive || qlogActive.outcome !== null) return;
+        const view = document.querySelector('.game-view.active');
+        if (!view || !view.contains(e.target)) return;
+        const el = qlogEventTarget(e.target);
+        if (!el) return;
+        qlogEvent('t', qlogEventLabel(el, e.detail === 0));   // capture 階段；鍵盤觸發加 k:
+      } catch (e2) {}
+    }, true);
+    document.addEventListener('pointerdown', e => {
+      try {
+        if (!qlogActive || qlogActive.outcome !== null) return;
+        const view = document.querySelector('.game-view.active');
+        if (!view || !view.contains(e.target)) return;
+        qlogActive.pointerDownCount++;   // 只計數，不記成事件
+      } catch (e2) {}
+    }, true);
+    // o = 進入不算時間的狀態，n = 離開
+    new MutationObserver(list => {
+      try {
+        for (const m of list) {
+          const el = m.target;
+          if (!el || !el.classList) continue;
+          if (!el.classList.contains('modal-overlay') && el.id !== 'eyeLock') continue;
+          qlogEvent(el.classList.contains('active') ? 'o' : 'n', el.id || el.className);
+          qlogOffTick();
+        }
+      } catch (e) {}
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    setInterval(qlogHeartbeat, QLOG_HEARTBEAT_MS);
+    window.addEventListener('pagehide', () => { try { if (qlogActive) { qlogOffTick(); qlogSaveRecord(qlogActive); } } catch (e) {} });   // 只存檔、不關紀錄
+    window.addEventListener('pageshow', () => { try { if (qlogActive) { qlogOffTick(); qlogSaveRecord(qlogActive); } } catch (e) {} });
+
     // 別的分頁改了名單：自己這位被刪掉就回首頁、換人
     window.addEventListener('storage', function (e) {
       if (e.key !== PROFILES_KEY) return;
       const p = readProfiles();
       if (!p.children.some(c => c.id === activeChildId)) {
         const c = p.children.find(x => x.id === p.active) || p.children[0];
-        showToast('這位孩子被其他分頁刪掉了，換 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + ' 玩囉！');
+        const frag = document.createDocumentFragment();   // N2：自訂名字走 data-no-zhuyin
+        frag.append('這位孩子被其他分頁刪掉了，換 ');
+        frag.append(nameParts(c));
+        frag.append(' 玩囉！');
+        showToast(frag);
+        qlogClose('abandoned');
         goHome();
         activeChildId = c.id;
         clearAdaptiveMemory();
@@ -3027,7 +3412,8 @@
     function showToast(msg) {
       const box = document.getElementById('toastBox');
       if (!box) return;
-      box.textContent = msg;
+      if (typeof msg === 'string') box.textContent = msg;
+      else { box.textContent = ''; box.append(msg); }   // N2：名字要分開 render，才不會被加注音
       box.classList.add('show');
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
@@ -3036,6 +3422,7 @@
     }
 
     function goHome() {
+      qlogClose('abandoned');   // 已關閉的紀錄再關一次不做任何事
       retryMistakeId = null;
       if (pendingAdaptMsg && currentModule) pendingAdaptNotice[currentModule] = pendingAdaptMsg;
       pendingAdaptMsg = '';
@@ -3063,6 +3450,7 @@
       document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
       currentModule = modName;
       currentLevel = 0;
+      qlogRoundId = qlogId(modName + ':' + Date.now() + ':' + Math.random());
 
       const view = document.getElementById(`view-${modName}`);
       if (view) view.classList.add('active');
@@ -3078,6 +3466,7 @@
         questionCountedWrong = false;
         pendingAdaptMsg = '';
         currentQuestion = mistake.question;
+        qlogOpen('retry');   // 從錯題本進來（記 mistakeId）
         MODULE_LOADERS[modName]();
       } else {
         loadCurrentQuestion();
@@ -3129,6 +3518,8 @@
     }
 
     function triggerVictory(title, msg, isLastLevel = false) {
+      qlogEvent('c', null);
+      qlogClose('correct');   // 第一行：過關視窗裡再按 🏠 也不會被關兩次
       soundSuccess();
       launchConfetti();
       // 錯題重做只給 1 顆星；答對當下就移除錯題，重新整理也不能重複刷星
@@ -3290,8 +3681,10 @@
     // 所有答錯都從這裡進來：計次、記錄錯題、錯到門檻的當下就算一次「答錯」（之後離開也算數）
     function onWrongAnswer(wrongText) {
       const now = performance.now();
+      const isDup = wrongText === lastWrong.text && now - lastWrong.at < DOUBLE_TAP_MS;
+      qlogEvent('w', { text: wrongText, dup: isDup, hint: QLOG_HINT_GRADE[qlogSub(currentModule, currentQuestion)] });   // 去重之前先記
       // 小朋友連點同一個按鈕只算一次；快速點了「不同」的錯誤選項仍各算一次
-      if (wrongText === lastWrong.text && now - lastWrong.at < DOUBLE_TAP_MS) return;
+      if (isDup) return;
       lastWrong = { text: wrongText, at: now };
       questionWrongAttempts++;
       recordMistake(wrongText);
@@ -3379,6 +3772,7 @@
       questionCountedWrong = false;
       pendingAdaptMsg = '';
       currentQuestion = generateQuestion(currentModule);
+      qlogOpen(qlogFirstSeen(currentQuestion) ? 'first' : 'repeat');
       MODULE_LOADERS[currentModule]();
     }
 
@@ -5849,6 +6243,7 @@
           if (retryMistakeId) {
             // 錯題重做：示範已經演出答案，同一題再答就是照抄；錯題留著，回錯題本下次再挑戰
             showToast("📖 這題先留在錯題本，下次再挑戰！");
+            qlogClose('retryEnded');   // 先關紀錄，再 goHome()
             goHome();
             openMistakeBook();
             return;
@@ -5861,6 +6256,8 @@
           questionCountedWrong = false;
           pendingAdaptMsg = '';
           currentQuestion = next;
+          qlogClose('replaced');   // 齒輪換題：先關這一筆
+          qlogOpen('afterDemo');   // 再開一筆 afterDemo
           loadGearsLevel();
           showToast(adaptMsg || "⚙️ 換一題新的齒輪題，再試試看！");
           if (adaptMsg) speakText(adaptMsg.replace(/^\S+\s/, ''));
@@ -6303,6 +6700,7 @@
           eyeOverSince = now;
           eyeNotice("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
         } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning && !pipeRunning) {
+          qlogClose('locked');   // 在 goHome() 之前關
           goHome();
           lockEyes();
         }
@@ -6521,7 +6919,10 @@
     setInterval(eyeTick, 1000);
     document.addEventListener('visibilitychange', () => {
       eyeLastTick = performance.now();
-      if (document.visibilityState === 'hidden') { markSeen(); saveEyeState(); }   // 記下「離開的時間」，handleAway 才不會把連續玩的時間當成離開
+      const hidden = document.visibilityState === 'hidden';
+      qlogEvent(hidden ? 'o' : 'n', 'hidden');
+      qlogOffTick();
+      if (hidden) { markSeen(); saveEyeState(); if (qlogActive) qlogSaveRecord(qlogActive); }   // 記下「離開的時間」，handleAway 才不會把連續玩的時間當成離開
       else handleAway();
     });
     // 別的分頁鎖住或解鎖時，這個分頁跟著改
@@ -6530,6 +6931,7 @@
       const wasLocked = eyeState.locked;
       mergeStoredEye();
       if (eyeState.locked && !wasLocked) {
+        qlogClose('locked');   // 在 goHome() 之前關
         goHome();
         lockEyes();
       } else if (!eyeState.locked && document.getElementById('eyeLock').classList.contains('active')) {
