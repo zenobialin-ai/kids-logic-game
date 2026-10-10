@@ -1547,6 +1547,26 @@
 
     .parent-row-label { font-weight: 800; color: #334155; }
 
+    /* R1：多位孩子 */
+    .child-avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .child-avatar-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 2px solid #CBD5E1; background: #FFF; border-radius: 16px;
+      padding: 8px 14px; font-family: inherit; font-size: calc(16px * var(--fs));
+      font-weight: 800; color: #1E293B; cursor: pointer; min-height: 44px;
+    }
+    .child-avatar-emoji { font-size: calc(22px * var(--fs)); }
+    .child-pick-list { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 16px; }
+    .child-pick-btn {
+      border: 2px solid #CBD5E1; background: #F8FAFC; border-radius: 18px;
+      padding: 12px 16px; font-family: inherit; font-size: calc(18px * var(--fs));
+      font-weight: 800; color: #1E293B; cursor: pointer; min-height: 48px;
+    }
+    .child-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed #E2E8F0; font-size: calc(15px * var(--fs)); }
+    .child-row button { border: 2px solid #CBD5E1; background: #F8FAFC; border-radius: 10px; padding: 6px 10px; font-family: inherit; font-size: calc(14px * var(--fs)); font-weight: 700; color: #334155; cursor: pointer; }
+    .child-row button[disabled] { opacity: .45; cursor: not-allowed; }
+    .child-row input { flex: 1; min-width: 60px; border: 2px solid #CBD5E1; border-radius: 10px; padding: 6px 8px; font-family: inherit; font-size: calc(15px * var(--fs)); }
+
     .eye-toggle, .eye-limit-btn {
       border: 2px solid #CBD5E1;
       background: #F8FAFC;
@@ -1737,6 +1757,14 @@
   <main>
     <!-- HUB / MAIN MENU -->
     <div id="view-menu">
+
+      <!-- CHILD AVATAR（只有 1 位孩子時畫面完全不變） -->
+      <div class="child-avatar-row" id="childAvatarRow" style="display:none;">
+        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false })">
+          <span class="child-avatar-emoji" id="childAvatarEmoji">🐰</span>
+          <span class="child-avatar-name" id="childAvatarName"></span>
+        </button>
+      </div>
 
       <!-- DIFFICULTY PICKER -->
       <div class="difficulty-bar">
@@ -2149,6 +2177,7 @@
           <input type="text" id="syncCodeInput" placeholder="在另一台裝置貼上進度代碼..." style="flex:1; min-width:0; padding:8px 12px; border-radius:10px; border:2px solid #CBD5E1; font-size:calc(14px * var(--fs)); font-family:monospace;">
           <button onclick="importSyncCode()" style="background:#10B981; color:#FFF; border:none; padding:8px 14px; border-radius:10px; font-weight:800; font-size:calc(14px * var(--fs)); cursor:pointer;">📥 載入進度</button>
         </div>
+        <div class="parent-note" id="syncTargetLine"></div>
         <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:space-between; align-items:center;">
           <span style="font-size:calc(14px * var(--fs)); color:#64748B;">目前已解鎖：<strong id="syncModalStarCount" style="color:#D97706;">0</strong> 顆星</span>
           <button onclick="copyRawCode()" style="background:#FFF; border:2px solid #CBD5E1; padding:4px 12px; border-radius:8px; font-size:calc(13px * var(--fs)); font-weight:700; cursor:pointer; white-space:nowrap;">複製代碼</button>
@@ -2252,6 +2281,16 @@
           </span>
         </div>
         <div class="parent-note">每台裝置各自記住。不同裝置朗讀起來快慢不一樣，可以按「試聽」聽聽看。</div>
+        <div class="parent-row" data-no-zhuyin>
+          <span class="parent-row-label">🧒 孩子</span>
+          <button class="eye-toggle" onclick="addChild()">加一位</button>
+        </div>
+        <div id="childRows" data-no-zhuyin></div>
+        <div class="parent-row" data-no-zhuyin>
+          <span class="parent-row-label">每次開始先問「誰要玩？」</span>
+          <button class="eye-toggle" id="askOnOpenBtn" onclick="toggleAskOnOpen()">關</button>
+        </div>
+        <div class="parent-note" data-no-zhuyin>換人只能在選單上進行。第一位孩子不可以刪，只能清空他的進度；正在玩的這位也不能刪。</div>
       </div>
     </div>
   </div>
@@ -2263,6 +2302,15 @@
       <canvas id="gearIntroCanvas" width="300" height="150" style="max-width:100%;"></canvas>
       <div class="modal-msg">咬在一起的兩個齒輪，轉的方向會<strong>相反</strong>！<br>A 順時針轉 ↷，B 就會逆時針轉 ↶。<br>題目裡只有第 1 顆會轉，其他的要你自己推理喔！</div>
       <button class="modal-btn" onclick="closeGearIntro()">我懂了，開始！</button>
+    </div>
+  </div>
+
+  <!-- CHILD PICKER（誰要玩？／要匯入給誰？） -->
+  <div class="modal-overlay scrollable" id="childPickerModal">
+    <div class="modal-card">
+      <div class="modal-title" id="childPickerTitle">誰要玩？</div>
+      <div class="child-pick-list" id="childPickerList"></div>
+      <button class="modal-btn" id="childPickerCancel" onclick="cancelChildPicker()" style="display:none;">不要</button>
     </div>
   </div>
 
@@ -2393,22 +2441,26 @@
 
     /* GLOBAL GAME STATE & CROSS-DEVICE SYNC ENGINE */
     const SAVE_KEY = 'little_logic_save_v1';
-    let userProgress = {
-      stars: 0,
-      completed: {
-        pattern: 0,
-        balance: 0,
-        blocks: 0,
-        maze: 0,
-        deduction: 0,
-        folding: 0,
-        gears: 0,
-        raven: 0,
-        oddone: 0,
-        pipes: 0
-      },
-      lastUpdated: Date.now()
-    };
+    // 每位孩子的預設進度（R1 新增；新增孩子時立刻寫入一份）
+    function defaultProgress() {
+      return {
+        stars: 0,
+        completed: {
+          pattern: 0,
+          balance: 0,
+          blocks: 0,
+          maze: 0,
+          deduction: 0,
+          folding: 0,
+          gears: 0,
+          raven: 0,
+          oddone: 0,
+          pipes: 0
+        },
+        lastUpdated: Date.now()
+      };
+    }
+    let userProgress = defaultProgress();
 
     let currentModule = null;
     let currentLevel = 0;
@@ -2422,10 +2474,11 @@
     }
 
     function saveToLocalStorage() {
+      if (!childOnList(getActiveChildId())) return;   // 被別的分頁刪掉時，不能把他的 key 寫回來
       try {
         userProgress.stars = starsEarned;
         userProgress.lastUpdated = Date.now();
-        localStorage.setItem(SAVE_KEY, JSON.stringify(userProgress));
+        safeSetItem(childKey(SAVE_KEY, activeChildId), JSON.stringify(userProgress));
       } catch(e){}
       updateMenuProgressBadges();
     }
@@ -2451,52 +2504,363 @@
     }
 
     function loadSavedProgress() {
-      // 1. Check URL query param ?save=
+      const p = loadProfiles();
+      // 啟動流程 1：一定先讀進他在這台裝置上的進度
+      userProgress = readProgressForChild(activeChildId);
+      starsEarned = userProgress.stars || 0;
+      document.getElementById('starCount').textContent = starsEarned;
+
       const urlParams = new URLSearchParams(window.location.search);
       const saveParam = urlParams.get('save');
+      let imported = null;
       if (saveParam) {
         try {
-          const jsonStr = decodeURIComponent(escape(atob(saveParam)));
-          const decoded = JSON.parse(jsonStr);
-          if (decoded && typeof decoded.stars === 'number') {
-            userProgress = keepLocalSettings(decoded);
-            starsEarned = userProgress.stars || 0;
-            saveToLocalStorage();
-            setTimeout(() => {
-              showToast("🎉 成功同步跨裝置進度！目前已累積 " + starsEarned + " 顆星！");
-            }, 500);
-            // 匯入後把 ?save= 從網址拿掉，不然每次重新整理都會再匯入一次、蓋掉之後的進度
-            try {
-              const cleanUrl = new URL(window.location.href);
-              cleanUrl.searchParams.delete('save');
-              history.replaceState(null, '', cleanUrl.toString());
-            } catch (e) {}
-          }
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(saveParam))));
+          if (decoded && typeof decoded.stars === 'number') imported = decoded;
         } catch(e) {
           console.warn("URL save decode failed", e);
         }
-      } else {
-        // 2. Read from localStorage
+        // 不論哪種情況都把 ?save= 從網址拿掉，不然每次重新整理都會再匯入一次
         try {
-          const saved = localStorage.getItem(SAVE_KEY);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && typeof parsed.stars === 'number') {
-              userProgress = parsed;
-              starsEarned = userProgress.stars || 0;
-            }
-          }
-        } catch(e){}
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('save');
+          history.replaceState(null, '', cleanUrl.toString());
+        } catch (e) {}
       }
+
+      // 啟動流程 5：「離開太久」要在決定要不要延後之前先處理
+      const seen = lastSeenAt();
+      if (seen > 0 && Date.now() - seen > AWAY_MS && currentModule) goHome();
+      markSeen();
+
+      if (imported) {
+        // 啟動流程 2：只有 1 位孩子就跟現在一樣直接匯入；2 位以上只問「要匯入給誰？」
+        if (p.children.length === 1) applyImport(imported, activeChildId);
+        else openChildPicker({ title: '要匯入給誰？', onPick: function (id) { applyImport(imported, id); }, cancellable: true });
+      } else if (p.askOnOpen && p.children.length >= 2) {
+        // 啟動流程 3
+        openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+      }
+
+      renderChildAvatar();
+      updateMenuProgressBadges();
+    }
+
+    /* =========================================================
+       R1：多位孩子（profiles）
+       孩子用固定 ID 識別，不用名字。ID 只存在這台裝置的孩子名單裡，
+       不放進 userProgress，也不放進同步碼。
+       ========================================================= */
+    const PROFILES_KEY = 'little_logic_profiles_v1';
+    const MAX_CHILDREN = 4;
+    const DEFAULT_EMOJI = '🐰';
+    const CHILD_EMOJIS = ['🐰', '🐶', '🐱', '🐻', '🐼', '🦊'];
+    const EMOJI_NAME = { '🐰': '兔子', '🐶': '小狗', '🐱': '小貓', '🐻': '小熊', '🐼': '貓熊', '🦊': '小狐狸' };
+    const AWAY_KEY = 'little_logic_last_seen_v1';   // 跟裝置走，不跟孩子走
+    const AWAY_MS = 10 * 60 * 1000;
+
+    let activeChildId = 'c0';
+    let pickerReq = null;        // 誰要玩？／要匯入給誰？的要求
+    let pickerPending = false;   // 護眼鎖住時被關掉 → 解鎖後再跳一次
+
+    // R2 會在這裡刪最老的學習紀錄；R1 先放空
+    function freeSpaceHook() {}
+
+    function safeSetItem(key, value) {
+      try { localStorage.setItem(key, value); return true; }
+      catch (e) {
+        freeSpaceHook();
+        try { localStorage.setItem(key, value); return true; } catch (e2) { return false; }
+      }
+    }
+
+    function slotOf(id) { return id === 'c0' ? '' : '__' + id; }
+    function childKey(base, id) { return base + slotOf(id); }
+
+    function readProfiles() {
+      let p = null;
+      try { p = JSON.parse(localStorage.getItem(PROFILES_KEY)); } catch (e) {}
+      let children = (p && Array.isArray(p.children)) ? p.children.filter(c => c && typeof c.id === 'string' && c.id) : [];
+      const seen = new Set(children.map(c => c.id));
+      // 名單不見或壞掉才從 key 的後綴重建（名單還在時不能把已刪掉的孩子又復活）
+      if (children.length === 0) {
+        for (const base of [SAVE_KEY, MISTAKE_KEY, GEAR_INTRO_KEY, 'little_logic_qlog_v1']) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k || !k.startsWith(base + '__')) continue;
+            const id = k.slice(base.length + 2);
+            if (seen.has(id)) continue;          // c0 只會出現一次
+            seen.add(id);
+            children.push({ id, emoji: DEFAULT_EMOJI, name: '', slot: slotOf(id), createdAt: Date.now() });
+          }
+        }
+      }
+      if (!seen.has('c0')) { seen.add('c0'); children.unshift({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() }); }
+      children.sort((a, b) => (a.id === 'c0' ? -1 : b.id === 'c0' ? 1 : 0));
+      const ids = new Set(children.map(c => c.id));
+      const active = (p && typeof p.active === 'string' && ids.has(p.active)) ? p.active : 'c0';
+      return { v: 1, active, askOnOpen: !!(p && p.askOnOpen), children };
+    }
+
+    function loadProfiles() {
+      const p = readProfiles();
+      activeChildId = p.active;
+      let ok = false;
+      try { const j = JSON.parse(localStorage.getItem(PROFILES_KEY)); ok = j && Array.isArray(j.children) && j.children.length > 0; } catch (e) {}
+      if (!ok) safeSetItem(PROFILES_KEY, JSON.stringify(p));   // 壞掉的名單寫回重建結果
+      return p;
+    }
+
+    // 名單寫入一律「先讀、再改、再寫」
+    function saveProfiles(mutator) {
+      const p = readProfiles();
+      const next = mutator(p);
+      if (!next) return false;
+      return safeSetItem(PROFILES_KEY, JSON.stringify(next));
+    }
+
+    function getActiveChildId() { return activeChildId; }
+    function childOnList(id) { return readProfiles().children.some(c => c.id === id); }
+    function childById(id) { return readProfiles().children.find(c => c.id === id) || null; }
+    function displayName(c) { return c.name || EMOJI_NAME[c.emoji] || c.id; }
+
+    function readProgressForChild(id) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, id)));
+        if (saved && typeof saved === 'object' && typeof saved.stars === 'number') return saved;
+      } catch (e) {}
+      return defaultProgress();
+    }
+
+    function lastSeenAt() {
+      try { const n = Number(localStorage.getItem(AWAY_KEY)); return Number.isFinite(n) ? n : 0; } catch (e) { return 0; }
+    }
+    function markSeen() { safeSetItem(AWAY_KEY, String(Date.now())); }
+
+    // 只存在記憶體的自適應狀態：換人時清空
+    function clearAdaptiveMemory() {
+      adaptStreaks = {};
+      pendingAdaptNotice = {};
+      pendingAdaptMsg = '';
+      lastWrong = { text: undefined, at: -Infinity };
+    }
+
+    function applyProgressToScreen() {
+      starsEarned = userProgress.stars || 0;
       document.getElementById('starCount').textContent = starsEarned;
       updateMenuProgressBadges();
     }
 
-    // 舊版同步碼沒有 adaptive 欄位時，沿用本機的設定
-    function keepLocalSettings(imported) {
+    // 只能在選單呼叫
+    function switchChild(id) {
+      if (currentModule) return;
+      if (!childOnList(id)) return;
+      const c = childById(id);
+      activeChildId = id;
+      saveProfiles(p => { p.active = id; return p; });
+      clearAdaptiveMemory();
+      userProgress = readProgressForChild(id);
+      applyProgressToScreen();
+      renderChildAvatar();
+      speakText('換 ' + displayName(c) + ' 玩囉！');
+    }
+
+    // 貼代碼一律匯入給目前這位孩子；啟動流程 2 選到的孩子就變成目前在玩的這位
+    function applyImport(imported, childId) {
+      if (!childOnList(childId)) return;
+      activeChildId = childId;
+      saveProfiles(p => { p.active = childId; return p; });
+      clearAdaptiveMemory();
+      userProgress = keepLocalSettings(imported, childId);
+      starsEarned = userProgress.stars || 0;
+      document.getElementById('starCount').textContent = starsEarned;
+      saveToLocalStorage();
+      renderChildAvatar();
+      showToast("🎉 成功同步跨裝置進度！目前已累積 " + starsEarned + " 顆星！");
+    }
+
+    function addChild() {
+      soundClick();
+      const p = readProfiles();
+      if (p.children.length >= MAX_CHILDREN) { showToast('最多 ' + MAX_CHILDREN + ' 位孩子'); return; }
+      const used = new Set(p.children.map(c => c.emoji));
+      const emoji = CHILD_EMOJIS.find(e => !used.has(e)) || DEFAULT_EMOJI;
+      const id = Math.random().toString(36).slice(2, 8);
+      const ok = saveProfiles(pp => {
+        if (pp.children.length >= MAX_CHILDREN) return null;
+        pp.children.push({ id, emoji, name: '', slot: slotOf(id), createdAt: Date.now() });
+        return pp;
+      });
+      if (!ok) { showToast('寫不進去，沒有加孩子'); return; }
+      safeSetItem(childKey(SAVE_KEY, id), JSON.stringify(defaultProgress()));
+      renderChildAvatar();
+      renderChildRows();
+      showToast('🎉 加了 ' + emoji + ' ' + EMOJI_NAME[emoji] + '！');
+    }
+
+    function renameChild(id, name) {
+      const ok = saveProfiles(p => {
+        const c = p.children.find(x => x.id === id);
+        if (!c) return null;
+        c.name = String(name).trim().slice(0, 20);
+        return p;
+      });
+      if (!ok) showToast('寫不進去，沒有換');
+    }
+
+    function cycleEmoji(id) {
+      const c = childById(id);
+      if (!c) return;
+      const p = readProfiles();
+      const used = new Set(p.children.filter(x => x.id !== id).map(x => x.emoji));
+      const next = CHILD_EMOJIS.find(e => !used.has(e));
+      if (!next) { showToast('圖示重複了'); return; }
+      const ok = saveProfiles(pp => {
+        const t = pp.children.find(x => x.id === id);
+        if (!t) return null;
+        t.emoji = next;
+        return pp;
+      });
+      if (!ok) { showToast('寫不進去，沒有換圖示'); return; }
+      renderChildAvatar();
+      renderChildRows();
+    }
+
+    function deleteChild(id) {
+      if (id === 'c0') { showToast('第一位孩子不可以刪'); return; }
+      if (id === activeChildId) { showToast('目前正在玩的孩子不可以刪'); return; }
+      if (!confirm('確定要刪掉這位孩子嗎？')) return;
+      const ok = saveProfiles(p => {
+        if (!p.children.some(x => x.id === id)) return null;
+        p.children = p.children.filter(x => x.id !== id);
+        return p;
+      });
+      if (!ok) { showToast('寫不進去，沒有刪掉'); return; }
+      for (const base of [SAVE_KEY, MISTAKE_KEY, GEAR_INTRO_KEY, 'little_logic_qlog_v1']) {
+        try { localStorage.removeItem(childKey(base, id)); } catch (e) {}
+      }
+      renderChildAvatar();
+      renderChildRows();
+    }
+
+    function toggleAskOnOpen() {
+      soundClick();
+      const ok = saveProfiles(p => { p.askOnOpen = !p.askOnOpen; return p; });
+      if (!ok) { showToast('寫不進去，開關沒有變'); return; }
+      renderChildRows();
+    }
+
+    // 護眼鎖住時所有選擇視窗都延到解鎖後才出現
+    function openChildPicker(req) {
+      pickerReq = req;
+      if (eyeState.locked) { pickerPending = true; return; }
+      showChildPicker();
+    }
+
+    function showChildPicker() {
+      const req = pickerReq;
+      if (!req) return;
+      if (currentModule) goHome();   // 一定在選單上跳出來
+      const p = readProfiles();
+      document.getElementById('childPickerTitle').textContent = req.title;
+      const list = document.getElementById('childPickerList');
+      list.textContent = '';
+      for (const c of p.children) {
+        const b = document.createElement('button');
+        b.className = 'child-pick-btn';
+        b.textContent = (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c);
+        b.onclick = function () { closeChildPicker(); req.onPick(c.id); };
+        list.append(b);
+      }
+      document.getElementById('childPickerCancel').style.display = req.cancellable ? 'inline-block' : 'none';
+      document.getElementById('childPickerModal').classList.add('active');
+    }
+
+    function cancelChildPicker() {
+      soundClick();
+      closeChildPicker();
+    }
+
+    function closeChildPicker() {
+      pickerReq = null;
+      pickerPending = false;
+      document.getElementById('childPickerModal').classList.remove('active');
+    }
+
+    // 離開超過 10 分鐘回來
+    function handleAway() {
+      const p = readProfiles();
+      const seen = lastSeenAt();
+      markSeen();
+      if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
+      // 先處理「離開太久」：還在題目中就先回首頁（R2 會用 away 結束紀錄）
+      if (currentModule) goHome();
+      openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
+    }
+
+    function renderChildAvatar() {
+      const p = readProfiles();
+      const row = document.getElementById('childAvatarRow');
+      if (!row) return;
+      if (p.children.length < 2) { row.style.display = 'none'; return; }   // 只有 1 位孩子：畫面完全不變
+      const c = p.children.find(x => x.id === activeChildId) || p.children[0];
+      document.getElementById('childAvatarEmoji').textContent = c.emoji || DEFAULT_EMOJI;
+      document.getElementById('childAvatarName').textContent = displayName(c);
+      row.style.display = 'flex';
+      const line = document.getElementById('syncTargetLine');
+      if (line) line.textContent = '📥 貼代碼會匯入給 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + '。要匯入給另一位孩子，請先在選單換人。';
+    }
+
+    function renderChildRows() {
+      const box = document.getElementById('childRows');
+      if (!box) return;
+      const p = readProfiles();
+      box.textContent = '';
+      for (const c of p.children) {
+        const row = document.createElement('div');
+        row.className = 'child-row';
+        const em = document.createElement('button');
+        em.textContent = c.emoji || DEFAULT_EMOJI;
+        em.onclick = function () { cycleEmoji(c.id); };
+        const inp = document.createElement('input');
+        inp.value = c.name || '';
+        inp.setAttribute('aria-label', c.id);
+        const okBtn = document.createElement('button');
+        okBtn.textContent = '確定';
+        okBtn.onclick = function () { renameChild(c.id, inp.value); renderChildAvatar(); renderChildRows(); };
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '刪';
+        delBtn.disabled = (c.id === 'c0' || c.id === activeChildId);
+        delBtn.onclick = function () { deleteChild(c.id); renderChildRows(); };
+        row.append(em, inp, okBtn, delBtn);
+        box.append(row);
+      }
+      const btn = document.getElementById('askOnOpenBtn');
+      if (btn) btn.textContent = p.askOnOpen ? '開' : '關';
+    }
+
+    // 別的分頁改了名單：自己這位被刪掉就回首頁、換人
+    window.addEventListener('storage', function (e) {
+      if (e.key !== PROFILES_KEY) return;
+      const p = readProfiles();
+      if (!p.children.some(c => c.id === activeChildId)) {
+        const c = p.children.find(x => x.id === p.active) || p.children[0];
+        showToast('這位孩子被另一位分頁刪掉了，換 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + ' 玩囉！');
+        goHome();
+        activeChildId = c.id;
+        clearAdaptiveMemory();
+        userProgress = readProgressForChild(activeChildId);
+        applyProgressToScreen();
+      }
+      renderChildAvatar();
+      renderChildRows();
+    });
+
+    // 舊版同步碼沒有 adaptive 欄位時，沿用本機的設定（讀目標孩子的 key）
+    function keepLocalSettings(imported, childId) {
       let local = userProgress;
       try {
-        const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+        const saved = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, childId || activeChildId)));
         if (saved && typeof saved === 'object') local = saved;
       } catch (e) {}
       if (!hasOwn(imported, 'adaptive') && hasOwn(local, 'adaptive')) imported.adaptive = local.adaptive;
@@ -2592,7 +2956,7 @@
         const jsonStr = decodeURIComponent(escape(atob(input)));
         const parsed = JSON.parse(jsonStr);
         if (parsed && typeof parsed.stars === 'number') {
-          userProgress = keepLocalSettings(parsed);
+          userProgress = keepLocalSettings(parsed, activeChildId);
           adaptStreaks = {};
           starsEarned = userProgress.stars || 0;
           document.getElementById('starCount').textContent = starsEarned;
@@ -3867,7 +4231,7 @@
 
     function loadMistakes() {
       try {
-        const list = JSON.parse(localStorage.getItem(MISTAKE_KEY) || '[]');
+        const list = JSON.parse(localStorage.getItem(childKey(MISTAKE_KEY, activeChildId)) || '[]');
         return Array.isArray(list) ? list.filter(isValidMistake) : [];
       } catch (e) {
         return [];
@@ -3877,7 +4241,8 @@
     function saveMistakes(list) {
       let saved = true;
       try {
-        localStorage.setItem(MISTAKE_KEY, JSON.stringify(list));
+        if (!childOnList(activeChildId)) saved = false;
+        else saved = safeSetItem(childKey(MISTAKE_KEY, activeChildId), JSON.stringify(list));
       } catch (e) {
         saved = false;
       }
@@ -5231,7 +5596,7 @@
       startGearAnimation();
 
       let seenIntro = false;
-      try { seenIntro = localStorage.getItem(GEAR_INTRO_KEY) === '1'; } catch (e) {}
+      try { seenIntro = localStorage.getItem(childKey(GEAR_INTRO_KEY, activeChildId)) === '1'; } catch (e) {}
       if (!seenIntro) openGearIntro();
       else speakText(data.prompt);
     }
@@ -5304,7 +5669,7 @@
 
     function closeGearIntro() {
       soundClick();
-      try { localStorage.setItem(GEAR_INTRO_KEY, '1'); } catch (e) {}
+      try { if (childOnList(activeChildId)) safeSetItem(childKey(GEAR_INTRO_KEY, activeChildId), '1'); } catch (e) {}
       document.getElementById('gearIntroModal').classList.remove('active');
       if (currentModule === 'gears' && currentQuestion) speakText(currentQuestion.prompt);
     }
@@ -5759,8 +6124,7 @@
       }
     });
 
-    // Initialize & restore saved progress
-    window.addEventListener('DOMContentLoaded', loadSavedProgress);
+    // Initialize & restore saved progress（只留 script 結尾那一次呼叫）
     /* =========================================================
        EYE CARE TIMER (護眼計時器)
        只計算在題目畫面中的時間（停在選單、切到別的 App 不算）。時間到了讓孩子做完手上這一題再鎖，
@@ -5835,7 +6199,7 @@
     function saveEyeState() {
       mergeStoredEye();
       try {
-        localStorage.setItem(EYE_KEY, JSON.stringify(eyeState));
+        safeSetItem(EYE_KEY, JSON.stringify(eyeState));
       } catch (e) {}
     }
 
@@ -5843,7 +6207,7 @@
     function saveEyeStateAsParent() {
       eyeState.rev = Date.now();
       try {
-        localStorage.setItem(EYE_KEY, JSON.stringify(eyeState));
+        safeSetItem(EYE_KEY, JSON.stringify(eyeState));
       } catch (e) {}
     }
 
@@ -5913,6 +6277,7 @@
       eyeState.locked = true;
       saveEyeState();
       if (wasLocked) return;
+      if (document.getElementById('childPickerModal').classList.contains('active') && pickerReq) pickerPending = true;  // 還沒選 → 解鎖後再跳
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
       setPageInert(true);
       document.getElementById('eyeLock').classList.add('active');
@@ -6022,6 +6387,7 @@
       clearInterval(eyeExerciseTimer);
       setPageInert(false);
       document.getElementById('eyeLock').classList.remove('active');
+      if (pickerReq && pickerPending) { pickerPending = false; showChildPicker(); }   // 補跳選擇視窗
     }
 
     function openParentSettings() {
@@ -6060,6 +6426,7 @@
         btn.classList.toggle('active', btn.dataset.rate === speechRate);
         btn.setAttribute('aria-pressed', btn.dataset.rate === speechRate);
       });
+      renderChildRows();
     }
 
     function setSpeechRate(rate) {
@@ -6105,6 +6472,7 @@
     document.addEventListener('visibilitychange', () => {
       eyeLastTick = performance.now();
       if (document.visibilityState === 'hidden') saveEyeState();
+      else handleAway();
     });
     // 別的分頁鎖住或解鎖時，這個分頁跟著改
     window.addEventListener('storage', e => {
