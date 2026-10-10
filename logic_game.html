@@ -2242,6 +2242,16 @@
           <button class="eye-toggle" onclick="resetEyeTimer()">重新計時</button>
         </div>
         <div class="parent-note">只計算在題目畫面中的時間，停在選單或彈出視窗時不算。時間到時會讓孩子做完手上這一題再休息；家長解鎖後重新計時，每天也會自動重新計時。</div>
+        <div class="parent-row">
+          <span class="parent-row-label">🗣️ 朗讀快慢</span>
+          <span>
+            <button class="eye-limit-btn" data-rate="slow" onclick="setSpeechRate('slow')">慢</button>
+            <button class="eye-limit-btn" data-rate="normal" onclick="setSpeechRate('normal')">普通</button>
+            <button class="eye-limit-btn" data-rate="fast" onclick="setSpeechRate('fast')">快</button>
+            <button class="eye-toggle" onclick="previewSpeech()">▶ 試聽</button>
+          </span>
+        </div>
+        <div class="parent-note">每台裝置各自記住。不同裝置朗讀起來快慢不一樣，可以按「試聽」聽聽看。</div>
       </div>
     </div>
   </div>
@@ -2324,12 +2334,21 @@
     }
 
     /* SPEECH SYNTHESIS (ZH-TW) */
+    // 朗讀快慢（每台裝置各自記住，不跟進度一起同步：不同裝置的語音引擎，同樣的速度聽起來快慢不一樣）
+    const SPEECH_RATES = { slow: 0.7, normal: 0.85, fast: 1 };
+    const SPEECH_RATE_KEY = 'little_logic_speech_rate';
+    let speechRate = 'slow';
+    try {
+      const saved = localStorage.getItem(SPEECH_RATE_KEY);
+      if (Object.prototype.hasOwnProperty.call(SPEECH_RATES, saved)) speechRate = saved;
+    } catch (e) {}
+
     function speakText(text) {
       if (!('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-TW';
-      utterance.rate = 0.95;
+      utterance.rate = SPEECH_RATES[speechRate];
       utterance.pitch = 1.2;
       window.speechSynthesis.speak(utterance);
     }
@@ -6035,6 +6054,21 @@
         btn.disabled = !eyeState.enabled;
       });
       document.getElementById('eyeUsedToday').textContent = Math.floor(eyeState.usedMs / 60000);
+      document.querySelectorAll('.eye-limit-btn[data-rate]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.rate === speechRate);
+      });
+    }
+
+    function setSpeechRate(rate) {
+      if (!Object.prototype.hasOwnProperty.call(SPEECH_RATES, rate)) return;
+      speechRate = rate;
+      try { localStorage.setItem(SPEECH_RATE_KEY, rate); } catch (e) {}
+      renderParentSettings();
+      previewSpeech();
+    }
+
+    function previewSpeech() {
+      speakText('小朋友，我們一起來玩邏輯遊戲吧！請仔細聽題目喔！');
     }
 
     function toggleEyeCare() {
