@@ -3051,14 +3051,27 @@
       return store;
     }
 
-    // 每次寫入：讀最新的 → 按 id 只換掉自己分頁的紀錄 → 套上限 → 寫回
+    // M1：寫紀錄失敗只減「這位孩子」最舊的 25% 再試一次（plan §3）；不能動別的孩子
+    // freeSpaceHook（每位孩子刪一半）只給進度、錯題本、護眼、名單用
     function qlogSave(store) {
       if (qlogEvicting) return false;
       if (!childOnList(store.childId)) return false;   // 寫前確認這位孩子還在名單上
       qlogEvict(store);
-      const ok = safeSetItem(qlogKey(store.childId), JSON.stringify(store));
-      if (!ok) qlogWriteFailed[store.childId] = true;
-      return ok;
+      const key = qlogKey(store.childId);
+      const write = () => { try { localStorage.setItem(key, JSON.stringify(store)); return true; } catch (e) { return false; } };
+      if (write()) { delete qlogWriteFailed[store.childId]; return true; }   // minor 4：成功就清掉標記
+      const sorted = store.records.slice().sort((a, b) => a.tOpen - b.tOpen);
+      const kill = Math.ceil(store.records.length * 0.25);
+      if (kill > 0) {
+        const drop = new Set(sorted.slice(0, kill));
+        const dropped = store.dropped || {};
+        for (const r of drop) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+        store.dropped = dropped;
+        store.records = store.records.filter(r => !drop.has(r));
+      }
+      if (write()) { delete qlogWriteFailed[store.childId]; return true; }
+      qlogWriteFailed[store.childId] = true;
+      return false;
     }
     function qlogSaveRecord(r) {
       const store = qlogLoad(r.childId);
@@ -3121,12 +3134,13 @@
           qk: qlogId(questionKey(q)), summary: mistakeSummary(currentModule, q),
           form: qlogForm(currentModule, q), nOptions: qlogNOptions(currentModule, q), p: qlogChance(currentModule, q),
           live: currentModule === 'pipes' ? !!q.live : null,
+          minActions: null,   // minor 3：plan §2 的欄位（R3 才會算）
           speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: null, source: 'tts' },
           soundOn: !!audioEnabled,
           tOpen: Date.now(), tShown: document.querySelector('.game-view.active') ? Date.now() : null,
           tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
-          firstAnswer: null, wrongCount: null, wrongDupCount: null, wrongCountGame: null, gameReasons: null,
-          tapCount: null, keyTapCount: null, pointerDownCount: 0, offMs: null, activeMs: null,
+          firstAnswer: null, wrongCount: 0, wrongDupCount: 0, wrongCountGame: 0, gameReasons: null,
+          tapCount: 0, keyTapCount: 0, pointerDownCount: 0, offMs: null, activeMs: null,
           promptSpeech: null, answeredDuringPrompt: null, aids: null, actions: null, leaks: null, overRotation: null
         };
         qlogActive = rec;
@@ -3140,24 +3154,26 @@
       try {
         const r = qlogActive;
         if (!r || r.outcome !== null) return;   // 已關閉的紀錄再記事件不做任何事
+        const dt = Date.now() - r.tOpen;
+        // M2：計數在事件當下就累加，ev 被截斷時摘要仍正確
+        if (type === 't') {
+          r.tapCount++;
+          if (typeof data === 'string' && data.indexOf('k:') === 0) r.keyTapCount++;
+        } else if (type === 'w') {
+          if (data && data.dup) r.wrongDupCount++;
+          else r.wrongCount++;
+          if (!r.firstAnswer) r.firstAnswer = { ok: false, dt: dt };
+        } else if (type === 'c' && !r.firstAnswer) {
+          r.firstAnswer = { ok: true, dt: dt };
+        }
         if (r.ev.length >= QLOG_MAX_EV) { r.evTruncated = true; return; }
-        r.ev.push([Date.now() - r.tOpen, type, data === undefined ? null : data]);
+        r.ev.push([dt, type, data === undefined ? null : data]);
       } catch (e) {}
     }
 
     function qlogSummarize(r) {
-      let tap = 0, keyTap = 0, w = 0, dup = 0, first = null;
-      for (const e of r.ev) {
-        if (e[1] === 't') { tap++; if (typeof e[2] === 'string' && e[2].indexOf('k:') === 0) keyTap++; }
-        else if (e[1] === 'w') {
-          if (e[2] && e[2].dup) dup++; else w++;
-          if (!first) first = { ok: false, dt: e[0] };
-        } else if (e[1] === 'c' && !first) first = { ok: true, dt: e[0] };
-      }
-      r.tapCount = tap; r.keyTapCount = keyTap;
-      r.wrongCount = w; r.wrongDupCount = dup;
-      r.wrongCountGame = w;   // R3 才會把「看範例／用提示／轉太多」分開
-      r.firstAnswer = first;
+      // M2：tapCount / wrongCount / wrongDupCount / firstAnswer 已在 qlogEvent 當下累加
+      r.wrongCountGame = r.wrongCount;   // R3 才會把「看範例／用提示／轉太多」分開
       r.offMs = qlogOffMs;
       r.activeMs = r.tClose - r.tOpen - r.offMs;
     }
@@ -3209,7 +3225,9 @@
       return null;
     }
     function qlogEventLabel(el, keyboard) {
-      let s = el.id || ((el.className || '') + ' ' + (el.textContent || '')).slice(0, 12);
+      // minor 1：先放 trim 過的文字、再放 class；按字元切，emoji 不會被切斷
+      const t = (el.textContent || '').trim();
+      const s = el.id || (Array.from(t).slice(0, 12).join('') + ' ' + (el.className || ''));
       return keyboard ? 'k:' + s : s;
     }
     document.addEventListener('click', e => {
