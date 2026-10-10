@@ -6037,6 +6037,7 @@
     function closeParentSettings() {
       soundClick();
       delete parentGates.parentGate;
+      window.speechSynthesis && window.speechSynthesis.cancel();   // 關掉時一併停掉試聽
       document.getElementById('parentModal').classList.remove('active');
     }
 
@@ -6051,11 +6052,13 @@
       document.getElementById('eyeEnabledBtn').classList.toggle('active', eyeState.enabled);
       document.querySelectorAll('.eye-limit-btn[data-min]').forEach(btn => {
         btn.classList.toggle('active', Number(btn.dataset.min) === eyeState.limitMin);
+        btn.setAttribute('aria-pressed', Number(btn.dataset.min) === eyeState.limitMin);
         btn.disabled = !eyeState.enabled;
       });
       document.getElementById('eyeUsedToday').textContent = Math.floor(eyeState.usedMs / 60000);
       document.querySelectorAll('.eye-limit-btn[data-rate]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.rate === speechRate);
+        btn.setAttribute('aria-pressed', btn.dataset.rate === speechRate);
       });
     }
 
