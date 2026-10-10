@@ -1760,7 +1760,7 @@
 
       <!-- CHILD AVATAR（只有 1 位孩子時畫面完全不變） -->
       <div class="child-avatar-row" id="childAvatarRow" style="display:none;">
-        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false })">
+        <button class="child-avatar-btn" id="childAvatarBtn" onclick="openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: true })">
           <span class="child-avatar-emoji" id="childAvatarEmoji">🐰</span>
           <span class="child-avatar-name" id="childAvatarName"></span>
         </button>
@@ -2528,9 +2528,7 @@
         } catch (e) {}
       }
 
-      // 啟動流程 5：「離開太久」要在決定要不要延後之前先處理
-      const seen = lastSeenAt();
-      if (seen > 0 && Date.now() - seen > AWAY_MS && currentModule) goHome();
+      // 啟動流程 5：「離開太久」要在決定要不要延後之前先處理；啟動時一定在選單，沒有題目要關
       markSeen();
 
       if (imported) {
@@ -2581,9 +2579,15 @@
       let p = null;
       try { p = JSON.parse(localStorage.getItem(PROFILES_KEY)); } catch (e) {}
       let children = (p && Array.isArray(p.children)) ? p.children.filter(c => c && typeof c.id === 'string' && c.id) : [];
-      const seen = new Set(children.map(c => c.id));
+      const seen = new Set();
+      children = children.filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });  // 壞資料裡重複的 ID 去重
       // 名單不見或壞掉才從 key 的後綴重建（名單還在時不能把已刪掉的孩子又復活）
       if (children.length === 0) {
+        // 重建時圖示要互不重複，孩子才分得出誰是誰：c0 先拿預設圖示，其他依序拿沒人用的
+        const used = new Set([DEFAULT_EMOJI]);
+        const nextEmoji = () => CHILD_EMOJIS.find(e => !used.has(e)) || DEFAULT_EMOJI;
+        seen.add('c0');
+        children.push({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() });
         for (const base of [SAVE_KEY, MISTAKE_KEY, GEAR_INTRO_KEY, 'little_logic_qlog_v1']) {
           for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -2591,11 +2595,14 @@
             const id = k.slice(base.length + 2);
             if (seen.has(id)) continue;          // c0 只會出現一次
             seen.add(id);
-            children.push({ id, emoji: DEFAULT_EMOJI, name: '', slot: slotOf(id), createdAt: Date.now() });
+            const e = nextEmoji();
+            used.add(e);
+            children.push({ id, emoji: e, name: '', slot: slotOf(id), createdAt: Date.now() });
           }
         }
+      } else if (!seen.has('c0')) {
+        children.unshift({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() });
       }
-      if (!seen.has('c0')) { seen.add('c0'); children.unshift({ id: 'c0', emoji: DEFAULT_EMOJI, name: '', slot: '', createdAt: Date.now() }); }
       children.sort((a, b) => (a.id === 'c0' ? -1 : b.id === 'c0' ? 1 : 0));
       const ids = new Set(children.map(c => c.id));
       const active = (p && typeof p.active === 'string' && ids.has(p.active)) ? p.active : 'c0';
@@ -2622,7 +2629,25 @@
     function getActiveChildId() { return activeChildId; }
     function childOnList(id) { return readProfiles().children.some(c => c.id === id); }
     function childById(id) { return readProfiles().children.find(c => c.id === id) || null; }
-    function displayName(c) { return c.name || EMOJI_NAME[c.emoji] || c.id; }
+    function animalName(c) { return EMOJI_NAME[c.emoji] || ''; }
+    function displayName(c) { return c.name || animalName(c) || c.id; }
+
+    // 自訂名字不加注音（破音字會被標錯音）；沒取名字時顯示的動物名稱要保留注音，所以分開 render
+    function nameParts(c) {
+      const frag = document.createDocumentFragment();
+      const em = document.createElement('span');
+      em.className = 'child-avatar-emoji';
+      em.textContent = c.emoji || DEFAULT_EMOJI;
+      const nm = document.createElement('span');
+      if (c.name) {
+        nm.setAttribute('data-no-zhuyin', '');
+        nm.textContent = c.name;
+      } else {
+        nm.textContent = animalName(c) || c.id;
+      }
+      frag.append(em, nm);
+      return frag;
+    }
 
     function readProgressForChild(id) {
       try {
@@ -2655,6 +2680,7 @@
     function switchChild(id) {
       if (currentModule) return;
       if (!childOnList(id)) return;
+      if (id === activeChildId) return;   // 選到自己：不做任何事，也不要清自適應狀態、不要重念
       const c = childById(id);
       activeChildId = id;
       saveProfiles(p => { p.active = id; return p; });
@@ -2713,7 +2739,13 @@
       if (!c) return;
       const p = readProfiles();
       const used = new Set(p.children.filter(x => x.id !== id).map(x => x.emoji));
-      const next = CHILD_EMOJIS.find(e => !used.has(e));
+      // 從現在的圖示往後輪，跳過別人用的；繞一圈會回到原本的
+      const start = CHILD_EMOJIS.indexOf(c.emoji);
+      let next = null;
+      for (let k = 1; k <= CHILD_EMOJIS.length; k++) {
+        const e = CHILD_EMOJIS[((start < 0 ? 0 : start) + k) % CHILD_EMOJIS.length];
+        if (!used.has(e)) { next = e; break; }
+      }
       if (!next) { showToast('圖示重複了'); return; }
       const ok = saveProfiles(pp => {
         const t = pp.children.find(x => x.id === id);
@@ -2768,7 +2800,7 @@
       for (const c of p.children) {
         const b = document.createElement('button');
         b.className = 'child-pick-btn';
-        b.textContent = (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c);
+        b.append(nameParts(c));
         b.onclick = function () { closeChildPicker(); req.onPick(c.id); };
         list.append(b);
       }
@@ -2793,8 +2825,10 @@
       const seen = lastSeenAt();
       markSeen();
       if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
+      if (pickerReq) return;   // 「要匯入給誰？」還開著 → 匯入請求優先，不能覆蓋
       // 先處理「離開太久」：還在題目中就先回首頁（R2 會用 away 結束紀錄）
       if (currentModule) goHome();
+      document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));  // 齒輪說明之類的視窗不能還疊在選單上
       openChildPicker({ title: '誰要玩？', onPick: function (id) { switchChild(id); }, cancellable: false });
     }
 
@@ -2802,13 +2836,29 @@
       const p = readProfiles();
       const row = document.getElementById('childAvatarRow');
       if (!row) return;
-      if (p.children.length < 2) { row.style.display = 'none'; return; }   // 只有 1 位孩子：畫面完全不變
       const c = p.children.find(x => x.id === activeChildId) || p.children[0];
-      document.getElementById('childAvatarEmoji').textContent = c.emoji || DEFAULT_EMOJI;
-      document.getElementById('childAvatarName').textContent = displayName(c);
-      row.style.display = 'flex';
       const line = document.getElementById('syncTargetLine');
-      if (line) line.textContent = '📥 貼代碼會匯入給 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + '。要匯入給另一位孩子，請先在選單換人。';
+      if (p.children.length < 2) {   // 只有 1 位孩子：畫面完全不變
+        row.style.display = 'none';
+        if (line) line.textContent = '';
+        return;
+      }
+      const em = document.getElementById('childAvatarEmoji');
+      const nm = document.getElementById('childAvatarName');
+      em.textContent = c.emoji || DEFAULT_EMOJI;
+      if (c.name) { nm.setAttribute('data-no-zhuyin', ''); nm.textContent = c.name; }
+      else { nm.removeAttribute('data-no-zhuyin'); nm.textContent = animalName(c) || c.id; }
+      row.style.display = 'flex';
+      if (line) {
+        line.textContent = '';
+        const a = document.createElement('span');
+        a.textContent = '📥 貼代碼會匯入給 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + (animalName(c) || c.id);
+        const b = document.createElement('span');
+        if (c.name) { b.setAttribute('data-no-zhuyin', ''); b.textContent = '（' + c.name + '）'; }
+        const d = document.createElement('span');
+        d.textContent = '。要匯入給另一位孩子，請先在選單換人。';
+        line.append(a, b, d);
+      }
     }
 
     function renderChildRows() {
@@ -2845,7 +2895,7 @@
       const p = readProfiles();
       if (!p.children.some(c => c.id === activeChildId)) {
         const c = p.children.find(x => x.id === p.active) || p.children[0];
-        showToast('這位孩子被另一位分頁刪掉了，換 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + ' 玩囉！');
+        showToast('這位孩子被其他分頁刪掉了，換 ' + (c.emoji || DEFAULT_EMOJI) + ' ' + displayName(c) + ' 玩囉！');
         goHome();
         activeChildId = c.id;
         clearAdaptiveMemory();
@@ -6471,7 +6521,7 @@
     setInterval(eyeTick, 1000);
     document.addEventListener('visibilitychange', () => {
       eyeLastTick = performance.now();
-      if (document.visibilityState === 'hidden') saveEyeState();
+      if (document.visibilityState === 'hidden') { markSeen(); saveEyeState(); }   // 記下「離開的時間」，handleAway 才不會把連續玩的時間當成離開
       else handleAway();
     });
     // 別的分頁鎖住或解鎖時，這個分頁跟著改
