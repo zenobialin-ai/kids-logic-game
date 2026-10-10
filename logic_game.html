@@ -3053,7 +3053,7 @@
 
     // M1：寫紀錄失敗只減「這位孩子」最舊的 25% 再試一次（plan §3）；不能動別的孩子
     // freeSpaceHook（每位孩子刪一半）只給進度、錯題本、護眼、名單用
-    function qlogSave(store) {
+    function qlogSave(store, keepId) {
       if (qlogEvicting) return false;
       if (!childOnList(store.childId)) return false;   // 寫前確認這位孩子還在名單上
       qlogEvict(store);
@@ -3063,21 +3063,26 @@
       const sorted = store.records.slice().sort((a, b) => a.tOpen - b.tOpen);
       const kill = Math.ceil(store.records.length * 0.25);
       if (kill > 0) {
-        const drop = new Set(sorted.slice(0, kill));
-        const dropped = store.dropped || {};
-        for (const r of drop) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
-        store.dropped = dropped;
-        store.records = store.records.filter(r => !drop.has(r));
+        // N-D：正在寫入的那一筆不能被判給最舊 25% 而刪掉
+        const drop = new Set(sorted.slice(0, kill).filter(r => r.id !== keepId));
+        if (drop.size) {
+          const dropped = store.dropped || {};
+          for (const r of drop) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+          store.dropped = dropped;
+          store.records = store.records.filter(r => !drop.has(r));
+        }
       }
       if (write()) { delete qlogWriteFailed[store.childId]; return true; }
       qlogWriteFailed[store.childId] = true;
       return false;
     }
+    // N-A：每次寫入都要更新 lastWrite（跨分頁復原看的是這個時間，不是開題當下）
     function qlogSaveRecord(r) {
+      r.lastWrite = Date.now();
       const store = qlogLoad(r.childId);
       const i = store.records.findIndex(x => x.id === r.id);
       if (i >= 0) store.records[i] = r; else store.records.push(r);
-      return qlogSave(store);
+      return qlogSave(store, r.id);
     }
 
     // 空間不夠：每位孩子的紀錄各刪一半，讓進度、錯題本、護眼、名單可以優先寫入
@@ -3116,7 +3121,8 @@
     function qlogFirstSeen(q) {
       try {
         const k = qlogId(questionKey(q));
-        return !qlogLoad(activeChildId).records.some(r => r.qk === k);
+        const sub = qlogSub(currentModule, q);   // minor 2：plan §100 是「同一位孩子、同一組子題型」
+        return !qlogLoad(activeChildId).records.some(r => r.qk === k && r.sub === sub);
       } catch (e) { return true; }
     }
 
@@ -3161,7 +3167,7 @@
           if (typeof data === 'string' && data.indexOf('k:') === 0) r.keyTapCount++;
         } else if (type === 'w') {
           if (data && data.dup) r.wrongDupCount++;
-          else r.wrongCount++;
+          else { r.wrongCount++; r.wrongCountGame++; }   // N-B：復原那條路不會跑 qlogSummarize，這裡就要算
           if (!r.firstAnswer) r.firstAnswer = { ok: false, dt: dt };
         } else if (type === 'c' && !r.firstAnswer) {
           r.firstAnswer = { ok: true, dt: dt };
@@ -3172,8 +3178,7 @@
     }
 
     function qlogSummarize(r) {
-      // M2：tapCount / wrongCount / wrongDupCount / firstAnswer 已在 qlogEvent 當下累加
-      r.wrongCountGame = r.wrongCount;   // R3 才會把「看範例／用提示／轉太多」分開
+      // M2：tapCount / wrongCount / wrongDupCount / wrongCountGame / firstAnswer 已在 qlogEvent 當下累加
       r.offMs = qlogOffMs;
       r.activeMs = r.tClose - r.tOpen - r.offMs;
     }
@@ -3199,7 +3204,7 @@
           let changed = false;
           for (const r of store.records) {
             if (r.outcome === null && r.tab !== qlogTab && now - r.lastWrite > QLOG_RECOVER_MS) {
-              r.outcome = 'unload'; r.recovered = true; changed = true;
+              r.outcome = 'unload'; r.recovered = true; r.lastWrite = now; changed = true;
             }
           }
           if (changed) qlogSave(store);
