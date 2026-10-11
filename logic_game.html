@@ -3352,22 +3352,24 @@
        ========================================================= */
     let speechCurrent = null;      // 這一句：{ recId, kind, done, cut }
     let speechSpeaking = null;     // 還在念的那一句（start 之後、end／cut 之前）
-    let zhVoicesLoaded = false;    // 語音清單是否已載入（voiceschanged 可能晚到）
-
-    // 共用的 zh-TW 語音清單（#20 之後做語音選擇時可以直接用）
-    // M3：iPad Safari 常常直接回傳語音清單、不觸發 voiceschanged，所以開題時就要自己數一次
-    function qlogZhVoiceCount() {
-      const zh = getZhVoices();
-      if (zh === null) return null;
-      try { return (window.speechSynthesis.getVoices() || []).length ? zh.length : null; } catch (e) { return null; }
+    // R3（複查）：plan §2 是 zh-TW 的數量，zh-CN／zh-HK 不算；Android 可能回報 zh_TW
+    function isZhTw(v) {
+      return String((v && v.lang) || '').toLowerCase().replace(/_/g, '-') === 'zh-tw';
     }
 
+    // 共用的 zh-TW 語音清單（#20 之後做語音選擇時可以直接用）
     function getZhVoices() {
+      if (!('speechSynthesis' in window)) return null;
+      try { return (window.speechSynthesis.getVoices() || []).filter(isZhTw); } catch (e) { return null; }
+    }
+
+    // M3：iPad Safari 常常直接回傳語音清單、不觸發 voiceschanged，所以開題時就要自己數一次
+    function qlogZhVoiceCount() {
       if (!('speechSynthesis' in window)) return null;
       try {
         const v = window.speechSynthesis.getVoices() || [];
-        if (v.length) zhVoicesLoaded = true;
-        return v.filter(x => String(x.lang || '').toLowerCase().indexOf('zh') === 0);
+        if (!v.length) return null;            // 清單還沒載入 → null
+        return v.filter(isZhTw).length;        // 清單非空但沒有 zh-TW → 0
       } catch (e) { return null; }
     }
 
@@ -3398,7 +3400,7 @@
       try {
         window.speechSynthesis.addEventListener('voiceschanged', function () {
           try {
-            const zh = getZhVoices();
+            const zh = getZhVoices();   // R3（複查）：改用 zh-TW 計數；清單晚到時把開題記成 null 的那筆補上
             if (zh === null) return;
             if (qlogActive && qlogActive.outcome === null && qlogActive.speech.zhVoices === null) {
               qlogActive.speech.zhVoices = zh.length;
@@ -7099,6 +7101,13 @@
       'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
     };   // R3 Minor 6
     const LOG_ACTION_LABEL = { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' };
+    // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
+    const LOG_ACTION_FIELDS = {
+      maze: ['submits', 'resets', 'commands'],
+      'pipes.live': ['submits', 'resets', 'rotations'],
+      'pipes.hard': ['submits', 'resets', 'rotations'],
+      blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
+    };
     let logViewChildId = null;
 
     function logMedian(a) {
@@ -7146,8 +7155,13 @@
         // M2：用作答當下的 off；R2 舊紀錄沒有 off 的不算進中位數
         const t1 = done.filter(r => r.firstAnswer && Number.isFinite(r.firstAnswer.off)).map(r => r.firstAnswer.dt - r.firstAnswer.off);
         const during = done.filter(r => r.answeredDuringPrompt);
-        const act = { submits: [], resets: [], rotations: [], commands: [] };
-        for (const r of done) if (r.actions) for (const k in act) if (typeof r.actions[k] === 'number') act[k].push(r.actions[k]);   // R3 Minor 6：0 也要算
+        const fields = LOG_ACTION_FIELDS[sub] || null;   // R1（複查）
+        const act = {};
+        if (fields) {
+          for (const f of fields) act[f] = [];
+          // R2（複查）：done 的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
+          for (const r of done) for (const f of fields) act[f].push((r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0);
+        }
         const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
         const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
         const minTurns = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.turns)).map(r => r.minActions.turns);
@@ -7164,9 +7178,11 @@
           L.push('  題目還在朗讀時就作答：' + during.length + ' 題（當時朗讀速度：' + rates.join('、') + '）');
         }
         L.push('  用了哪些輔助：' + (Object.keys(aid).length ? Object.keys(aid).map(k => (LOG_AID_LABEL[k] || k) + ' ' + aid[k]).join('／') : '無'));
-        const ap = Object.keys(act).filter(k => act[k].length).map(k => (LOG_ACTION_LABEL[k] || k) + ' ' + logMedian(act[k]));
-        const minTxt = minNum.length ? logMedian(minNum) : (minSteps.length ? logMedian(minSteps) + ' 步／' + logMedian(minTurns) + ' 轉' : '');
-        L.push('  動作數（中位數）：' + (ap.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
+        if (fields) {   // R1（複查）：其他組不顯示這一行
+          const ap = fields.map(k => (LOG_ACTION_LABEL[k] || k) + ' ' + logMedian(act[k]));
+          const minTxt = minNum.length ? logMedian(minNum) : (minSteps.length ? logMedian(minSteps) + ' 步／' + logMedian(minTurns) + ' 轉' : '');
+          L.push('  動作數（中位數）：' + (done.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
+        }
         if (leaks) L.push('  水管漏水：' + leaks + ' 次');
       }
       return L.join('\n');
