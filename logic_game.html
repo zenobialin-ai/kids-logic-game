@@ -3400,10 +3400,10 @@
       try {
         window.speechSynthesis.addEventListener('voiceschanged', function () {
           try {
-            const zh = getZhVoices();   // R3（複查）：改用 zh-TW 計數；清單晚到時把開題記成 null 的那筆補上
-            if (zh === null) return;
+            const n = qlogZhVoiceCount();   // F2（第三次複查）：清單還是空的時不能寫 0，要留 null
+            if (n === null) return;
             if (qlogActive && qlogActive.outcome === null && qlogActive.speech.zhVoices === null) {
-              qlogActive.speech.zhVoices = zh.length;
+              qlogActive.speech.zhVoices = n;
               qlogSaveRecord(qlogActive);
             }
           } catch (e) {}
@@ -7157,10 +7157,12 @@
         const during = done.filter(r => r.answeredDuringPrompt);
         const fields = LOG_ACTION_FIELDS[sub] || null;   // R1（複查）
         const act = {};
+        // F1（第三次複查）：只算 build >= 2 的紀錄（R2 寫的紀錄沒有動作掛鉤，會被拉低）
+        const actDone = fields ? done.filter(r => Number(r.build) >= 2) : null;
         if (fields) {
           for (const f of fields) act[f] = [];
-          // R2（複查）：done 的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
-          for (const r of done) for (const f of fields) act[f].push((r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0);
+          // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
+          for (const r of actDone) for (const f of fields) act[f].push((r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0);
         }
         const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
         const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
@@ -7181,7 +7183,7 @@
         if (fields) {   // R1（複查）：其他組不顯示這一行
           const ap = fields.map(k => (LOG_ACTION_LABEL[k] || k) + ' ' + logMedian(act[k]));
           const minTxt = minNum.length ? logMedian(minNum) : (minSteps.length ? logMedian(minSteps) + ' 步／' + logMedian(minTurns) + ' 轉' : '');
-          L.push('  動作數（中位數）：' + (done.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
+          L.push('  動作數（中位數）：' + (actDone.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
         }
         if (leaks) L.push('  水管漏水：' + leaks + ' 次');
       }
