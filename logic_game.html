@@ -2293,7 +2293,7 @@
         <div class="parent-note" data-no-zhuyin>換人只能在選單上進行。第一位孩子不可以刪，只能清空他的進度；正在玩的這位也不能刪。</div>
         <div class="parent-row" data-no-zhuyin>
           <span class="parent-row-label">📊 學習紀錄</span>
-          <select id="logChildSelect" onchange="renderLearningLog()" aria-label="要看哪位孩子"></select>
+          <select id="logChildSelect" onchange="logViewChildId = this.value; renderLearningLog()" aria-label="要看哪位孩子"></select>
         </div>
         <div class="parent-note" id="learningLogBox" data-no-zhuyin style="white-space:pre-wrap;"></div>
         <div class="parent-row" data-no-zhuyin>
@@ -2418,7 +2418,7 @@
       utterance.lang = 'zh-TW';
       utterance.rate = SPEECH_RATES[speechRate];         // #20：保留
       utterance.pitch = 1.2;
-      const cur = { recId: recId, kind: k, done: false, cut: false };
+      const cur = { recId: recId, kind: k, done: false, cut: false, rateSetting: speechRate };   // R3 Minor 8
       speechCurrent = cur;
       try {
         if ((k === 'prompt' || k === 'manual') && qlogActive && qlogActive.outcome === null) {
@@ -3054,6 +3054,15 @@
       if (!QLOG_SOURCES.includes(r.source)) return false;
       if (r.outcome !== null && !QLOG_OUTCOMES.includes(r.outcome)) return false;
       if (!Array.isArray(r.ev) || r.ev.length > QLOG_MAX_EV) return false;
+      // R3 Minor 9：R3 欄位是 null 或不存在可以接受，但型別錯的要擋掉（舊紀錄沒有這些欄位）
+      if (r.firstAnswer != null && (typeof r.firstAnswer !== 'object' || Array.isArray(r.firstAnswer) ||
+          typeof r.firstAnswer.ok !== 'boolean' || !Number.isFinite(r.firstAnswer.dt))) return false;
+      if (r.firstAnswer != null && r.firstAnswer.off != null && !Number.isFinite(r.firstAnswer.off)) return false;
+      if (r.actions != null && (typeof r.actions !== 'object' || Array.isArray(r.actions))) return false;
+      if (r.aids != null && !Array.isArray(r.aids)) return false;
+      if (r.aidCounts != null && (typeof r.aidCounts !== 'object' || Array.isArray(r.aidCounts))) return false;
+      if (r.leaks != null && !Array.isArray(r.leaks)) return false;
+      if (r.gameReasons != null && !Array.isArray(r.gameReasons)) return false;
       for (const e of r.ev) {
         if (!Array.isArray(e) || e.length !== 3 || !Number.isFinite(e[0]) || typeof e[1] !== 'string' || !QLOG_EVENT_TYPES.includes(e[1])) return false;
       }
@@ -3192,13 +3201,13 @@
           form: qlogForm(currentModule, q), nOptions: qlogNOptions(currentModule, q), p: qlogChance(currentModule, q),
           live: currentModule === 'pipes' ? !!q.live : null,
           minActions: qlogMinActions(currentModule, q),   // R3：迷宮／水管的最少動作數
-          speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: zhVoicesLoaded ? (getZhVoices() || []).length : null, source: 'tts' },
+          speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: qlogZhVoiceCount(), source: 'tts' },   // M3：一律呼叫 getZhVoices()
           soundOn: !!audioEnabled,
           tOpen: Date.now(), tShown: document.querySelector('.game-view.active') ? Date.now() : null,
           tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
           firstAnswer: null, wrongCount: 0, wrongDupCount: 0, wrongCountGame: 0, gameReasons: null,
           tapCount: 0, keyTapCount: 0, pointerDownCount: 0, offMs: null, activeMs: null,
-          promptSpeech: null, answeredDuringPrompt: false, aids: null, actions: null, leaks: null, overRotation: null
+          promptSpeech: null, answeredDuringPrompt: false, answeredDuringPromptRate: null, aids: null, aidCounts: null, actions: null, leaks: null, overRotation: null
         };
         qlogActive = rec;
         qlogOffMs = 0; qlogOffSince = Date.now(); qlogOffNow = qlogIsOff();
@@ -3219,17 +3228,27 @@
         } else if (type === 'w') {
           if (data && data.dup) r.wrongDupCount++;
           else { r.wrongCount++; r.wrongCountGame++; }   // N-B：復原那條路不會跑 qlogSummarize，這裡就要算
-          if (!r.firstAnswer) r.firstAnswer = { ok: false, dt: dt };
+          // M2：先 qlogOffTick() 再記 off＝作答當下的累計 offMs（不是整題的 offMs）
+          if (!r.firstAnswer) { qlogOffTick(); r.firstAnswer = { ok: false, dt: dt, off: qlogOffMs }; }
         } else if (type === 'c' && !r.firstAnswer) {
-          r.firstAnswer = { ok: true, dt: dt };
+          qlogOffTick(); r.firstAnswer = { ok: true, dt: dt, off: qlogOffMs };
         }
         // R3：輔助、動作計數、漏水
-        if (type === 'a') { if (!r.aids) r.aids = []; r.aids.push(data); }
+        // R3 Minor 7：aids 跟 ev 一樣最多 100 筆；計數另外記，不受上限影響
+        if (type === 'a') {
+          if (!r.aids) r.aids = [];
+          if (!r.aidCounts) r.aidCounts = {};
+          r.aidCounts[data] = (Number(r.aidCounts[data]) || 0) + 1;
+          if (r.aids.length < QLOG_MAX_EV) r.aids.push(data);
+        }
         else if (type === 'l') { if (!r.leaks) r.leaks = []; r.leaks.push(data); }
         else if (type === 'x' && (data === 'submit' || data === 'reset')) qlogCountAction(data === 'submit' ? 'submits' : 'resets', 1);
         // 題目還在朗讀時就作答
         if ((type === 'w' || type === 'c') && speechSpeaking && speechSpeaking.recId === r.id &&
-            (speechSpeaking.kind === 'prompt' || speechSpeaking.kind === 'manual')) r.answeredDuringPrompt = true;
+            (speechSpeaking.kind === 'prompt' || speechSpeaking.kind === 'manual')) {
+          r.answeredDuringPrompt = true;
+          if (!r.answeredDuringPromptRate) r.answeredDuringPromptRate = speechSpeaking.rateSetting;   // R3 Minor 8：作答當下正在念的那一句的速度
+        }
         if (r.ev.length >= QLOG_MAX_EV) { r.evTruncated = true; return; }
         r.ev.push([dt, type, data === undefined ? null : data]);
       } catch (e) {}
@@ -3336,6 +3355,13 @@
     let zhVoicesLoaded = false;    // 語音清單是否已載入（voiceschanged 可能晚到）
 
     // 共用的 zh-TW 語音清單（#20 之後做語音選擇時可以直接用）
+    // M3：iPad Safari 常常直接回傳語音清單、不觸發 voiceschanged，所以開題時就要自己數一次
+    function qlogZhVoiceCount() {
+      const zh = getZhVoices();
+      if (zh === null) return null;
+      try { return (window.speechSynthesis.getVoices() || []).length ? zh.length : null; } catch (e) { return null; }
+    }
+
     function getZhVoices() {
       if (!('speechSynthesis' in window)) return null;
       try {
@@ -3359,7 +3385,7 @@
       if (!('speechSynthesis' in window)) return;
       try {
         const cur = speechCurrent;
-        if (cur && !cur.done) {
+        if (cur && !cur.done && !cur.cut) {   // R3 Minor 1：同一句只記一次 cut
           qlogSpeechEvent(cur.recId, 'cut', cur.kind);
           cur.cut = true;
         }
@@ -3388,7 +3414,8 @@
         const r = qlogActive;
         if (!r || r.outcome !== null) return;
         if (!r.actions) r.actions = { submits: 0, resets: 0, rotations: 0, commands: 0 };
-        r.actions[field] = (Number(r.actions[field]) || 0) + (Number(n) || 1);
+        // R3 Minor 2：n 沒給才當 1；給 0 就是 0（迷宮 0 個指令不能記成 1）
+        r.actions[field] = (Number(r.actions[field]) || 0) + (n == null ? 1 : (Number(n) || 0));
       } catch (e) {}
     }
 
@@ -3407,7 +3434,8 @@
     function qlogMinActions(module, q) {
       try {
         if (!q) return null;
-        if (module === 'maze') { const s = solveMaze(q); return s ? s.steps : null; }
+        // R3 Minor 4：迷宮記 {steps, turns}（plan §2），水管維持數字
+        if (module === 'maze') { const s = solveMaze(q); return s ? { steps: s.steps, turns: s.turns } : null; }
         if (module === 'pipes') return solvePipes(q);
         return null;
       } catch (e) { return null; }
@@ -5680,12 +5708,13 @@
 
     function runMazeProgram() {
       if (isRunningMaze) return;
-      qlogEvent('x', 'submit');
-      qlogCountAction('commands', currentCommands.length);   // R3：指令數
+      // R3 Minor 3：掛鉤要在 guard 之後，不會執行的按鍵不記錄
       if (currentCommands.length === 0) {
         speakText("請先點選方向箭頭加入指令喔！");
         return;
       }
+      qlogEvent('x', 'submit');
+      qlogCountAction('commands', currentCommands.length);   // R3：指令數
 
       isRunningMaze = true;
       document.getElementById('btnRunCode').disabled = true;
@@ -6058,13 +6087,13 @@
     }
 
     function checkDeductionAnswer() {
-      qlogEvent('x', 'submit');
       const data = currentQuestion;
-      if (deductionPlacements.some(p => p === null)) {
+      if (deductionPlacements.some(p => p === null)) {   // R3 Minor 3：還沒排滿就不算送出
         soundError();
         speakText("還有房間空著唷！請把所有小動物都安排好房間！");
         return;
       }
+      qlogEvent('x', 'submit');
 
       let isCorrect = true;
       for (let i = 0; i < data.houses; i++) {
@@ -6219,10 +6248,10 @@
     }
 
     function useGearHint() {
+      const data = currentQuestion;
+      if (gearDemoRunning || gearMoving >= data.targetGearIndex) return;   // R3 Minor 3：提示用完了按了也不記
       qlogEvent('a', 'gearHint');
       qlogGameWrong('gearHint');   // R3 驗收 6：wrongCount 0、wrongCountGame 1
-      const data = currentQuestion;
-      if (gearDemoRunning || gearMoving >= data.targetGearIndex) return;
       soundClick();
       gearMoving++;
       // 用了提示再答對，不算「第一次就答對」（自動調整不會升級），但也不算答錯
@@ -6386,9 +6415,9 @@
     }
 
     function checkGearAnswer(chosen) {
-      qlogEvent('x', 'submit');
       const data = currentQuestion;
-      if (gearDemoRunning) return;
+      if (gearDemoRunning) return;   // R3 Minor 3：示範中按答不進去，也不記送出
+      qlogEvent('x', 'submit');
       if (chosen === data.answer) {
         // 先記分（星星、進度、自動調整），示範完才顯示過關視窗；示範中離開或護眼時間到，答對仍然算數
         triggerVictory("齒輪力學大師！答對了！", data.rule, isLastQuestion());
@@ -7063,6 +7092,13 @@
     const LOG_OUTCOME_LABEL = { correct: '答對', abandoned: '中途離開', retryEnded: '再挑戰沒過', locked: '休息鎖定', replaced: '換題', away: '離開太久', unload: '關閉頁面' };
     const LOG_AID_LABEL = { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' };
     const LOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
+    const LOG_SUB_LABEL = {
+      pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
+      blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
+      gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
+      'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
+    };   // R3 Minor 6
+    const LOG_ACTION_LABEL = { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' };
     let logViewChildId = null;
 
     function logMedian(a) {
@@ -7084,47 +7120,53 @@
     function learningLogText(childId) {
       const store = qlogLoad(childId);
       const recs = store.records;
+      const dropped = store.dropped || {};
       const c = readProfiles().children.find(x => x.id === childId);
       const L = [];
       L.push('📊 ' + (c ? displayName(c) : childId) + ' 的學習紀錄（保留 ' + recs.length + ' 筆）');
       L.push('略過 ' + store.skipped + ' 筆' + (qlogWriteFailed[childId] ? '；這位孩子的紀錄寫不進去（空間不足）' : ''));
-      if (!recs.length) { L.push('還沒有紀錄。'); return L.join('\n'); }
+      const dp = QLOG_SUBS.filter(k => Number(dropped[k]) > 0).map(k => (LOG_SUB_LABEL[k] || k) + ' ' + dropped[k]);   // R3 Minor 5
+      if (!recs.length) { L.push('還沒有紀錄。' + (dp.length ? '自動刪掉：' + dp.join('／') : '')); return L.join('\n'); }
       for (const sub of QLOG_SUBS) {
         const rs = recs.filter(r => r.sub === sub);
-        if (!rs.length) continue;
+        const dr = Number(dropped[sub]) || 0;
+        if (!rs.length && !dr) continue;   // R3 Minor 5：保留 0 筆但有刪過的組也要列
+        const done = rs.filter(r => r.outcome !== null);   // M1：進行中只算在「進行中」那一欄
         const info = MODULE_INFO[sub.split('.')[0]];
         const src = {}, out = {}, aid = {};
-        for (const r of rs) {
+        for (const r of rs) { const o = r.outcome === null ? 'ongoing' : r.outcome; out[o] = (Number(out[o]) || 0) + 1; }
+        for (const r of done) {
           src[r.source] = (Number(src[r.source]) || 0) + 1;
-          const o = r.outcome === null ? 'ongoing' : r.outcome;
-          out[o] = (Number(out[o]) || 0) + 1;
-          for (const a of (Array.isArray(r.aids) ? r.aids : [])) aid[a] = (Number(aid[a]) || 0) + 1;
+          if (r.aidCounts && typeof r.aidCounts === 'object') for (const k in r.aidCounts) aid[k] = (Number(aid[k]) || 0) + (Number(r.aidCounts[k]) || 0);
+          else for (const a of (Array.isArray(r.aids) ? r.aids : [])) aid[a] = (Number(aid[a]) || 0) + 1;
         }
-        const firsts = rs.filter(r => r.source === 'first');
+        const firsts = done.filter(r => r.source === 'first');
         const firstOk = firsts.filter(r => r.firstAnswer && r.firstAnswer.ok).length;
-        const ps = rs.filter(r => typeof r.p === 'number' && isFinite(r.p)).map(r => r.p);
-        const t1 = rs.filter(r => r.firstAnswer).map(r => r.firstAnswer.dt - (Number(r.offMs) || 0));
-        const during = rs.filter(r => r.answeredDuringPrompt);
+        const ps = done.filter(r => typeof r.p === 'number' && isFinite(r.p)).map(r => r.p);
+        // M2：用作答當下的 off；R2 舊紀錄沒有 off 的不算進中位數
+        const t1 = done.filter(r => r.firstAnswer && Number.isFinite(r.firstAnswer.off)).map(r => r.firstAnswer.dt - r.firstAnswer.off);
+        const during = done.filter(r => r.answeredDuringPrompt);
         const act = { submits: [], resets: [], rotations: [], commands: [] };
-        for (const r of rs) {
-          if (r.actions) for (const k in act) if (Number(r.actions[k])) act[k].push(Number(r.actions[k]));
-        }
-        const minA = rs.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
-        const leaks = rs.reduce((n, r) => n + (Array.isArray(r.leaks) ? r.leaks.length : 0), 0);
+        for (const r of done) if (r.actions) for (const k in act) if (typeof r.actions[k] === 'number') act[k].push(r.actions[k]);   // R3 Minor 6：0 也要算
+        const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
+        const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
+        const minTurns = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.turns)).map(r => r.minActions.turns);
+        const leaks = done.reduce((n, r) => n + (Array.isArray(r.leaks) ? r.leaks.length : 0), 0);
         L.push('');
-        L.push((info ? info.icon + ' ' : '') + sub + '：保留 ' + rs.length + ' 筆／自動刪掉 ' + (Number(store.dropped[sub]) || 0) + ' 筆');
+        L.push((info ? info.icon + ' ' : '') + (LOG_SUB_LABEL[sub] || sub) + '：保留 ' + rs.length + ' 筆／自動刪掉 ' + dr + ' 筆');
         L.push('  來源：' + logDist(src, LOG_SOURCE_LABEL));
         L.push('  結果：' + logDist(out, LOG_OUTCOME_LABEL) + (out.ongoing ? '／進行中 ' + out.ongoing : ''));
         L.push('  第一次遇到的題目中，第一次就答對：' + firstOk + ' 題（第一次遇到的共 ' + firsts.length + ' 題）');
         if (ps.length) L.push('  隨機作答的答對機率（中位數）：' + logP(logMedian(ps)));
         if (t1.length) L.push('  第一次作答前的時間（中位數，已扣掉離開畫面的時間）：' + logSec(logMedian(t1)));
         if (during.length) {
-          const rates = Array.from(new Set(during.map(r => LOG_RATE_LABEL[(r.promptSpeech && r.promptSpeech.rateSetting) || r.speech && r.speech.rateSetting] || '?')));
+          const rates = Array.from(new Set(during.map(r => LOG_RATE_LABEL[r.answeredDuringPromptRate || (r.promptSpeech && r.promptSpeech.rateSetting) || (r.speech && r.speech.rateSetting)] || '?')));
           L.push('  題目還在朗讀時就作答：' + during.length + ' 題（當時朗讀速度：' + rates.join('、') + '）');
         }
         L.push('  用了哪些輔助：' + (Object.keys(aid).length ? Object.keys(aid).map(k => (LOG_AID_LABEL[k] || k) + ' ' + aid[k]).join('／') : '無'));
-        const ap = Object.keys(act).filter(k => act[k].length).map(k => k + ' ' + logMedian(act[k]));
-        L.push('  動作數（中位數）：' + (ap.length ? ap.join('／') : '無') + (minA.length ? '；最少需要 ' + logMedian(minA) : ''));
+        const ap = Object.keys(act).filter(k => act[k].length).map(k => (LOG_ACTION_LABEL[k] || k) + ' ' + logMedian(act[k]));
+        const minTxt = minNum.length ? logMedian(minNum) : (minSteps.length ? logMedian(minSteps) + ' 步／' + logMedian(minTurns) + ' 轉' : '');
+        L.push('  動作數（中位數）：' + (ap.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
         if (leaks) L.push('  水管漏水：' + leaks + ' 次');
       }
       return L.join('\n');
@@ -7136,7 +7178,9 @@
         const box = document.getElementById('learningLogBox');
         if (!sel || !box) return;
         const kids = readProfiles().children;
-        if (!kids.some(c => c.id === logViewChildId)) logViewChildId = activeChildId;
+        // B1：報告、複製報告、複製原始資料、清空都要作用在選到的那位孩子
+        if (kids.some(c => c.id === sel.value)) logViewChildId = sel.value;
+        else if (!kids.some(c => c.id === logViewChildId)) logViewChildId = activeChildId;
         sel.innerHTML = '';
         for (const c of kids) {
           const o = document.createElement('option');
