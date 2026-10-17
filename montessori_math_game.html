@@ -4189,6 +4189,152 @@
     }
 
     // =========================================================================
+    // 📝 學習紀錄（M2b）：紀錄核心（qlogOpen／qlogEvent／qlogClose…）在 family.js，這裡只接數學樂園專屬的部分
+    // =========================================================================
+    // build：之後只有改到數學樂園出題、作答的 PR 才 +1（跟邏輯遊戲的 build 分開算）
+    const MONTESSORI_LOG_BUILD = 1;
+    // 分頁 id、紀錄 id 不用 Math.random（不能改變出題用的亂數序列）
+    const qlogTab = (() => {
+      try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36).padStart(6, '0').slice(-6); }
+      catch (e) { return Date.now().toString(36).slice(-6); }
+    })();
+    let qlogRecSeq = 0;
+    let qlogRetryMistakeId = null;   // 錯題本「再練一次」：只傳給下一次開題（出的是同題型的新題目）
+    let qlogBalanceSteps = 0;        // 天平：第一次點選項之前按了幾次 +1／−1
+
+    const QLOG_MODE_MODULE = { 1: 'add', 2: 'sub', 3: 'mul', 4: 'div', 5: 'bank', 6: 'challenge', 7: 'balance' };
+    const QLOG_MODE_CHOICES = { 1: 'addChoices', 2: 'subChoices', 3: 'mulChoices', 4: 'divChoices', 5: 'bankChoices', 6: 'challengeChoices', 7: 'balanceChoices' };
+    const QLOG_CHALLENGE_SUB = { '萬以內加法': 'challenge.add', '萬以內減法': 'challenge.sub', '千位乘法': 'challenge.muldiv', '千位除法': 'challenge.muldiv' };
+
+    function bankNumber(d) { return d.th * 1000 + d.hu * 100 + d.te * 10 + d.un; }
+
+    // 題目的文字說明（錯題本和紀錄的 summary 共用）
+    function questionDesc(modeId) {
+      if (modeId === 1) return `${addA} 顆珠子 ➕ ${addB} 顆珠子`;
+      if (modeId === 2) return `${subTotal} 顆珠子 ➖ 拿走 ${subTake} 顆`;
+      if (modeId === 3) return `每根 ${mulNum} 顆 ✖️ ${mulCount} 根排排站`;
+      if (modeId === 4) return `${divPerPerson * divPeople} 顆金色糖果珠 ➗ 平分給 2 隻小動物`;
+      if (modeId === 5) return `${bankNumber(bankA)} ${bankOperation === 'add' ? '➕' : '➖'} ${bankNumber(bankB)}`;
+      if (modeId === 6) return currentChallengeData ? currentChallengeData.formulaText : '';
+      if (modeId === 7) return `${balanceWeightL} 🟰 ${balanceBaseR} ➕ ❓`;
+      return '';
+    }
+
+    // 目前畫面上這一題：module／sub／qk（雜湊前）／difficulty／題目快照
+    function qlogQuestionInfo() {
+      const m = currentMode, module = QLOG_MODE_MODULE[m];
+      if (!module) return null;
+      if (m === 1) return { module, sub: 'add', qk: `add:${addA}+${addB}`, difficulty: currentDifficulty, question: { a: addA, b: addB, ans: addA + addB } };
+      if (m === 2) return { module, sub: 'sub', qk: `sub:${subTotal}-${subTake}`, difficulty: currentDifficulty, question: { total: subTotal, take: subTake, ans: subTotal - subTake } };
+      if (m === 3) return { module, sub: 'mul', qk: `mul:${mulNum}x${mulCount}`, difficulty: currentDifficulty, question: { num: mulNum, count: mulCount, ans: mulNum * mulCount } };
+      if (m === 4) {
+        const total = divPerPerson * divPeople;
+        return { module, sub: 'div', qk: `div:${total}/${divPeople}`, difficulty: currentDifficulty, question: { total, people: divPeople, ans: divPerPerson } };
+      }
+      if (m === 5) {
+        const a = bankNumber(bankA), b = bankNumber(bankB), op = bankOperation === 'add' ? '+' : '-';
+        return { module, sub: 'bank.' + (bankOperation === 'add' ? 'add' : 'sub'), qk: `bank:${a}${op}${b}`,
+          difficulty: bankCarrying ? 'carry' : 'noCarry', question: { a, op, b, carrying: bankCarrying, ans: bankAnswer } };
+      }
+      if (m === 6) {
+        const q = currentChallengeData;
+        if (!q || !QLOG_CHALLENGE_SUB[q.category]) return null;
+        return { module, sub: QLOG_CHALLENGE_SUB[q.category], qk: `challenge:${q.formulaText}`, difficulty: q.levelName,
+          question: { type: currentChallengeType, category: q.category, level: q.levelName, formula: q.formulaText, ans: q.ans } };
+      }
+      return { module, sub: 'balance', qk: `balance:${balanceLeftParts.join('+')}=${balanceBaseR}+?`, difficulty: currentDifficulty,
+        question: { left: balanceLeftParts.slice(), baseR: balanceBaseR, ans: balanceTargetAns } };
+    }
+
+    function qlogChoiceValues() {
+      const box = document.getElementById(QLOG_MODE_CHOICES[currentMode]);
+      return box ? Array.from(box.querySelectorAll('button')).map(b => Number(b.textContent)) : [];
+    }
+
+    // 第一次遇到：同一位孩子、同一組在保留的紀錄裡沒有相同的 qk
+    function qlogFirstSeen(info) {
+      try {
+        const k = qlogId(info.qk);
+        return !qlogLoad(qlogConfig.base, activeChildId).records.some(r => r.qk === k && r.sub === info.sub);
+      } catch (e) { return true; }
+    }
+
+    // qlogConfig.buildOpen：這一題的紀錄（讀遊戲狀態）；關上一筆、開題、存檔在 family.js 的 qlogOpen
+    function qlogBuildOpen(source) {
+      const info = qlogQuestionInfo();
+      if (!info) return null;
+      const options = qlogChoiceValues();
+      const nOptions = options.length || null;
+      const now = Date.now();
+      return {
+        v: 1, id: qlogId(qlogTab + ':' + now + ':' + (++qlogRecSeq)), build: MONTESSORI_LOG_BUILD, tab: qlogTab,
+        lastWrite: now, childId: activeChildId, game: 'montessori', module: info.module, sub: info.sub,
+        difficulty: info.difficulty, source, via: qlogRetryMistakeId ? 'mistakeBook' : null, mistakeId: qlogRetryMistakeId || null,
+        qk: qlogId(info.qk), summary: questionDesc(currentMode), question: Object.assign(info.question, { options }),
+        // 7 個題型第一次作答都是 4 選 1；天平第一次點選項時才覆寫 p（先按過 +1／−1 → null），只用 +1／−1 → form:'stepper'
+        form: null, nOptions, p: nOptions ? 1 / nOptions : null,
+        soundOn: !!isSoundOn,
+        tOpen: now, tShown: now, tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
+        firstAnswer: null, wrongCount: 0, wrongDupCount: 0, wrongCountGame: 0, gameReasons: null,
+        tapCount: 0, keyTapCount: 0, pointerDownCount: 0, offMs: null, activeMs: null,
+        aids: null, aidCounts: null, actions: null, leaks: null
+      };
+    }
+
+    Object.assign(qlogConfig, {
+      base: 'montessori_qlog_v1',
+      build: MONTESSORI_LOG_BUILD,
+      tab: qlogTab,
+      buildOpen: qlogBuildOpen,
+      // offMs（M2b 先只看彈出視窗和護眼鎖；切到背景在 M2c）
+      isOff: () => {
+        const overlay = document.getElementById('modalOverlay');
+        return (!!overlay && overlay.style.display === 'block') || eyeLockShown();
+      },
+      actionsTemplate: { steps: 0 },
+      countAction: () => null,   // 天平的 +1／−1（actions.steps）在 M3 才記
+      onAnswerEvent: () => {}    // 數學樂園沒有語音
+    });
+
+    // 每個 init* 出題完成時呼叫：還開著的上一筆用 replaced 關掉（在 qlogOpen 裡），再開這一題
+    function qlogBeginQuestion() {
+      qlogBalanceSteps = 0;
+      if (awaitingPick || eyeLockShown()) { qlogClose('replaced'); return; }   // 保險：等「誰要玩？」或鎖著時不開
+      const info = qlogQuestionInfo();
+      if (!info) return;
+      qlogOpen(qlogFirstSeen(info) ? 'first' : 'repeat');
+    }
+
+    // 4 選 1 作答：答錯記 w；答對記 c 並關成 correct（已關閉的紀錄再記、再關都不做任何事）
+    function qlogAnswer(ok, value) {
+      qlogEvent(ok ? 'c' : 'w', value);
+      if (ok) qlogClose('correct');
+    }
+
+    // 天平點選項：第一次點選項時記下之前按了幾次 +1／−1；按過就不是純猜（p:null）
+    function qlogBalanceChoice(ok, value) {
+      const r = qlogActive;
+      const first = !!r && r.outcome === null && !r.firstAnswer;
+      qlogEvent(ok ? 'c' : 'w', value);
+      if (first && r.firstAnswer) {
+        r.firstAnswer.stepsBefore = qlogBalanceSteps;
+        if (qlogBalanceSteps > 0) r.p = null;
+      }
+      if (ok) qlogClose('correct');
+    }
+
+    // 天平只用 +1／−1 調到平衡：沒有點過選項 → firstAnswer:null、form:'stepper'、p:null
+    function qlogBalanceStepperCorrect(value) {
+      const r = qlogActive;
+      if (r && r.outcome === null) {
+        const hadAnswer = !!r.firstAnswer;
+        qlogEvent('c', value);
+        if (!hadAnswer) { r.firstAnswer = null; r.form = 'stepper'; r.p = null; }
+      }
+      qlogClose('correct');
+    }
+
+    // =========================================================================
     // 📖 錯題本回顧管理系統 (MistakeBook)
     // =========================================================================
     const MistakeBook = {
@@ -4286,7 +4432,7 @@
               <div class="ans-badge correct-ans">✅ 正確答案：<strong>${item.correctVal}</strong></div>
             </div>
             <div class="mistake-card-actions">
-              <button class="mistake-action-btn retry-btn" onclick="retryMistake(${item.modeId})">
+              <button class="mistake-action-btn retry-btn" onclick="retryMistake('${item.id}')">
                 🎯 立即重練此單元
               </button>
               <button class="mistake-action-btn master-btn" onclick="MistakeBook.resolve('${item.id}')">
@@ -4307,9 +4453,14 @@
       if (m) m.style.display = 'flex';
     }
 
-    function retryMistake(modeId) {
+    // 再練一次：出的是同題型的新題目；紀錄記 via:'mistakeBook' 和錯題 id（不是 retry，見計畫第 3 節）
+    function retryMistake(mistakeId) {
+      const item = MistakeBook.load().find(m => m.id === mistakeId);
       closeModal();
-      switchMode(modeId);
+      if (!item) return;   // 別的分頁已經刪掉這一題
+      qlogRetryMistakeId = mistakeId;   // 只給這一次 switchMode 開的紀錄
+      switchMode(item.modeId);
+      qlogRetryMistakeId = null;
       Mascot.setHappy("我們再練習一次這個單元，你一定可以做對！💪");
     }
 
@@ -5281,6 +5432,7 @@
 
       generateBalanceProblem();
       renderBalanceScaleView();
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     function generateBalanceProblem() {
@@ -5491,6 +5643,7 @@
 
     function adjustBalanceGuess(delta) {
       Sound.click();
+      qlogBalanceSteps++;   // M2b：天平 firstAnswer.stepsBefore
       const nextVal = Math.max(0, balanceCurrentGuess + delta);
       setBalanceGuess(nextVal, true);
     }
@@ -5526,6 +5679,7 @@
         );
         Sound.correct();
         AnalyticsBook.recordAnswer(7, true);
+        if (isTweak) qlogBalanceStepperCorrect(val); else qlogBalanceChoice(true, val);
         const card = document.getElementById('balanceScaleCard');
         if (card) card.classList.add('balanced-glow');
 
@@ -5544,10 +5698,11 @@
           // 直接點選錯誤選項
           Sound.wrong();
           AnalyticsBook.recordAnswer(7, false);
+          qlogBalanceChoice(false, val);
           MistakeBook.record(
             7,
             "⚖️ 數字天平",
-            `${balanceWeightL} 🟰 ${balanceBaseR} ➕ ❓`,
+            questionDesc(7),
             val,
             balanceTargetAns
           );
@@ -6667,6 +6822,7 @@
           if (opt === q.ans) {
             lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(6, true);
+            qlogAnswer(true, opt);
             Sound.snap();
             const qCard = document.getElementById('challengeQCard');
             if (qCard) {
@@ -6682,10 +6838,11 @@
             }, 300);
           } else {
             AnalyticsBook.recordAnswer(6, false);
+            qlogAnswer(false, opt);
             MistakeBook.record(
               6,
               "🏆 純題目挑戰",
-              q.formulaText,
+              questionDesc(6),
               opt,
               q.ans
             );
@@ -6697,6 +6854,7 @@
         };
         choicesContainer.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     // =========================================================================
@@ -6758,6 +6916,7 @@
           if (opt === sum) {
             lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(1, true);
+            qlogAnswer(true, opt);
             Sound.snap();
             document.getElementById('addQuestionCard').textContent = sum;
             document.getElementById('addQuestionCard').style.color = "#2e7d32";
@@ -6769,7 +6928,8 @@
             }, 250);
           } else {
             AnalyticsBook.recordAnswer(1, false);
-            MistakeBook.record(1, "➕ 基礎加法", `${addA} 顆珠子 ➕ ${addB} 顆珠子`, opt, sum);
+            qlogAnswer(false, opt);
+            MistakeBook.record(1, "➕ 基礎加法", questionDesc(1), opt, sum);
             Sound.wrong();
             Mascot.setSad("嗚嗚～沒關係，再算算看！");
             btn.style.opacity = "0.25";
@@ -6778,6 +6938,7 @@
         };
         choicesContainer.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     // =========================================================================
@@ -6857,6 +7018,7 @@
           if (opt === remain) {
             lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(2, true);
+            qlogAnswer(true, opt);
             Sound.snap();
             document.getElementById('subQuestionCard').textContent = remain;
             document.getElementById('subQuestionCard').style.color = "#2e7d32";
@@ -6868,7 +7030,8 @@
             }, 250);
           } else {
             AnalyticsBook.recordAnswer(2, false);
-            MistakeBook.record(2, "➖ 基礎減法", `${subTotal} 顆珠子 ➖ 拿走 ${subTake} 顆`, opt, remain);
+            qlogAnswer(false, opt);
+            MistakeBook.record(2, "➖ 基礎減法", questionDesc(2), opt, remain);
             Sound.wrong();
             Mascot.setSad("嗚嗚～沒關係，再算算看！");
             btn.style.opacity = "0.25";
@@ -6877,6 +7040,7 @@
         };
         choicesContainer.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     // =========================================================================
@@ -6942,6 +7106,7 @@
           if (opt === product) {
             lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(3, true);
+            qlogAnswer(true, opt);
             Sound.snap();
             document.getElementById('mulQuestionCard').textContent = product;
             document.getElementById('mulQuestionCard').style.color = "#2e7d32";
@@ -6950,7 +7115,8 @@
             }, 250);
           } else {
             AnalyticsBook.recordAnswer(3, false);
-            MistakeBook.record(3, "✖️ 串珠乘法", `每根 ${mulNum} 顆 ✖️ ${mulCount} 根排排站`, opt, product);
+            qlogAnswer(false, opt);
+            MistakeBook.record(3, "✖️ 串珠乘法", questionDesc(3), opt, product);
             Sound.wrong();
             Mascot.setSad("嗚嗚～再數數看有幾根！");
             btn.style.opacity = "0.25";
@@ -6959,6 +7125,7 @@
         };
         choicesContainer.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     // =========================================================================
@@ -7034,13 +7201,15 @@
           if (opt === divPerPerson) {
             lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(4, true);
+            qlogAnswer(true, opt);
             Sound.snap();
             scheduleSuccess(() => {
               showSuccess("公平分享大師！答對了！", `一共有 ${totalBeads} 顆糖果珠，平分給小熊和小兔，每隻小動物分到 ${divPerPerson} 顆！`);
             }, 250);
           } else {
             AnalyticsBook.recordAnswer(4, false);
-            MistakeBook.record(4, "➗ 除法平分", `${totalBeads} 顆金色糖果珠 ➗ 平分給 2 隻小動物`, opt, divPerPerson);
+            qlogAnswer(false, opt);
+            MistakeBook.record(4, "➗ 除法平分", questionDesc(4), opt, divPerPerson);
             Sound.wrong();
             Mascot.setSad("盤子裡珠子不一樣多喔，再分分看！");
             btn.style.opacity = "0.25";
@@ -7049,6 +7218,7 @@
         };
         choicesContainer.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
 
     
@@ -7316,6 +7486,7 @@
           if (opt === bankAnswer) {
             lockChoiceButtons(choiceBox);
             AnalyticsBook.recordAnswer(5, true);
+            qlogAnswer(true, opt);
             const ansStr = bankAnswer.toString().padStart(4, '0');
             const rTh = document.getElementById('resTh');
             const rHu = document.getElementById('resHu');
@@ -7338,8 +7509,8 @@
             }, 300);
           } else {
             AnalyticsBook.recordAnswer(5, false);
-            const opSym = isAdd ? '➕' : '➖';
-            MistakeBook.record(5, "🏛️ 金色串珠銀行", `${numA} ${opSym} ${numB}`, opt, bankAnswer);
+            qlogAnswer(false, opt);
+            MistakeBook.record(5, "🏛️ 金色串珠銀行", questionDesc(5), opt, bankAnswer);
             Sound.wrong();
             Mascot.setSad("再數數看千、百、十、個位喔！加油！");
             btn.style.opacity = "0.25";
@@ -7348,6 +7519,7 @@
         };
         choiceBox.appendChild(btn);
       });
+      qlogBeginQuestion();   // M2b：出題完成 → 開這一題的紀錄
     }
   
     // =========================================================================
@@ -7363,9 +7535,9 @@
       stampedStickers = [];
     }
 
-    // how：進行中的紀錄要用哪個原因關（換孩子 'replaced'；被別的分頁刪掉 'abandoned'）。紀錄在 M2b 才有。
+    // how：進行中的紀錄要用哪個原因關（換孩子 'replaced'；被別的分頁刪掉 'abandoned'）
     function applyChildSwitch(id, how) {
-      // M2b：先關掉進行中的紀錄（how）
+      qlogClose(how);   // 先關掉進行中的紀錄（被刪掉的孩子：family.js 的 qlogSave 不會寫回他的 key）
       // 答對後還沒出現的過關：不開視窗，但星星照樣記給原本那位孩子（在換人之前記；被刪掉的孩子 saveChildItem 不會寫）
       for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();
       activeChildId = id;
@@ -7797,13 +7969,13 @@
       document.getElementById('eyeGateBtn').innerHTML = zy('解鎖');
     }
 
-    // 鎖的順序：關掉進行中的紀錄（M2b：locked）→ 關掉所有視窗 → 顯示鎖定畫面
+    // 鎖的順序：關掉進行中的紀錄（locked）→ 關掉所有視窗 → 顯示鎖定畫面
     function lockEyes() {
       const wasShown = eyeLockShown();
       eyeState.locked = true;
       saveEyeState();
       if (wasShown) return;
-      // M2b：qlogClose('locked')
+      qlogClose('locked');
       // 別的分頁鎖住時剛好在等過關視窗：不開視窗，但星星照樣記（只 +1）
       for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();
       if (childPickerOpen()) closeChildPicker();   // 啟動或離開太久的「誰要玩？」（awaitingPick）解鎖後再問；點頭像開的就不再開
@@ -7924,7 +8096,7 @@
       markSeen();
       if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
       if (awaitingPick) return;   // 已經在等「誰要玩？」
-      // M2b：qlogClose('away')
+      qlogClose('away');
       for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();   // 還沒出現的過關：星星照記、不開視窗
       if (childPickerOpen()) closeChildPicker();   // 點頭像開的（可以取消）換成不能取消的
       hideModals();

@@ -49,6 +49,8 @@
  *
  * 【ID 代號化（一律會做）】
  *   錯題 id（'m_' + Date.now() + 亂數）依出現順序換成 <mistake#1>、<mistake#2>…
+ *   學習紀錄 montessori_qlog_v1__*（M2b 起）：分頁 id（crypto 亂數）和由它算出的紀錄 id
+ *   依出現順序換成 <tab#1>…、<qrec#1>…（紀錄裡的其他欄位，包括 qk 雜湊，都是固定的）
  *
  * 【情境】（一位孩子、一個分頁）
  *   1. 7 個題型依序：答錯一次 → 答對一次 → 「再來一題」；天平再用 +1 微調答對一題
@@ -127,6 +129,18 @@ function canonicalizeIds(out) {
     if (isObj(v)) { const o = {}; for (const k of Object.keys(v)) o[k] = walk(v[k]); return o; }
     return v;
   };
+  // 學習紀錄的分頁 id、紀錄 id（每次執行都不同）
+  const qtok = new Map(), counts = { tab: 0, qrec: 0 };
+  const qcode = (kind, v) => { const k = kind + ':' + v; if (!qtok.has(k)) qtok.set(k, `<${kind}#${++counts[kind]}>`); return qtok.get(k); };
+  for (const k of Object.keys(out.localStorage || {}).sort()) {
+    const st = out.localStorage[k];
+    if (!k.startsWith('montessori_qlog_v1__') || !isObj(st) || !Array.isArray(st.records)) continue;
+    st.records.forEach(r => {
+      if (!isObj(r)) return;
+      if (typeof r.tab === 'string') r.tab = qcode('tab', r.tab);
+      if (typeof r.id === 'string') r.id = qcode('qrec', r.id);
+    });
+  }
   // 先走 localStorage，讓代號依錯題本裡的順序編號
   const ls = walk(out.localStorage);
   const steps = walk(out.steps);
