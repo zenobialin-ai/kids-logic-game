@@ -2323,6 +2323,10 @@
         </div>
         <div class="parent-note" id="learningLogBox" data-no-zhuyin style="white-space:pre-wrap;"></div>
         <div class="parent-row" data-no-zhuyin>
+          <span class="parent-row-label">複製、清空的範圍</span>
+          <select id="logScopeSelect" aria-label="複製、清空的範圍"><option value="this">這個遊戲</option><option value="both">兩個遊戲</option></select>
+        </div>
+        <div class="parent-row" data-no-zhuyin>
           <button class="eye-toggle" onclick="copyLearningLog()">複製報告</button>
           <button class="eye-toggle" onclick="copyLearningLogRaw()">複製原始資料（JSON）</button>
           <button class="eye-toggle" onclick="clearLearningLog()">清空這位孩子的紀錄</button>
@@ -2358,7 +2362,7 @@
     /* =========================================================
        common/family.js：兩個遊戲共用的程式（孩子名單、儲存、護眼狀態、家長算式）
        原始碼在這裡；用 tools/build_common.py 嵌進各遊戲 HTML 裡標記好的共用程式區塊。
-       規則：不碰 DOM、不放畫面文字、初始化時不呼叫 Math.random()。
+       規則：不碰 DOM、不放畫面文字（例外：家長頁學習紀錄的報告文字，見最後一段）、初始化時不呼叫 Math.random()。
        遊戲才有的東西用 familyHooks 接；這裡的預設值都不做事。
        ========================================================= */
 
@@ -2849,6 +2853,201 @@
         if (!r.gameReasons) r.gameReasons = [];
         if (r.gameReasons.length < QLOG_MAX_EV) r.gameReasons.push(reason);   // 上限同 aids；次數以 wrongCountGame 為準
       } catch (e) {}
+    }
+
+    /* ---------- 家長頁「📊 學習紀錄」的統計與報告文字（M4：R3 的 learningLogText 從 logic_game.html 搬來） ----------
+       只列事實，不下判定：不會出現判定符號、「蒙」「猜」「可信」這類字眼、跟孩子自己的平均比快慢。
+       兩個遊戲的家長頁顯示同一份報告，所以統計和報告文字都放這裡（例外：這是畫面文字，但只給家長看、不加注音）；
+       畫面（選單、按鈕、複製、確認視窗）由各遊戲自己畫。讀每個遊戲的紀錄都用那個遊戲自己的 base（qlogLoad 依 base 檢查）。 */
+    const QLOG_SOURCE_LABEL = { first: '第一次', repeat: '重複', retry: '再挑戰', afterDemo: '示範後換題', resume: '繼續同一題', verify: '驗證題' };
+    const QLOG_OUTCOME_LABEL = { correct: '答對', abandoned: '中途離開', retryEnded: '再挑戰沒過', locked: '休息鎖定', replaced: '換題', away: '離開太久', unload: '關閉頁面' };
+    const QLOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
+    // 每個遊戲的報告設定（key 跟 QLOG_GAMES 一樣；報告依 QLOG_GAMES 的順序列）
+    //   icons：模組圖示（logic 的跟 MODULE_INFO 一致）；subLabel：子題型名稱
+    //   aidLabel：列在「用了哪些輔助」；ownLines：不算輔助、自己一行的操作（數串珠是蒙特梭利本來就要做的操作）
+    //   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）
+    const QLOG_REPORT = {
+      little_logic_qlog_v1: {
+        title: '🚀 小小邏輯探險家',
+        icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰' },
+        subLabel: {
+          pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
+          blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
+          gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
+          'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
+        },
+        aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' },
+        ownLines: {},
+        actionLabel: { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' },
+        // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
+        actionFields: {
+          maze: ['submits', 'resets', 'commands'],
+          'pipes.live': ['submits', 'resets', 'rotations'],
+          'pipes.hard': ['submits', 'resets', 'rotations'],
+          blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
+        },
+        actionMinBuild: 2   // F1（第三次複查）：R2 寫的紀錄沒有動作掛鉤
+      },
+      montessori_qlog_v1: {
+        title: '🧮 蒙特梭利數學樂園',
+        icons: { add: '➕', sub: '➖', mul: '✖️', div: '➗', bank: '🏛️', challenge: '🏆', balance: '⚖️' },
+        subLabel: {
+          add: '加法', sub: '減法', mul: '乘法', div: '除法', 'bank.add': '銀行加法', 'bank.sub': '銀行減法',
+          'challenge.add': '挑戰加法', 'challenge.sub': '挑戰減法', 'challenge.muldiv': '挑戰乘除', balance: '天平'
+        },
+        aidLabel: { verticalHint: '看直式提示' },
+        ownLines: { beadCount: '數串珠' },
+        actionLabel: { steps: '調整' },
+        actionFields: { balance: ['steps'] },   // 只有天平記動作數（+1／−1）
+        actionMinBuild: 3                        // 數學樂園 build 3（M3）起才記 actions.steps
+      }
+    };
+
+    function qlogMedian(a) {
+      if (!a.length) return null;
+      const s = a.slice().sort((x, y) => x - y);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    }
+
+    // 一個遊戲、一位孩子的統計（只讀，不寫）；文字在 qlogReportSection
+    function qlogReportStats(base, childId) {
+      const g = QLOG_GAMES[base], rep = QLOG_REPORT[base];
+      const store = qlogLoad(base, childId);
+      const recs = store.records;
+      const dropped = store.dropped || {};
+      const st = {
+        base, kept: recs.length, skipped: store.skipped, writeFailed: !!qlogWriteFailed[qlogKey(base, childId)],
+        dropped: g.subs.filter(k => Number(dropped[k]) > 0).map(k => ({ sub: k, n: dropped[k] })),   // R3 Minor 5
+        subs: []
+      };
+      for (const sub of g.subs) {
+        const rs = recs.filter(r => r.sub === sub);
+        const dr = Number(dropped[sub]) || 0;
+        if (!rs.length && !dr) continue;   // R3 Minor 5：保留 0 筆但有刪過的組也要列
+        const done = rs.filter(r => r.outcome !== null);   // M1：進行中只算在「進行中」那一欄
+        const src = {}, out = {}, aid = {}, own = {};
+        for (const r of rs) { const o = r.outcome === null ? 'ongoing' : r.outcome; out[o] = (Number(out[o]) || 0) + 1; }
+        for (const r of done) {
+          src[r.source] = (Number(src[r.source]) || 0) + 1;
+          const add = (k, n) => { const m = (k in rep.ownLines) ? own : aid; m[k] = (Number(m[k]) || 0) + n; };   // 數串珠不算輔助
+          if (r.aidCounts && typeof r.aidCounts === 'object') for (const k in r.aidCounts) add(k, Number(r.aidCounts[k]) || 0);
+          else for (const a of (Array.isArray(r.aids) ? r.aids : [])) add(a, 1);
+        }
+        const firsts = done.filter(r => r.source === 'first');
+        const ps = done.filter(r => typeof r.p === 'number' && isFinite(r.p)).map(r => r.p);   // p 是 null（天平按過 +1／−1、只用 +1／−1）就不算
+        // M2：用作答當下的 off；off 不是數字的（R2 舊紀錄、數學樂園 build 1）不算進中位數
+        const t1 = done.filter(r => r.firstAnswer && Number.isFinite(r.firstAnswer.off)).map(r => r.firstAnswer.dt - r.firstAnswer.off);
+        const during = done.filter(r => r.answeredDuringPrompt);
+        const fields = rep.actionFields[sub] || null;   // R1（複查）
+        let actDone = null, act = null;
+        if (fields) {
+          actDone = done.filter(r => Number(r.build) >= rep.actionMinBuild);
+          act = {};
+          // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
+          for (const f of fields) act[f] = qlogMedian(actDone.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+        }
+        const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
+        const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
+        const minTurns = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.turns)).map(r => r.minActions.turns);
+        st.subs.push({
+          sub, kept: rs.length, dropped: dr, src, out, aid, own,
+          firsts: firsts.length, firstOk: firsts.filter(r => r.firstAnswer && r.firstAnswer.ok).length,
+          firstStepper: firsts.filter(r => r.form === 'stepper').length,   // 天平只用 +1／−1 調到平衡：沒有「第一次作答」
+          p: ps.length ? qlogMedian(ps) : null,
+          t1: t1.length ? qlogMedian(t1) : null,
+          during: during.length,
+          rates: during.map(r => r.answeredDuringPromptRate || (r.promptSpeech && r.promptSpeech.rateSetting) || (r.speech && r.speech.rateSetting)),
+          fields, actN: actDone ? actDone.length : 0, act,
+          minNum: minNum.length ? qlogMedian(minNum) : null,
+          minSteps: minSteps.length ? qlogMedian(minSteps) : null,
+          minTurns: qlogMedian(minTurns),
+          leaks: done.reduce((n, r) => n + (Array.isArray(r.leaks) ? r.leaks.length : 0), 0)
+        });
+      }
+      return st;
+    }
+
+    function qlogDist(map, labels) {
+      const parts = Object.keys(labels).filter(k => map[k]).map(k => labels[k] + ' ' + map[k]);
+      return parts.length ? parts.join('／') : '無';
+    }
+    function qlogP(p) {
+      const inv = 1 / p;
+      return Math.abs(inv - Math.round(inv)) < 1e-9 ? '1/' + Math.round(inv) : (Math.round(p * 1000) / 1000);
+    }
+    function qlogSec(ms) { return (Math.round(ms / 100) / 10) + ' 秒'; }   // dt 是毫秒
+
+    // 一個遊戲那一段的文字（一行一個元素）
+    function qlogReportSection(st) {
+      const rep = QLOG_REPORT[st.base];
+      const lab = sub => rep.subLabel[sub] || sub;
+      const L = [];
+      L.push(rep.title + '（保留 ' + st.kept + ' 筆）');
+      L.push('略過 ' + st.skipped + ' 筆' + (st.writeFailed ? '；這位孩子的紀錄寫不進去（空間不足）' : ''));
+      const dp = st.dropped.map(d => lab(d.sub) + ' ' + d.n);
+      if (!st.kept) { L.push('還沒有紀錄。' + (dp.length ? '自動刪掉：' + dp.join('／') : '')); return L; }
+      for (const s of st.subs) {
+        const icon = rep.icons[s.sub.split('.')[0]];
+        L.push('');
+        L.push((icon ? icon + ' ' : '') + lab(s.sub) + '：保留 ' + s.kept + ' 筆／自動刪掉 ' + s.dropped + ' 筆');
+        L.push('  來源：' + qlogDist(s.src, QLOG_SOURCE_LABEL));
+        L.push('  結果：' + qlogDist(s.out, QLOG_OUTCOME_LABEL) + (s.out.ongoing ? '／進行中 ' + s.out.ongoing : ''));
+        L.push('  第一次遇到的題目中，第一次就答對：' + s.firstOk + ' 題（第一次遇到的共 ' + s.firsts + ' 題）');
+        if (s.firstStepper) L.push('  （其中 ' + s.firstStepper + ' 題是只用 +1／−1 調到平衡，沒有點選答案）');
+        if (s.p !== null) L.push('  隨機作答的答對機率（中位數）：' + qlogP(s.p));
+        if (s.t1 !== null) L.push('  第一次作答前的時間（中位數，已扣掉離開畫面的時間）：' + qlogSec(s.t1));
+        if (s.during) {
+          const rates = Array.from(new Set(s.rates.map(k => QLOG_RATE_LABEL[k] || '?')));
+          L.push('  題目還在朗讀時就作答：' + s.during + ' 題（當時朗讀速度：' + rates.join('、') + '）');
+        }
+        const aids = Object.keys(s.aid);
+        L.push('  用了哪些輔助：' + (aids.length ? aids.map(k => (rep.aidLabel[k] || k) + ' ' + s.aid[k]).join('／') : '無'));
+        for (const k in rep.ownLines) if (s.own[k]) L.push('  ' + rep.ownLines[k] + '：' + s.own[k] + ' 次');
+        if (s.fields) {   // R1（複查）：其他組不顯示這一行
+          const ap = s.fields.map(k => (rep.actionLabel[k] || k) + ' ' + s.act[k]);
+          const minTxt = s.minNum !== null ? s.minNum : (s.minSteps !== null ? s.minSteps + ' 步／' + s.minTurns + ' 轉' : '');
+          L.push('  動作數（中位數）：' + (s.actN ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
+        }
+        if (s.leaks) L.push('  水管漏水：' + s.leaks + ' 次');
+      }
+      return L;
+    }
+
+    // scope：'this' = 這個遊戲（qlogConfig.base）、'both' = 兩個遊戲
+    function qlogReportBases(scope) { return scope === 'both' ? Object.keys(QLOG_GAMES) : [qlogConfig.base]; }
+
+    // 家長頁的報告：name 由遊戲給（顯示名稱）；兩個遊戲各一段，依 QLOG_GAMES 的順序
+    function qlogReportText(childId, name, scope) {
+      const L = ['📊 ' + name + ' 的學習紀錄'];
+      for (const base of qlogReportBases(scope)) { L.push(''); L.push(...qlogReportSection(qlogReportStats(base, childId))); }
+      return L.join('\n');
+    }
+
+    // 複製原始資料：一個遊戲 → 那個 key 的內容（跟 R3 一樣）；兩個遊戲 → { key: 內容 }
+    function qlogRawText(childId, scope) {
+      const parse = raw => { try { return JSON.parse(raw); } catch (e) { return raw; } };
+      const bases = qlogReportBases(scope);
+      if (bases.length === 1) {
+        const raw = localStorage.getItem(qlogKey(bases[0], childId)) || '';
+        try { return JSON.stringify(JSON.parse(raw), null, 1); } catch (e) { return raw; }
+      }
+      const all = {};
+      for (const base of bases) { const k = qlogKey(base, childId); const raw = localStorage.getItem(k); all[k] = raw === null ? null : parse(raw); }
+      return JSON.stringify(all, null, 1);
+    }
+
+    // 清空一位孩子的紀錄（只動這位孩子、選到的遊戲）；沒有這個 key 就不建立。全部寫成功才回傳 true
+    function qlogClearChild(childId, scope) {
+      let ok = true;
+      for (const base of qlogReportBases(scope)) {
+        const key = qlogKey(base, childId);
+        if (localStorage.getItem(key) === null) continue;
+        const store = qlogLoad(base, childId);
+        store.records = []; store.dropped = {}; store.skipped = 0;
+        try { localStorage.setItem(key, JSON.stringify(store)); } catch (e) { ok = false; }
+      }
+      return ok;
     }
   </script>
   <!-- FAMILY:END -->
@@ -7236,109 +7435,15 @@
     }
 
     /* =========================================================
-       R3：家長頁「📊 學習紀錄」— 只列事實，不下判定（plan §4）
+       R3／M4：家長頁「📊 學習紀錄」— 只列事實，不下判定（plan §4）
+       統計和報告文字在 family.js（qlogReportText），兩個遊戲的家長頁是同一份報告；這裡只畫畫面。
        整區 data-no-zhuyin；要先過家長算式（在 parentSettingsBox 內）。
-       不會出現：判定符號、「蒙」「猜」「可信」這類字眼、跟孩子自己的平均比快慢。
        ========================================================= */
-    const LOG_SOURCE_LABEL = { first: '第一次', repeat: '重複', retry: '再挑戰', afterDemo: '示範後換題', resume: '繼續同一題', verify: '驗證題' };
-    const LOG_OUTCOME_LABEL = { correct: '答對', abandoned: '中途離開', retryEnded: '再挑戰沒過', locked: '休息鎖定', replaced: '換題', away: '離開太久', unload: '關閉頁面' };
-    const LOG_AID_LABEL = { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' };
-    const LOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
-    const LOG_SUB_LABEL = {
-      pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
-      blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
-      gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
-      'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
-    };   // R3 Minor 6
-    const LOG_ACTION_LABEL = { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' };
-    // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
-    const LOG_ACTION_FIELDS = {
-      maze: ['submits', 'resets', 'commands'],
-      'pipes.live': ['submits', 'resets', 'rotations'],
-      'pipes.hard': ['submits', 'resets', 'rotations'],
-      blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
-    };
     let logViewChildId = null;
 
-    function logMedian(a) {
-      if (!a.length) return null;
-      const s = a.slice().sort((x, y) => x - y);
-      const m = Math.floor(s.length / 2);
-      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-    }
-    function logDist(map, labels) {
-      const parts = Object.keys(labels).filter(k => map[k]).map(k => labels[k] + ' ' + map[k]);
-      return parts.length ? parts.join('／') : '無';
-    }
-    function logP(p) {
-      const inv = 1 / p;
-      return Math.abs(inv - Math.round(inv)) < 1e-9 ? '1/' + Math.round(inv) : (Math.round(p * 1000) / 1000);
-    }
-    function logSec(ms) { return (Math.round(ms / 100) / 10) + ' 秒'; }   // dt 是毫秒
-
-    function learningLogText(childId) {
-      const store = qlogLoad(qlogConfig.base, childId);
-      const recs = store.records;
-      const dropped = store.dropped || {};
-      const c = readProfiles().children.find(x => x.id === childId);
-      const L = [];
-      L.push('📊 ' + (c ? displayName(c) : childId) + ' 的學習紀錄（保留 ' + recs.length + ' 筆）');
-      L.push('略過 ' + store.skipped + ' 筆' + (qlogWriteFailed[qlogKey(qlogConfig.base, childId)] ? '；這位孩子的紀錄寫不進去（空間不足）' : ''));
-      const dp = QLOG_SUBS.filter(k => Number(dropped[k]) > 0).map(k => (LOG_SUB_LABEL[k] || k) + ' ' + dropped[k]);   // R3 Minor 5
-      if (!recs.length) { L.push('還沒有紀錄。' + (dp.length ? '自動刪掉：' + dp.join('／') : '')); return L.join('\n'); }
-      for (const sub of QLOG_SUBS) {
-        const rs = recs.filter(r => r.sub === sub);
-        const dr = Number(dropped[sub]) || 0;
-        if (!rs.length && !dr) continue;   // R3 Minor 5：保留 0 筆但有刪過的組也要列
-        const done = rs.filter(r => r.outcome !== null);   // M1：進行中只算在「進行中」那一欄
-        const info = MODULE_INFO[sub.split('.')[0]];
-        const src = {}, out = {}, aid = {};
-        for (const r of rs) { const o = r.outcome === null ? 'ongoing' : r.outcome; out[o] = (Number(out[o]) || 0) + 1; }
-        for (const r of done) {
-          src[r.source] = (Number(src[r.source]) || 0) + 1;
-          if (r.aidCounts && typeof r.aidCounts === 'object') for (const k in r.aidCounts) aid[k] = (Number(aid[k]) || 0) + (Number(r.aidCounts[k]) || 0);
-          else for (const a of (Array.isArray(r.aids) ? r.aids : [])) aid[a] = (Number(aid[a]) || 0) + 1;
-        }
-        const firsts = done.filter(r => r.source === 'first');
-        const firstOk = firsts.filter(r => r.firstAnswer && r.firstAnswer.ok).length;
-        const ps = done.filter(r => typeof r.p === 'number' && isFinite(r.p)).map(r => r.p);
-        // M2：用作答當下的 off；R2 舊紀錄沒有 off 的不算進中位數
-        const t1 = done.filter(r => r.firstAnswer && Number.isFinite(r.firstAnswer.off)).map(r => r.firstAnswer.dt - r.firstAnswer.off);
-        const during = done.filter(r => r.answeredDuringPrompt);
-        const fields = LOG_ACTION_FIELDS[sub] || null;   // R1（複查）
-        const act = {};
-        // F1（第三次複查）：只算 build >= 2 的紀錄（R2 寫的紀錄沒有動作掛鉤，會被拉低）
-        const actDone = fields ? done.filter(r => Number(r.build) >= 2) : null;
-        if (fields) {
-          for (const f of fields) act[f] = [];
-          // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
-          for (const r of actDone) for (const f of fields) act[f].push((r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0);
-        }
-        const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
-        const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
-        const minTurns = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.turns)).map(r => r.minActions.turns);
-        const leaks = done.reduce((n, r) => n + (Array.isArray(r.leaks) ? r.leaks.length : 0), 0);
-        L.push('');
-        L.push((info ? info.icon + ' ' : '') + (LOG_SUB_LABEL[sub] || sub) + '：保留 ' + rs.length + ' 筆／自動刪掉 ' + dr + ' 筆');
-        L.push('  來源：' + logDist(src, LOG_SOURCE_LABEL));
-        L.push('  結果：' + logDist(out, LOG_OUTCOME_LABEL) + (out.ongoing ? '／進行中 ' + out.ongoing : ''));
-        L.push('  第一次遇到的題目中，第一次就答對：' + firstOk + ' 題（第一次遇到的共 ' + firsts.length + ' 題）');
-        if (ps.length) L.push('  隨機作答的答對機率（中位數）：' + logP(logMedian(ps)));
-        if (t1.length) L.push('  第一次作答前的時間（中位數，已扣掉離開畫面的時間）：' + logSec(logMedian(t1)));
-        if (during.length) {
-          const rates = Array.from(new Set(during.map(r => LOG_RATE_LABEL[r.answeredDuringPromptRate || (r.promptSpeech && r.promptSpeech.rateSetting) || (r.speech && r.speech.rateSetting)] || '?')));
-          L.push('  題目還在朗讀時就作答：' + during.length + ' 題（當時朗讀速度：' + rates.join('、') + '）');
-        }
-        L.push('  用了哪些輔助：' + (Object.keys(aid).length ? Object.keys(aid).map(k => (LOG_AID_LABEL[k] || k) + ' ' + aid[k]).join('／') : '無'));
-        if (fields) {   // R1（複查）：其他組不顯示這一行
-          const ap = fields.map(k => (LOG_ACTION_LABEL[k] || k) + ' ' + logMedian(act[k]));
-          const minTxt = minNum.length ? logMedian(minNum) : (minSteps.length ? logMedian(minSteps) + ' 步／' + logMedian(minTurns) + ' 轉' : '');
-          L.push('  動作數（中位數）：' + (actDone.length ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
-        }
-        if (leaks) L.push('  水管漏水：' + leaks + ' 次');
-      }
-      return L.join('\n');
-    }
+    // 複製報告、複製原始資料、清空的範圍：'this'（小小邏輯探險家）或 'both'（兩個遊戲）
+    function logScope() { const s = document.getElementById('logScopeSelect'); return s && s.value === 'both' ? 'both' : 'this'; }
+    function logViewName() { const c = readProfiles().children.find(x => x.id === logViewChildId); return c ? displayName(c) : logViewChildId; }
 
     function renderLearningLog() {
       try {
@@ -7357,7 +7462,7 @@
           o.selected = c.id === logViewChildId;
           sel.append(o);
         }
-        box.textContent = learningLogText(logViewChildId);
+        box.textContent = qlogReportText(logViewChildId, logViewName(), 'both');
       } catch (e) { console.warn('renderLearningLog', e); }
     }
 
@@ -7365,25 +7470,17 @@
       if (!navigator.clipboard) { showToast('這個瀏覽器不能複製'); return; }
       navigator.clipboard.writeText(text).then(() => showToast('📋 ' + label)).catch(() => showToast('複製失敗'));
     }
-    function copyLearningLog() { try { copyTextToClipboard(learningLogText(logViewChildId), '已複製報告'); } catch (e) {} }
-    function copyLearningLogRaw() {
-      try {
-        const raw = localStorage.getItem(qlogKey(qlogConfig.base, logViewChildId)) || '';
-        let text = raw;
-        try { text = JSON.stringify(JSON.parse(raw), null, 1); } catch (e) {}
-        copyTextToClipboard(text, '已複製原始資料');
-      } catch (e) {}
-    }
+    function copyLearningLog() { try { copyTextToClipboard(qlogReportText(logViewChildId, logViewName(), logScope()), '已複製報告'); } catch (e) {} }
+    function copyLearningLogRaw() { try { copyTextToClipboard(qlogRawText(logViewChildId, logScope()), '已複製原始資料'); } catch (e) {} }
     function clearLearningLog() {
       try {
         const c = readProfiles().children.find(x => x.id === logViewChildId);
         if (!c) return;
-        if (!confirm('要清空 ' + displayName(c) + ' 的學習紀錄嗎？')) return;
-        const store = qlogLoad(qlogConfig.base, c.id);
-        store.records = []; store.dropped = {}; store.skipped = 0;
-        try { localStorage.setItem(qlogKey(qlogConfig.base, c.id), JSON.stringify(store)); } catch (e) { showToast('寫入失敗'); return; }
+        const scope = logScope();
+        if (!confirm('要清空 ' + displayName(c) + (scope === 'both' ? ' 在兩個遊戲' : ' 在小小邏輯探險家') + '的學習紀錄嗎？')) return;
+        const ok = qlogClearChild(c.id, scope);
         renderLearningLog();
-        showToast('📋 已清空這位孩子的紀錄');
+        showToast(ok ? '📋 已清空這位孩子的紀錄' : '寫入失敗');
       } catch (e) {}
     }
 
@@ -7486,7 +7583,7 @@
     /* 自動注音：把畫面上每個中文字包成「字＋右側注音」，之後動態加入的文字也會自動補上。
        不想加注音的區塊可以加上 data-no-zhuyin 屬性。 */
     (function () {
-      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ久ㄐㄧㄡˇ之ㄓ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ著˙ㄓㄜ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
+      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ串ㄔㄨㄢˋ久ㄐㄧㄡˇ之ㄓ乘ㄔㄥˊ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圍ㄨㄟˊ園ㄩㄢˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ梭ㄙㄨㄛ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ減ㄐㄧㄢˇ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ珠ㄓㄨ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ著˙ㄓㄜ蒙ㄇㄥˊ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銀ㄧㄣˊ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","銀行":"ㄧㄣˊ ㄏㄤˊ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
       const CHARS = {};
       DATA.chars.replace(/([㐀-䶿一-鿿])([^㐀-䶿一-鿿]+)/g, (m, c, z) => { CHARS[c] = z; });
       const WORDS = DATA.words;

@@ -3066,6 +3066,22 @@
           </span>
         </div>
         <div class="parent-note">跟小小邏輯探險家共用同一個設定，兩個遊戲加起來算；今天已經用了 <span id="parentEyeUsed">0</span> 分鐘。時間到了，孩子做完手上這一題（最多再 3 分鐘）就會鎖住，要家長解鎖。</div>
+        <div class="parent-row">
+          <span class="parent-row-label">📊 學習紀錄</span>
+          <select id="logChildSelect" class="parent-select" onchange="logViewChildId = this.value; renderLearningLog()" aria-label="要看哪位孩子"></select>
+        </div>
+        <div class="parent-note" id="learningLogBox" style="white-space:pre-wrap;"></div>
+        <div class="parent-row">
+          <span class="parent-row-label">複製、清空的範圍</span>
+          <select id="logScopeSelect" class="parent-select" aria-label="複製、清空的範圍"><option value="this">這個遊戲</option><option value="both">兩個遊戲</option></select>
+        </div>
+        <div class="parent-row">
+          <span>
+            <button class="parent-btn" onclick="copyLearningLog()">複製報告</button>
+            <button class="parent-btn" onclick="copyLearningLogRaw()">複製原始資料（JSON）</button>
+            <button class="parent-btn" onclick="clearLearningLog()">清空這位孩子的紀錄</button>
+          </span>
+        </div>
         <div class="parent-note parent-msg" id="parentMsg" role="status"></div>
       </div>
     </div>
@@ -3076,7 +3092,7 @@
     /* =========================================================
        common/family.js：兩個遊戲共用的程式（孩子名單、儲存、護眼狀態、家長算式）
        原始碼在這裡；用 tools/build_common.py 嵌進各遊戲 HTML 裡標記好的共用程式區塊。
-       規則：不碰 DOM、不放畫面文字、初始化時不呼叫 Math.random()。
+       規則：不碰 DOM、不放畫面文字（例外：家長頁學習紀錄的報告文字，見最後一段）、初始化時不呼叫 Math.random()。
        遊戲才有的東西用 familyHooks 接；這裡的預設值都不做事。
        ========================================================= */
 
@@ -3567,6 +3583,201 @@
         if (!r.gameReasons) r.gameReasons = [];
         if (r.gameReasons.length < QLOG_MAX_EV) r.gameReasons.push(reason);   // 上限同 aids；次數以 wrongCountGame 為準
       } catch (e) {}
+    }
+
+    /* ---------- 家長頁「📊 學習紀錄」的統計與報告文字（M4：R3 的 learningLogText 從 logic_game.html 搬來） ----------
+       只列事實，不下判定：不會出現判定符號、「蒙」「猜」「可信」這類字眼、跟孩子自己的平均比快慢。
+       兩個遊戲的家長頁顯示同一份報告，所以統計和報告文字都放這裡（例外：這是畫面文字，但只給家長看、不加注音）；
+       畫面（選單、按鈕、複製、確認視窗）由各遊戲自己畫。讀每個遊戲的紀錄都用那個遊戲自己的 base（qlogLoad 依 base 檢查）。 */
+    const QLOG_SOURCE_LABEL = { first: '第一次', repeat: '重複', retry: '再挑戰', afterDemo: '示範後換題', resume: '繼續同一題', verify: '驗證題' };
+    const QLOG_OUTCOME_LABEL = { correct: '答對', abandoned: '中途離開', retryEnded: '再挑戰沒過', locked: '休息鎖定', replaced: '換題', away: '離開太久', unload: '關閉頁面' };
+    const QLOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
+    // 每個遊戲的報告設定（key 跟 QLOG_GAMES 一樣；報告依 QLOG_GAMES 的順序列）
+    //   icons：模組圖示（logic 的跟 MODULE_INFO 一致）；subLabel：子題型名稱
+    //   aidLabel：列在「用了哪些輔助」；ownLines：不算輔助、自己一行的操作（數串珠是蒙特梭利本來就要做的操作）
+    //   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）
+    const QLOG_REPORT = {
+      little_logic_qlog_v1: {
+        title: '🚀 小小邏輯探險家',
+        icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰' },
+        subLabel: {
+          pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
+          blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
+          gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
+          'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
+        },
+        aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' },
+        ownLines: {},
+        actionLabel: { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' },
+        // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
+        actionFields: {
+          maze: ['submits', 'resets', 'commands'],
+          'pipes.live': ['submits', 'resets', 'rotations'],
+          'pipes.hard': ['submits', 'resets', 'rotations'],
+          blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
+        },
+        actionMinBuild: 2   // F1（第三次複查）：R2 寫的紀錄沒有動作掛鉤
+      },
+      montessori_qlog_v1: {
+        title: '🧮 蒙特梭利數學樂園',
+        icons: { add: '➕', sub: '➖', mul: '✖️', div: '➗', bank: '🏛️', challenge: '🏆', balance: '⚖️' },
+        subLabel: {
+          add: '加法', sub: '減法', mul: '乘法', div: '除法', 'bank.add': '銀行加法', 'bank.sub': '銀行減法',
+          'challenge.add': '挑戰加法', 'challenge.sub': '挑戰減法', 'challenge.muldiv': '挑戰乘除', balance: '天平'
+        },
+        aidLabel: { verticalHint: '看直式提示' },
+        ownLines: { beadCount: '數串珠' },
+        actionLabel: { steps: '調整' },
+        actionFields: { balance: ['steps'] },   // 只有天平記動作數（+1／−1）
+        actionMinBuild: 3                        // 數學樂園 build 3（M3）起才記 actions.steps
+      }
+    };
+
+    function qlogMedian(a) {
+      if (!a.length) return null;
+      const s = a.slice().sort((x, y) => x - y);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    }
+
+    // 一個遊戲、一位孩子的統計（只讀，不寫）；文字在 qlogReportSection
+    function qlogReportStats(base, childId) {
+      const g = QLOG_GAMES[base], rep = QLOG_REPORT[base];
+      const store = qlogLoad(base, childId);
+      const recs = store.records;
+      const dropped = store.dropped || {};
+      const st = {
+        base, kept: recs.length, skipped: store.skipped, writeFailed: !!qlogWriteFailed[qlogKey(base, childId)],
+        dropped: g.subs.filter(k => Number(dropped[k]) > 0).map(k => ({ sub: k, n: dropped[k] })),   // R3 Minor 5
+        subs: []
+      };
+      for (const sub of g.subs) {
+        const rs = recs.filter(r => r.sub === sub);
+        const dr = Number(dropped[sub]) || 0;
+        if (!rs.length && !dr) continue;   // R3 Minor 5：保留 0 筆但有刪過的組也要列
+        const done = rs.filter(r => r.outcome !== null);   // M1：進行中只算在「進行中」那一欄
+        const src = {}, out = {}, aid = {}, own = {};
+        for (const r of rs) { const o = r.outcome === null ? 'ongoing' : r.outcome; out[o] = (Number(out[o]) || 0) + 1; }
+        for (const r of done) {
+          src[r.source] = (Number(src[r.source]) || 0) + 1;
+          const add = (k, n) => { const m = (k in rep.ownLines) ? own : aid; m[k] = (Number(m[k]) || 0) + n; };   // 數串珠不算輔助
+          if (r.aidCounts && typeof r.aidCounts === 'object') for (const k in r.aidCounts) add(k, Number(r.aidCounts[k]) || 0);
+          else for (const a of (Array.isArray(r.aids) ? r.aids : [])) add(a, 1);
+        }
+        const firsts = done.filter(r => r.source === 'first');
+        const ps = done.filter(r => typeof r.p === 'number' && isFinite(r.p)).map(r => r.p);   // p 是 null（天平按過 +1／−1、只用 +1／−1）就不算
+        // M2：用作答當下的 off；off 不是數字的（R2 舊紀錄、數學樂園 build 1）不算進中位數
+        const t1 = done.filter(r => r.firstAnswer && Number.isFinite(r.firstAnswer.off)).map(r => r.firstAnswer.dt - r.firstAnswer.off);
+        const during = done.filter(r => r.answeredDuringPrompt);
+        const fields = rep.actionFields[sub] || null;   // R1（複查）
+        let actDone = null, act = null;
+        if (fields) {
+          actDone = done.filter(r => Number(r.build) >= rep.actionMinBuild);
+          act = {};
+          // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
+          for (const f of fields) act[f] = qlogMedian(actDone.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+        }
+        const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
+        const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
+        const minTurns = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.turns)).map(r => r.minActions.turns);
+        st.subs.push({
+          sub, kept: rs.length, dropped: dr, src, out, aid, own,
+          firsts: firsts.length, firstOk: firsts.filter(r => r.firstAnswer && r.firstAnswer.ok).length,
+          firstStepper: firsts.filter(r => r.form === 'stepper').length,   // 天平只用 +1／−1 調到平衡：沒有「第一次作答」
+          p: ps.length ? qlogMedian(ps) : null,
+          t1: t1.length ? qlogMedian(t1) : null,
+          during: during.length,
+          rates: during.map(r => r.answeredDuringPromptRate || (r.promptSpeech && r.promptSpeech.rateSetting) || (r.speech && r.speech.rateSetting)),
+          fields, actN: actDone ? actDone.length : 0, act,
+          minNum: minNum.length ? qlogMedian(minNum) : null,
+          minSteps: minSteps.length ? qlogMedian(minSteps) : null,
+          minTurns: qlogMedian(minTurns),
+          leaks: done.reduce((n, r) => n + (Array.isArray(r.leaks) ? r.leaks.length : 0), 0)
+        });
+      }
+      return st;
+    }
+
+    function qlogDist(map, labels) {
+      const parts = Object.keys(labels).filter(k => map[k]).map(k => labels[k] + ' ' + map[k]);
+      return parts.length ? parts.join('／') : '無';
+    }
+    function qlogP(p) {
+      const inv = 1 / p;
+      return Math.abs(inv - Math.round(inv)) < 1e-9 ? '1/' + Math.round(inv) : (Math.round(p * 1000) / 1000);
+    }
+    function qlogSec(ms) { return (Math.round(ms / 100) / 10) + ' 秒'; }   // dt 是毫秒
+
+    // 一個遊戲那一段的文字（一行一個元素）
+    function qlogReportSection(st) {
+      const rep = QLOG_REPORT[st.base];
+      const lab = sub => rep.subLabel[sub] || sub;
+      const L = [];
+      L.push(rep.title + '（保留 ' + st.kept + ' 筆）');
+      L.push('略過 ' + st.skipped + ' 筆' + (st.writeFailed ? '；這位孩子的紀錄寫不進去（空間不足）' : ''));
+      const dp = st.dropped.map(d => lab(d.sub) + ' ' + d.n);
+      if (!st.kept) { L.push('還沒有紀錄。' + (dp.length ? '自動刪掉：' + dp.join('／') : '')); return L; }
+      for (const s of st.subs) {
+        const icon = rep.icons[s.sub.split('.')[0]];
+        L.push('');
+        L.push((icon ? icon + ' ' : '') + lab(s.sub) + '：保留 ' + s.kept + ' 筆／自動刪掉 ' + s.dropped + ' 筆');
+        L.push('  來源：' + qlogDist(s.src, QLOG_SOURCE_LABEL));
+        L.push('  結果：' + qlogDist(s.out, QLOG_OUTCOME_LABEL) + (s.out.ongoing ? '／進行中 ' + s.out.ongoing : ''));
+        L.push('  第一次遇到的題目中，第一次就答對：' + s.firstOk + ' 題（第一次遇到的共 ' + s.firsts + ' 題）');
+        if (s.firstStepper) L.push('  （其中 ' + s.firstStepper + ' 題是只用 +1／−1 調到平衡，沒有點選答案）');
+        if (s.p !== null) L.push('  隨機作答的答對機率（中位數）：' + qlogP(s.p));
+        if (s.t1 !== null) L.push('  第一次作答前的時間（中位數，已扣掉離開畫面的時間）：' + qlogSec(s.t1));
+        if (s.during) {
+          const rates = Array.from(new Set(s.rates.map(k => QLOG_RATE_LABEL[k] || '?')));
+          L.push('  題目還在朗讀時就作答：' + s.during + ' 題（當時朗讀速度：' + rates.join('、') + '）');
+        }
+        const aids = Object.keys(s.aid);
+        L.push('  用了哪些輔助：' + (aids.length ? aids.map(k => (rep.aidLabel[k] || k) + ' ' + s.aid[k]).join('／') : '無'));
+        for (const k in rep.ownLines) if (s.own[k]) L.push('  ' + rep.ownLines[k] + '：' + s.own[k] + ' 次');
+        if (s.fields) {   // R1（複查）：其他組不顯示這一行
+          const ap = s.fields.map(k => (rep.actionLabel[k] || k) + ' ' + s.act[k]);
+          const minTxt = s.minNum !== null ? s.minNum : (s.minSteps !== null ? s.minSteps + ' 步／' + s.minTurns + ' 轉' : '');
+          L.push('  動作數（中位數）：' + (s.actN ? ap.join('／') : '無') + (minTxt ? '；最少需要 ' + minTxt : ''));
+        }
+        if (s.leaks) L.push('  水管漏水：' + s.leaks + ' 次');
+      }
+      return L;
+    }
+
+    // scope：'this' = 這個遊戲（qlogConfig.base）、'both' = 兩個遊戲
+    function qlogReportBases(scope) { return scope === 'both' ? Object.keys(QLOG_GAMES) : [qlogConfig.base]; }
+
+    // 家長頁的報告：name 由遊戲給（顯示名稱）；兩個遊戲各一段，依 QLOG_GAMES 的順序
+    function qlogReportText(childId, name, scope) {
+      const L = ['📊 ' + name + ' 的學習紀錄'];
+      for (const base of qlogReportBases(scope)) { L.push(''); L.push(...qlogReportSection(qlogReportStats(base, childId))); }
+      return L.join('\n');
+    }
+
+    // 複製原始資料：一個遊戲 → 那個 key 的內容（跟 R3 一樣）；兩個遊戲 → { key: 內容 }
+    function qlogRawText(childId, scope) {
+      const parse = raw => { try { return JSON.parse(raw); } catch (e) { return raw; } };
+      const bases = qlogReportBases(scope);
+      if (bases.length === 1) {
+        const raw = localStorage.getItem(qlogKey(bases[0], childId)) || '';
+        try { return JSON.stringify(JSON.parse(raw), null, 1); } catch (e) { return raw; }
+      }
+      const all = {};
+      for (const base of bases) { const k = qlogKey(base, childId); const raw = localStorage.getItem(k); all[k] = raw === null ? null : parse(raw); }
+      return JSON.stringify(all, null, 1);
+    }
+
+    // 清空一位孩子的紀錄（只動這位孩子、選到的遊戲）；沒有這個 key 就不建立。全部寫成功才回傳 true
+    function qlogClearChild(childId, scope) {
+      let ok = true;
+      for (const base of qlogReportBases(scope)) {
+        const key = qlogKey(base, childId);
+        if (localStorage.getItem(key) === null) continue;
+        const store = qlogLoad(base, childId);
+        store.records = []; store.dropped = {}; store.skipped = 0;
+        try { localStorage.setItem(key, JSON.stringify(store)); } catch (e) { ok = false; }
+      }
+      return ok;
     }
   </script>
   <!-- FAMILY:END -->
@@ -7890,6 +8101,7 @@
         o.textContent = childLabel(c);
         mv.append(o);
       }
+      renderLearningLog();   // M4：家長頁（過家長算式後才會顯示）
     }
 
     function parentSwitchChild(id) {
@@ -7905,6 +8117,54 @@
       if (!confirm('確定要清空 ' + childLabel(me) + ' 的錯題本嗎？')) return;
       MistakeBook.clearAll();
       setParentMsg('已經清空 ' + childLabel(me) + ' 的錯題本。');
+    }
+
+    /* ---------- 📊 學習紀錄（M4）：只列事實，不下判定 ----------
+       統計和報告文字在 family.js（qlogReportText），跟小小邏輯探險家的家長頁是同一份報告；這裡只畫畫面。
+       家長設定整區不經過 zy()（報告用 textContent）。 */
+    let logViewChildId = null;
+
+    // 複製報告、複製原始資料、清空的範圍：'this'（數學樂園）或 'both'（兩個遊戲）
+    function logScope() { const s = document.getElementById('logScopeSelect'); return s && s.value === 'both' ? 'both' : 'this'; }
+    function logViewName() { const c = readProfiles().children.find(x => x.id === logViewChildId); return c ? (c.name || animalName(c) || c.id) : logViewChildId; }
+
+    function renderLearningLog() {
+      try {
+        const sel = document.getElementById('logChildSelect');
+        const box = document.getElementById('learningLogBox');
+        if (!sel || !box) return;
+        const kids = readProfiles().children;
+        // 報告、複製、清空都作用在選到的那位孩子（預設是現在在玩的孩子）
+        if (kids.some(c => c.id === sel.value)) logViewChildId = sel.value;
+        else if (!kids.some(c => c.id === logViewChildId)) logViewChildId = activeChildId;
+        sel.textContent = '';
+        for (const c of kids) {
+          const o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = childLabel(c);
+          o.selected = c.id === logViewChildId;
+          sel.append(o);
+        }
+        box.textContent = qlogReportText(logViewChildId, logViewName(), 'both');
+      } catch (e) { console.warn('renderLearningLog', e); }
+    }
+
+    function copyLearningText(text, label) {
+      if (!navigator.clipboard) { setParentMsg('這個瀏覽器不能複製'); return; }
+      navigator.clipboard.writeText(text).then(() => setParentMsg('📋 ' + label)).catch(() => setParentMsg('複製失敗'));
+    }
+    function copyLearningLog() { try { copyLearningText(qlogReportText(logViewChildId, logViewName(), logScope()), '已複製報告'); } catch (e) {} }
+    function copyLearningLogRaw() { try { copyLearningText(qlogRawText(logViewChildId, logScope()), '已複製原始資料'); } catch (e) {} }
+    function clearLearningLog() {
+      try {
+        const c = readProfiles().children.find(x => x.id === logViewChildId);
+        if (!c) return;
+        const scope = logScope();
+        if (!confirm('要清空 ' + childLabel(c) + (scope === 'both' ? ' 在兩個遊戲' : ' 在蒙特梭利數學樂園') + '的學習紀錄嗎？')) return;
+        const ok = qlogClearChild(c.id, scope);
+        renderLearningLog();
+        setParentMsg(ok ? '📋 已清空 ' + childLabel(c) + ' 的學習紀錄。' : '寫入失敗');
+      } catch (e) {}
     }
 
     // QM8 的 7 個 key（學習紀錄 montessori_qlog_v1__<id> 不搬：每一筆都記著當時的 childId）
