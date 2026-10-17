@@ -1246,6 +1246,9 @@
       font-weight: 800;
     }
 
+    /* 回遊戲大廳（#27）：是連結不是按鈕，樣式跟其他頂端按鈕一致 */
+    a.lobby-link { display: inline-block; text-decoration: none; }
+
     .device-help-btn {
       background: #507346;
       color: #ffffff;
@@ -2382,6 +2385,7 @@
     <h1 id="appTitle"></h1>
     <div class="subtitle" id="appSubtitle"></div>
     <div class="header-action-row">
+      <a class="device-help-btn lobby-link" href="index.html" title="回到遊戲大廳，選別的遊戲" style="background:#6b5b95;">🏰 回遊戲大廳</a>
       <button class="reward-capsule-btn" onclick="openStickerAlbum()" title="打開貼紙收集簿">
         <span class="star-icon">⭐</span>
         <span class="star-count" id="headerStarCount">0</span> 顆星
