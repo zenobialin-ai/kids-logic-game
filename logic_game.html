@@ -3718,7 +3718,7 @@
           form: qlogForm(currentModule, q), nOptions: qlogNOptions(currentModule, q), p: qlogChance(currentModule, q),
           live: currentModule === 'pipes' ? !!q.live : null,
           minActions: qlogMinActions(currentModule, q),   // R3：迷宮／水管的最少動作數
-          speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: qlogZhVoiceCount(), source: 'tts' },   // M3：一律呼叫 getZhVoices()
+          speech: { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: qlogZhVoiceCount(), source: 'tts' },   // M3：一律呼叫 qlogZhVoiceCount()
           soundOn: !!audioEnabled,
           tOpen: Date.now(), tShown: document.querySelector('.game-view.active') ? Date.now() : null,
           tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
@@ -3775,7 +3775,7 @@
       return String((v && v.lang) || '').toLowerCase().replace(/_/g, '-') === 'zh-tw';
     }
 
-    // 共用的 zh-TW 語音清單（#20 之後做語音選擇時可以直接用）
+    // 共用的 zh-TW 語音清單：目前沒有呼叫端，保留給 #20 做語音選擇時用（數量統計請用 qlogZhVoiceCount）
     function getZhVoices() {
       if (!('speechSynthesis' in window)) return null;
       try { return (window.speechSynthesis.getVoices() || []).filter(isZhTw); } catch (e) { return null; }

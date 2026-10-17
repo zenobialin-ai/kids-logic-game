@@ -4868,7 +4868,7 @@
         const totalCor = data.totalCorrect || 0;
         const rate = totalAns > 0 ? Math.round((totalCor / totalAns) * 100) : 100;
         const starCount = (typeof userStars !== 'undefined') ? userStars : totalCor;
-        const unlockedCount = (typeof userUnlockedStickers !== 'undefined' && userUnlockedStickers) ? userUnlockedStickers.length : Math.min(12, Math.floor(totalCor / 2));
+        const unlockedCount = unlockedStickerIds.length;   // #48：讀實際解鎖的貼紙（原本讀不存在的 userUnlockedStickers，一直退回估計值）
 
         let bearAdvice = "太棒了！每做一題都在變得更聰明，小熊隨時為你加油打氣喔！🧸✨";
         if (totalAns >= 5) {
@@ -4931,7 +4931,7 @@
             </div>
             <div class="summary-metric-box">
               <div class="metric-icon">🎨</div>
-              <div class="metric-num">${unlockedCount}/12</div>
+              <div class="metric-num">${unlockedCount}/${STICKER_DEFS.length}</div>
               <div class="metric-lbl">${zy("收集貼紙")}</div>
             </div>
           </div>
