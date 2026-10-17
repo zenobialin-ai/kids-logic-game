@@ -2262,6 +2262,89 @@
       cursor: default;
     }
 
+
+    /* =========================================================================
+       平板直放、橫拿手機、小筆電（1100px 以下）：木托盤旁邊放不下小熊老師，
+       托盤會被擠到很窄（題目變成一字一行、串珠跑出托盤）。
+       改成小熊在上、托盤在下，小熊縮成一列（左邊小熊、右邊對話），不把題目擠到很下面。
+       ========================================================================= */
+    @media (max-width: 1100px) {
+      .classroom-work-area {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 16px;
+      }
+
+      .main-stage {
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: none;
+      }
+
+      .teacher-bear-station {
+        width: 100%;
+        max-width: none;
+        position: static;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+          "bear badge"
+          "bear bubble"
+          "bear dress";
+        align-items: center;
+        gap: 6px 16px;
+        padding: 12px 16px;
+      }
+
+      .teacher-badge { grid-area: badge; justify-self: start; margin-bottom: 0; }
+      .teacher-speech-bubble { grid-area: bubble; margin-bottom: 0; }
+      .teacher-bear-station > div:last-child { grid-area: dress; text-align: left !important; }
+
+      .mascot-figure-box {
+        grid-area: bear;
+        width: 150px;
+        height: 175px;
+        min-height: 0;
+        margin: 0;
+      }
+
+      .mascot-svg {
+        width: 140px;
+        height: 165px;
+        max-height: none;
+      }
+
+      .instruction-bar {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+    }
+
+    /* 困難題的串珠比較長，算式列放不下時換行（桌機上小熊旁邊的托盤也可能放不下） */
+    .math-formula-box { flex-wrap: wrap; }
+
+    /* 教學視窗裡的長網址不要撐破手機畫面 */
+    .device-modal code { overflow-wrap: anywhere; }
+
+    @media (max-width: 480px) {
+      /* 算式列在各題型裡是用 inline style 寫的（固定 padding、gap），
+         窄手機上放不下就會超出托盤：讓它們縮小間距、可以換行 */
+      .math-formula-box {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+      }
+      .math-formula-box > * { max-width: 100%; }
+      .math-formula-box > div[style*="display:flex"] {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px !important;
+      }
+
+      .teacher-bear-station { gap: 4px 10px; padding: 10px 12px; }
+      .mascot-figure-box { width: 100px; height: 120px; }
+      .mascot-svg { width: 96px; height: 114px; }
+    }
   </style>
 </head>
 <body>
