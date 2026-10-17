@@ -1617,8 +1617,11 @@
       header { padding: 10px 12px; }
       .brand { gap: 6px; }
       .brand-icon { font-size: 26px; }
-      .brand-title { font-size: 15px; white-space: nowrap; }
+      /* #28：加了注音字距後標題變寬，放不下時讓標題換行，不要把右邊的按鈕擠出畫面 */
+      .brand { min-width: 0; }
+      .brand-title { font-size: 15px; white-space: normal; }
       .header-stats { gap: 4px; flex-shrink: 0; }
+      .sync-btn .btn-label { display: none; }   /* 只留圖示，標題才放得下 */
       .stat-badge { padding: 3px 8px; font-size: 15px; gap: 4px; }
       .sync-btn { padding: 6px 10px; min-height: 40px; }
       /* 小朋友的手指：可點的東西至少 40px */
@@ -1679,7 +1682,8 @@
        不然朗讀鈕會被擠出卡片、按鈕會比卡片寬。字級「大」時 378px 也會發生，所以範圍到 420px */
     @media (max-width: 420px) {
       html:not(.fs-large) .level-badge { white-space: normal; }
-      #view-deduction .btn-run { white-space: normal; max-width: 100%; }
+      #view-deduction .btn-run, #view-maze .btn-run { white-space: normal; max-width: 100%; }
+      .font-size-ctrl { flex-wrap: wrap; justify-content: center; }
     }
 
     /* 按鈕只留圖示：480px 以下才需要，600px 左右還放得下文字 */
