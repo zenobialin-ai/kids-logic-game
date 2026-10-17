@@ -38,6 +38,7 @@
  *   - 音效 Sound 換成假的、不發聲：DOMContentLoaded 時把 Sound 的每個方法（init 以外）換成只記名字，
  *     每一步 steps[].sounds 列出這一步呼叫過的方法（依呼叫順序）。啟動程式在 DOMContentLoaded 前就跑完，
  *     所以啟動當下（init 那一步之前）的音效不會被記到。
+ *     串珠的叮噹聲等直接用 Sound.ctx 發聲（不經過 Sound 的方法），也不會出現在 sounds 裡。
  *   - 全新的 browser context（localStorage 是空的），時區固定 Asia/Taipei、語系 zh-TW。
  *   - 正確答案從頁面的全域變數讀（answerOf()；改名時只要改這裡），錯的答案 = 第一個不等於正確答案的選項。
  *
