@@ -1,12 +1,12 @@
 /* =========================================================
    common/family.js：兩個遊戲共用的程式（孩子名單、儲存、護眼狀態、家長算式）
-   原始碼在這裡；用 tools/build_common.py 嵌進各遊戲的 HTML（FAMILY:START～FAMILY:END 區塊）。
+   原始碼在這裡；用 tools/build_common.py 嵌進各遊戲 HTML 裡標記好的共用程式區塊。
    規則：不碰 DOM、不放畫面文字、初始化時不呼叫 Math.random()。
    遊戲才有的東西用 familyHooks 接；這裡的預設值都不做事。
    ========================================================= */
 
 const familyHooks = {
-  freeSpace: () => {}   // 儲存空間不夠時，讓遊戲刪掉自己的舊資料（邏輯遊戲：qlogFreeSpace）
+  freeSpace: () => qlogFreeSpace()   // 儲存空間不夠時：兩個遊戲的學習紀錄都砍一半（qlogFreeSpace 在下面）
 };
 
 /* ---------- 小工具 ---------- */
@@ -165,4 +165,310 @@ function gateCheck(gate, value, now) {
   if (Number(value) === gate.a + gate.b) return 'ok';
   gate.tries++;
   return gate.tries >= 3 ? 'reroll' : 'wrong';
+}
+
+/* ---------- 學習紀錄核心（M2a 從 logic_game.html 搬來） ---------- */
+// 紀錄的格式表：依 key base 查，不依目前在哪個遊戲查；每個遊戲的上限只放這裡
+// logic 的紀錄沒有 game 欄位（沒有就是邏輯遊戲）；montessori 的紀錄加 game:'montessori'
+const QLOG_GAMES = {
+  little_logic_qlog_v1: {
+    game: 'logic',
+    modules: ['pattern', 'balance', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone', 'pipes'],
+    subs: ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard'],
+    maxPerSub: 30, total: 1000000, perChild: 400000   // total：所有孩子合計（字元）
+  },
+  montessori_qlog_v1: {
+    game: 'montessori',
+    modules: ['add', 'sub', 'mul', 'div', 'bank', 'challenge', 'balance'],
+    subs: ['add', 'sub', 'mul', 'div', 'bank.add', 'bank.sub', 'challenge.add', 'challenge.sub', 'challenge.muldiv', 'balance'],
+    maxPerSub: 30, total: 400000, perChild: 150000
+  }
+};
+const QLOG_MAX_EV = 100;
+const QLOG_RECOVER_MS = 3 * 60 * 1000;
+const QLOG_HEARTBEAT_MS = 60 * 1000;
+const QLOG_SOURCES = ['first', 'repeat', 'retry', 'afterDemo', 'resume', 'verify'];
+const QLOG_OUTCOMES = ['correct', 'abandoned', 'replaced', 'retryEnded', 'locked', 'away', 'unload'];
+const QLOG_EVENT_TYPES = ['t', 'w', 'c', 'a', 'x', 'l', 's', 'o', 'n'];
+
+// 遊戲專屬的部分：各遊戲在自己的主程式裡 Object.assign(qlogConfig, {...})；這裡的預設值都不做事
+const qlogConfig = {
+  base: null,                     // 這個遊戲寫入的 key base
+  build: null,                    // 這個遊戲的 LOG_BUILD
+  tab: '',                        // 分頁 id（由遊戲自己產生）
+  buildOpen: () => null,          // (source) → 這一題的紀錄；沒有題目就回傳 null
+  isOff: () => false,             // 目前是否算「離開畫面」
+  actionsTemplate: {},            // actions 的初始欄位
+  countAction: () => null,        // (type, data) → x 事件要累加的 actions 欄位（不累加就回傳 null）
+  onAnswerEvent: () => {}         // (r, type) → 答題事件（w／c）的遊戲專屬處理
+};
+
+let qlogActive = null;        // 目前開著的紀錄（記憶體）
+let qlogWriteFailed = {};     // { 紀錄 key: true }，只在記憶體，不是單筆欄位
+let qlogEvicting = false;     // 防 safeSetItem → familyHooks.freeSpace → 寫入 的遞迴
+let qlogOffMs = 0, qlogOffSince = Date.now(), qlogOffNow = false;
+
+// §3：紀錄 key 一律用 ID（不用 slot 規則），c0 也是 __c0；base 不含底線
+function qlogKey(base, id) { return base + '__' + id; }
+
+function fnv1a(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function qlogId(s) { return fnv1a(s).toString(36); }
+
+function childOnList(id) { return readProfiles().children.some(c => c.id === id); }
+
+// R2 寫的紀錄沒有 R3 的欄位：那些欄位允許 null 或不存在
+// 一律用 base 的格式表檢查（不依目前在哪個遊戲），別的遊戲的紀錄才不會被當成格式錯誤
+function isValidLogRecord(r, base) {
+  const g = QLOG_GAMES[base];
+  if (!g) return false;
+  if (!r || typeof r !== 'object' || r.v !== 1) return false;
+  if (typeof r.id !== 'string' || !r.id) return false;
+  if (typeof r.tab !== 'string' || !r.tab) return false;
+  if (typeof r.childId !== 'string' || !r.childId) return false;
+  if (!Number.isFinite(r.lastWrite) || !Number.isFinite(r.tOpen)) return false;
+  if (!g.modules.includes(r.module)) return false;
+  if (!g.subs.includes(r.sub)) return false;
+  if (!QLOG_SOURCES.includes(r.source)) return false;
+  if (r.outcome !== null && !QLOG_OUTCOMES.includes(r.outcome)) return false;
+  if (!Array.isArray(r.ev) || r.ev.length > QLOG_MAX_EV) return false;
+  // R3 Minor 9：R3 欄位是 null 或不存在可以接受，但型別錯的要擋掉（舊紀錄沒有這些欄位）
+  if (r.firstAnswer != null && (typeof r.firstAnswer !== 'object' || Array.isArray(r.firstAnswer) ||
+      typeof r.firstAnswer.ok !== 'boolean' || !Number.isFinite(r.firstAnswer.dt))) return false;
+  if (r.firstAnswer != null && r.firstAnswer.off != null && !Number.isFinite(r.firstAnswer.off)) return false;
+  if (r.actions != null && (typeof r.actions !== 'object' || Array.isArray(r.actions))) return false;
+  if (r.aids != null && !Array.isArray(r.aids)) return false;
+  if (r.aidCounts != null && (typeof r.aidCounts !== 'object' || Array.isArray(r.aidCounts))) return false;
+  if (r.leaks != null && !Array.isArray(r.leaks)) return false;
+  if (r.gameReasons != null && !Array.isArray(r.gameReasons)) return false;
+  for (const e of r.ev) {
+    if (!Array.isArray(e) || e.length !== 3 || !Number.isFinite(e[0]) || typeof e[1] !== 'string' || !QLOG_EVENT_TYPES.includes(e[1])) return false;
+  }
+  return true;
+}
+
+// 整個 key 讀不出來 → 當成空的；單筆格式不合 → 丟掉那一筆、skipped + 1
+function qlogLoad(base, childId) {
+  const empty = { v: 1, childId, records: [], dropped: {}, skipped: 0 };
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(qlogKey(base, childId))); } catch (e) { return empty; }
+  if (!raw || typeof raw !== 'object' || raw.v !== 1 || !Array.isArray(raw.records)) return empty;
+  const recs = raw.records.filter(r => isValidLogRecord(r, base) && r.childId === childId);
+  const dropped = (raw.dropped && typeof raw.dropped === 'object') ? raw.dropped : {};
+  return { v: 1, childId, records: recs, dropped, skipped: (Number(raw.skipped) || 0) + (raw.records.length - recs.length) };
+}
+
+function qlogBudget(base, childId) {
+  const g = QLOG_GAMES[base];
+  const n = Math.max(1, readProfiles().children.length);
+  return Math.min(g.perChild, Math.floor(g.total / n));
+}
+
+// 每組最多 30 筆；超過額度時從筆數最多的那一組開始刪最舊的
+function qlogEvict(base, store) {
+  const g = QLOG_GAMES[base];
+  const dropped = store.dropped || {};
+  const bump = (sub, n) => { dropped[sub] = (Number(dropped[sub]) || 0) + n; };
+  for (const sub of g.subs) {
+    const rs = store.records.filter(r => r.sub === sub).sort((a, b) => a.tOpen - b.tOpen);
+    if (rs.length > g.maxPerSub) {
+      const kill = new Set(rs.slice(0, rs.length - g.maxPerSub));
+      store.records = store.records.filter(r => !kill.has(r));
+      bump(sub, kill.size);
+    }
+  }
+  while (JSON.stringify(store).length > qlogBudget(base, store.childId)) {
+    const counts = {};
+    for (const r of store.records) counts[r.sub] = (counts[r.sub] || 0) + 1;
+    let top = null;
+    for (const sub in counts) if (!top || counts[sub] > counts[top]) top = sub;
+    if (!top) break;
+    const oldest = store.records.filter(r => r.sub === top).sort((a, b) => a.tOpen - b.tOpen)[0];
+    store.records = store.records.filter(r => r !== oldest);
+    bump(top, 1);
+  }
+  store.dropped = dropped;
+  return store;
+}
+
+// M1：寫紀錄失敗只減「這位孩子」最舊的 25% 再試一次（plan §3）；不能動別的孩子
+// familyHooks.freeSpace（qlogFreeSpace：每位孩子刪一半）只給進度、錯題本、護眼、名單用
+function qlogSave(base, store, keepId) {
+  if (qlogEvicting) return false;
+  if (!childOnList(store.childId)) return false;   // 寫前確認這位孩子還在名單上
+  qlogEvict(base, store);
+  const key = qlogKey(base, store.childId);
+  const write = () => { try { localStorage.setItem(key, JSON.stringify(store)); return true; } catch (e) { return false; } };
+  if (write()) { delete qlogWriteFailed[key]; return true; }   // minor 4：成功就清掉標記
+  const sorted = store.records.slice().sort((a, b) => a.tOpen - b.tOpen);
+  const kill = Math.ceil(store.records.length * 0.25);
+  if (kill > 0) {
+    // N-D + R3：先把正在寫入的那一筆排除，再取最舊 kill 筆（順序反過來會少刪一筆）
+    const drop = new Set(sorted.filter(r => r.id !== keepId).slice(0, kill));
+    if (drop.size) {
+      const dropped = store.dropped || {};
+      for (const r of drop) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+      store.dropped = dropped;
+      store.records = store.records.filter(r => !drop.has(r));
+    }
+  }
+  if (write()) { delete qlogWriteFailed[key]; return true; }
+  qlogWriteFailed[key] = true;
+  return false;
+}
+// N-A：每次寫入都要更新 lastWrite（跨分頁復原看的是這個時間，不是開題當下）
+// 寫的是這個遊戲自己的 key（qlogConfig.base）
+function qlogSaveRecord(r) {
+  r.lastWrite = Date.now();
+  const store = qlogLoad(qlogConfig.base, r.childId);
+  const i = store.records.findIndex(x => x.id === r.id);
+  if (i >= 0) store.records[i] = r; else store.records.push(r);
+  return qlogSave(qlogConfig.base, store, r.id);
+}
+
+// 空間不夠：兩個遊戲、每位孩子的紀錄各刪一半，讓進度、錯題本、護眼、名單可以優先寫入
+// 每個 key 用自己的格式表檢查（QLOG_GAMES[base]），別的遊戲的紀錄只會被砍一半、不會被當成格式錯誤
+function qlogFreeSpace() {
+  if (qlogEvicting) return;
+  qlogEvicting = true;
+  try {
+    const children = readProfiles().children;
+    for (const base of Object.keys(QLOG_GAMES)) {
+      for (const c of children) {
+        const store = qlogLoad(base, c.id);
+        if (!store.records.length) continue;
+        const keep = Math.floor(store.records.length / 2);
+        const sorted = store.records.slice().sort((a, b) => b.tOpen - a.tOpen);
+        const dropped = store.dropped || {};
+        for (const r of sorted.slice(keep)) dropped[r.sub] = (Number(dropped[r.sub]) || 0) + 1;
+        store.records = sorted.slice(0, keep);
+        store.dropped = dropped;
+        try { localStorage.setItem(qlogKey(base, c.id), JSON.stringify(store)); } catch (e) {}
+      }
+    }
+  } catch (e) {
+  } finally { qlogEvicting = false; }
+}
+
+// offMs：「離開畫面」由遊戲判斷（logic：切到背景 + 任何彈出視窗 + 護眼鎖住）
+function qlogIsOff() { return !!qlogConfig.isOff(); }
+function qlogOffTick() {
+  const now = Date.now();
+  if (qlogOffNow) qlogOffMs += now - qlogOffSince;
+  qlogOffNow = qlogIsOff();
+  qlogOffSince = now;
+}
+
+// 開一筆新紀錄：這一題的內容由遊戲組（qlogConfig.buildOpen；沒有題目就回傳 null）
+function qlogOpen(source) {
+  try {
+    const rec = qlogConfig.buildOpen(source);
+    if (!rec) return null;
+    if (qlogActive) qlogClose('replaced');   // 上一筆還沒關
+    qlogActive = rec;
+    qlogOffMs = 0; qlogOffSince = Date.now(); qlogOffNow = qlogIsOff();
+    qlogSaveRecord(rec);
+    return rec;
+  } catch (e) { console.warn('qlogOpen', e); return null; }
+}
+
+function qlogEvent(type, data) {
+  try {
+    const r = qlogActive;
+    if (!r || r.outcome !== null) return;   // 已關閉的紀錄再記事件不做任何事
+    const dt = Date.now() - r.tOpen;
+    // M2：計數在事件當下就累加，ev 被截斷時摘要仍正確
+    if (type === 't') {
+      r.tapCount++;
+      if (typeof data === 'string' && data.indexOf('k:') === 0) r.keyTapCount++;
+    } else if (type === 'w') {
+      if (data && data.dup) r.wrongDupCount++;
+      else { r.wrongCount++; r.wrongCountGame++; }   // N-B：復原那條路不會跑 qlogSummarize，這裡就要算
+      // M2：先 qlogOffTick() 再記 off＝作答當下的累計 offMs（不是整題的 offMs）
+      if (!r.firstAnswer) { qlogOffTick(); r.firstAnswer = { ok: false, dt: dt, off: qlogOffMs }; }
+    } else if (type === 'c' && !r.firstAnswer) {
+      qlogOffTick(); r.firstAnswer = { ok: true, dt: dt, off: qlogOffMs };
+    }
+    // R3：輔助、動作計數、漏水
+    // R3 Minor 7：aids 跟 ev 一樣最多 100 筆；計數另外記，不受上限影響
+    if (type === 'a') {
+      if (!r.aids) r.aids = [];
+      if (!r.aidCounts) r.aidCounts = {};
+      r.aidCounts[data] = (Number(r.aidCounts[data]) || 0) + 1;
+      if (r.aids.length < QLOG_MAX_EV) r.aids.push(data);
+    }
+    else if (type === 'l') { if (!r.leaks) r.leaks = []; r.leaks.push(data); }
+    else { const f = qlogConfig.countAction(type, data); if (f) qlogCountAction(f, 1); }   // 動作要累加哪個欄位由遊戲決定
+    if (type === 'w' || type === 'c') qlogConfig.onAnswerEvent(r, type);   // 答題事件的遊戲專屬處理（logic：朗讀中作答）
+    if (r.ev.length >= QLOG_MAX_EV) { r.evTruncated = true; return; }
+    r.ev.push([dt, type, data === undefined ? null : data]);
+  } catch (e) {}
+}
+
+function qlogSummarize(r) {
+  // M2：tapCount / wrongCount / wrongDupCount / wrongCountGame / firstAnswer 已在 qlogEvent 當下累加
+  r.offMs = qlogOffMs;
+  r.activeMs = r.tClose - r.tOpen - r.offMs;
+}
+
+function qlogClose(outcome) {
+  try {
+    const r = qlogActive; if (!r || r.outcome !== null) return;   // 已關閉就什麼都不做
+    qlogOffTick();
+    r.tClose = Date.now();
+    r.outcome = outcome;
+    qlogSummarize(r);
+    qlogActive = null;
+    qlogSaveRecord(r);
+  } catch (e) { console.warn('qlogClose', e); }
+}
+
+// 載入時掃所有孩子：別的分頁留著的舊紀錄 → 復原成 unload（只復原這個遊戲自己的 key）
+function qlogRecover() {
+  try {
+    const now = Date.now();
+    for (const c of readProfiles().children) {
+      const store = qlogLoad(qlogConfig.base, c.id);
+      let changed = false;
+      for (const r of store.records) {
+        if (r.outcome === null && r.tab !== qlogConfig.tab && now - r.lastWrite > QLOG_RECOVER_MS) {
+          r.outcome = 'unload'; r.recovered = true; r.lastWrite = now; changed = true;
+        }
+      }
+      if (changed) qlogSave(qlogConfig.base, store);
+    }
+  } catch (e) { console.warn('qlogRecover', e); }
+}
+
+function qlogHeartbeat() {
+  try {
+    if (!qlogActive || qlogActive.outcome !== null) return;
+    if (document.visibilityState !== 'visible') return;
+    qlogOffTick();
+    qlogSaveRecord(qlogActive);
+  } catch (e) {}
+}
+
+function qlogCountAction(field, n) {
+  try {
+    const r = qlogActive;
+    if (!r || r.outcome !== null) return;
+    if (!r.actions) r.actions = Object.assign({}, qlogConfig.actionsTemplate);
+    // R3 Minor 2：n 沒給才當 1；給 0 就是 0（迷宮 0 個指令不能記成 1）
+    r.actions[field] = (Number(r.actions[field]) || 0) + (n == null ? 1 : (Number(n) || 0));
+  } catch (e) {}
+}
+
+// R3 驗收 6：用提示／看範例／亂轉不算答錯（wrongCount 不變），但算 game 層的「用了輔助」
+function qlogGameWrong(reason) {
+  try {
+    const r = qlogActive;
+    if (!r || r.outcome !== null) return;
+    r.wrongCountGame++;
+    if (!r.gameReasons) r.gameReasons = [];
+    r.gameReasons.push(reason);
+  } catch (e) {}
 }
