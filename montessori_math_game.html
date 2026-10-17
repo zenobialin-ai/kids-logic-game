@@ -2477,6 +2477,87 @@
       font-weight: 800;
       cursor: pointer;
     }
+    /* 👀 護眼鎖定畫面（M1d；從小小邏輯探險家複製，改成數學樂園的字級） */
+    .eye-lock {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #DCFCE7, #E0F2FE);
+      display: none;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-y: auto;      /* 矮螢幕或手機橫放時可以捲到解鎖按鈕 */
+      z-index: 3500;         /* 比彩帶畫布（3000）、彈出視窗都高 */
+      padding: 16px;
+    }
+
+    .eye-lock.active { display: flex; }
+
+    .eye-lock-card {
+      margin: auto;
+      background: #FFF;
+      border-radius: 30px;
+      padding: 28px 24px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .eye-lock-title { font-size: 1.7rem; font-weight: 900; color: #166534; margin-bottom: 8px; }
+    .eye-lock-sub { font-size: 1.15rem; color: #475569; margin-bottom: 18px; }
+    .eye-ex { background: #F0FDF4; border-radius: 22px; padding: 20px 12px; margin-bottom: 16px; }
+    .eye-ex-icon { font-size: 72px; animation: eyeFloat 2.5s ease-in-out infinite; }
+    .eye-ex-text { font-size: 1.45rem; font-weight: 900; color: #1E293B; margin: 8px 0; }
+    .eye-ex-step { font-size: 1rem; color: #64748B; }
+    .eye-ex-count { font-size: 40px; font-weight: 900; color: #16A34A; min-height: 48px; }
+    @keyframes eyeFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+    .eye-parent-link {
+      background: none;
+      border: 2px solid #CBD5E1;
+      color: #64748B;
+      border-radius: 14px;
+      padding: 8px 16px;
+      min-height: 44px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .eye-lock .parent-gate { margin-top: 14px; }
+
+    @media (max-height: 600px) {
+      .eye-lock-card { padding: 18px 16px; }
+      .eye-lock-title { font-size: 1.45rem; }
+      .eye-ex { padding: 10px; }
+      .eye-ex-icon { font-size: 48px; }
+      .eye-ex-count { font-size: 30px; min-height: 36px; }
+    }
+
+    /* 提示框（M1d；像小小邏輯探險家的 #toastBox）：小熊的對話泡泡換題時會被清掉，提醒改放這裡 */
+    .toast-box {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1E293B;
+      color: #FFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 3600;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
+      max-width: calc(100vw - 32px);
+      text-align: center;
+    }
+    .toast-box.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -2913,6 +2994,33 @@
     </div>
   </div>
 
+  <!-- 👀 護眼鎖定畫面（M1d；放在 .classroom-work-area 外面，背景設 inert 時不受影響）：文字由程式經過 zy() 填入 -->
+  <div class="eye-lock" id="eyeLock" role="dialog" aria-modal="true">
+    <div class="eye-lock-card">
+      <div class="eye-lock-title" id="eyeLockTitle"></div>
+      <div class="eye-lock-sub"><span id="eyeLockSubA"></span><strong id="eyeLockMinutes">0</strong><span id="eyeLockSubB"></span></div>
+      <div class="eye-ex">
+        <div class="eye-ex-icon" id="eyeExIcon">🌳</div>
+        <div class="eye-ex-text" id="eyeExText"></div>
+        <div class="eye-ex-step" id="eyeExStep"></div>
+        <div class="eye-ex-count" id="eyeExCount"></div>
+      </div>
+      <button class="eye-parent-link" id="eyeParentLink" onclick="showEyeUnlock()"></button>
+      <div class="parent-gate" id="eyeUnlockBox" style="display:none;">
+        <div class="parent-gate-label"><span id="eyeGateLabel"></span><strong id="eyeGateQ"></strong></div>
+        <div class="parent-gate-row">
+          <input type="number" inputmode="numeric" id="eyeGateInput" class="parent-gate-input" aria-label="答案"
+                 onkeydown="if (event.key === 'Enter') checkEyeAnswer()">
+          <button class="action-btn parent-gate-btn" id="eyeGateBtn" onclick="checkEyeAnswer()"></button>
+        </div>
+        <div class="parent-gate-msg" id="eyeGateMsg" role="alert"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示框（M1d）：文字經過 zy() -->
+  <div class="toast-box" id="toastBox" role="status"></div>
+
   <!-- ⚙️ 家長設定（M1c）：整區不加注音；要先過家長算式 -->
   <div class="custom-modal" id="parentModal">
     <div class="modal-header-bar" style="background: linear-gradient(135deg, #546e7a, #37474f);">
@@ -2949,6 +3057,15 @@
           </div>
           <div class="parent-note">會把 <span id="parentMoveFrom"></span> 的星星、貼紙、衣帽間、錯題本、學習分析、難度、打卡全部搬過去（不合併），<span id="parentMoveFrom2"></span> 會變成空的。學習紀錄不搬。</div>
         </div>
+        <div class="parent-row">
+          <span class="parent-row-label">👀 護眼時間</span>
+          <span>
+            <button class="parent-btn" id="parentEyeToggle" onclick="toggleEyeCare()"></button>
+            <select id="parentEyeLimit" class="parent-select" onchange="setEyeLimit(Number(this.value))" aria-label="護眼分鐘數"></select>
+            <button class="parent-btn" onclick="resetEyeTimer()">重新計時</button>
+          </span>
+        </div>
+        <div class="parent-note">跟小小邏輯探險家共用同一個設定，兩個遊戲加起來算；今天已經用了 <span id="parentEyeUsed">0</span> 分鐘。時間到了，孩子做完手上這一題（最多再 3 分鐘）就會鎖住，要家長解鎖。</div>
         <div class="parent-note parent-msg" id="parentMsg" role="status"></div>
       </div>
     </div>
@@ -3859,7 +3976,25 @@
       // 「狸」標輕聲只在「狐狸」裡才對（單獨的「狸」是 ㄌㄧˊ）；目前只有「小狐狸」用到
       "誰": "ㄕㄟˊ",
       "狐": "ㄏㄨˊ",
-      "狸": "˙ㄌㄧ"
+      "狸": "˙ㄌㄧ",
+      // M1d：護眼鎖定畫面、提示框（只有單字讀音，不標輕聲）
+      "休": "ㄒㄧㄡ",
+      "住": "ㄓㄨˋ",
+      "圈": "ㄑㄩㄢ",
+      "外": "ㄨㄞˋ",
+      "始": "ㄕˇ",
+      "媽": "ㄇㄚ",
+      "很": "ㄏㄣˇ",
+      "息": "ㄒㄧˊ",
+      "搓": "ㄘㄨㄛ",
+      "熱": "ㄖㄜˋ",
+      "爸": "ㄅㄚˋ",
+      "眨": "ㄓㄚˇ",
+      "睛": "ㄐㄧㄥ",
+      "護": "ㄏㄨˋ",
+      "跟": "ㄍㄣ",
+      "遠": "ㄩㄢˇ",
+      "鐘": "ㄓㄨㄥ"
     };
 
     // 解析注音字串：拆出輕聲(˙)、側邊聲調(ˊˇˋ)與注音本體符號
@@ -4002,7 +4137,10 @@
     // 答對後 250～500ms 才出現的過關（星星＋過關視窗）一律走這裡排程：
     // 換孩子時要取消，不然星星會記到下一位孩子身上、過關視窗蓋在新題目上（M1d 的 successPending 也用這組）
     const pendingSuccess = new Set();
+    // M1d：答對到過關視窗關掉之間都是 true（closeModal／hideModals 設回 false）；護眼要等它變回 false 才鎖
+    let successPending = false;
     function scheduleSuccess(fn, ms) {
+      successPending = true;
       const h = setTimeout(() => { pendingSuccess.delete(h); fn(); }, ms);
       pendingSuccess.add(h);
       return h;
@@ -4960,6 +5098,12 @@
 
     function closeModal() {
       Sound.click();
+      hideModals();
+    }
+
+    // 關掉所有視窗（不出聲）；護眼鎖、離開太久也用。不可以在這裡呼叫 switchMode（switchMode 會呼叫 closeModal，會無窮遞迴）
+    function hideModals() {
+      successPending = false;   // 過關視窗的三種關法（再來一題、✕、點背景）都會走到這裡
       const overlay = document.getElementById('modalOverlay');
       if (overlay) overlay.style.display = 'none';
       const modal = document.getElementById('successModal');
@@ -7260,16 +7404,17 @@
 
     // cancellable：點頭像打開的可以「不要換」；啟動時的不能取消
     function openChildPicker(cancellable) {
+      if (eyeLockShown()) return;   // 護眼鎖著：解鎖後 hideEyeLock 會依 awaitingPick 再問
       pickerCancellable = !!cancellable && !awaitingPick;   // 啟動時還沒選好：不能取消
       renderChildPicker();
       document.getElementById('childPickerModal').style.display = 'flex';
-      setPickerInert(true);
+      setPageInert(true);
       const first = document.querySelector('#childPickerList .child-pick-btn');
       if (first) first.focus();
     }
 
-    // 「誰要玩？」開著時背景不能用鍵盤（Tab／Enter）操作：頂端、題型按鈕、題目區、小熊都設 inert
-    function setPickerInert(on) {
+    // 「誰要玩？」或護眼鎖開著時背景不能用鍵盤（Tab／Enter）操作：頂端、題型按鈕、題目區、小熊都設 inert
+    function setPageInert(on) {
       document.querySelectorAll('header, .nav-tabs, .classroom-work-area, .teacher-bear-station').forEach(el => {
         if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
       });
@@ -7294,7 +7439,7 @@
 
     function closeChildPicker() {
       document.getElementById('childPickerModal').style.display = 'none';
-      setPickerInert(false);
+      setPageInert(false);
     }
 
     function cancelChildPicker() {
@@ -7330,11 +7475,55 @@
     // =========================================================================
     // ⚙️ 家長設定（M1c）：家長算式 → 換孩子、清空錯題本、把進度移給別的孩子（QM8）
     // =========================================================================
-    // 家長算式的狀態關掉視窗也保留（#35：關掉再打開不能重設冷卻、已錯次數）；答對才清掉、下次出新題
-    let parentGate = null;   // { a, b, tries, cooldownUntil }
+    // 家長算式（⚙️ 家長設定 parentGate、護眼解鎖 eyeGate）：每個表單各自的狀態，關掉視窗也保留
+    // （#35：關掉再打開不能重設冷卻、已錯次數）；答對才清掉、下次出新題。元素 id 是 key + 'Q'／'Input'／'Msg'
+    const gateStates = { parentGate: null, eyeGate: null };   // { a, b, tries, cooldownUntil }
 
-    function setParentGateMsg(text) { document.getElementById('parentGateMsg').textContent = text; }
+    function setGateMsg(key, text) { document.getElementById(key + 'Msg').textContent = text; }
     function setParentMsg(text) { document.getElementById('parentMsg').textContent = text; }
+
+    // 顯示這個表單的算式（沒有就出新題），回傳輸入框
+    function openGateForm(key) {
+      if (!gateStates[key]) {
+        const { a, b } = gateNew();
+        gateStates[key] = { a, b, tries: 0, cooldownUntil: 0 };
+      }
+      const gate = gateStates[key];
+      document.getElementById(key + 'Q').textContent = `${gate.a} + ${gate.b} = ?`;
+      const input = document.getElementById(key + 'Input');
+      input.value = '';
+      const wait = gate.cooldownUntil - Date.now();
+      setGateMsg(key, wait > 0 ? `請等 ${Math.ceil(wait / 1000)} 秒再試一次` : '');
+      return input;
+    }
+
+    function checkGateForm(key, onPass) {
+      const gate = gateStates[key];
+      if (!gate) return;
+      const input = document.getElementById(key + 'Input');
+      const now = Date.now();
+      const result = gateCheck(gate, input.value, now);
+      if (result === 'wait') {
+        setGateMsg(key, `請等 ${Math.ceil((gate.cooldownUntil - now) / 1000)} 秒再試一次`);
+        return;
+      }
+      input.value = '';
+      if (result === 'ok') {
+        gateStates[key] = null;
+        setGateMsg(key, '');
+        onPass();
+        return;
+      }
+      Sound.wrong();
+      if (result === 'reroll') {
+        const { a, b } = gateNew();
+        gateStates[key] = { a, b, tries: 0, cooldownUntil: Date.now() + GATE_COOLDOWN_MS };
+        document.getElementById(key + 'Q').textContent = `${a} + ${b} = ?`;
+        setGateMsg(key, `答錯 3 次，已經換一題。請等 ${GATE_COOLDOWN_MS / 1000} 秒再試。`);
+      } else {
+        setGateMsg(key, `答案不對喔（還可以再試 ${3 - gate.tries} 次）`);
+      }
+    }
 
     function showParentModal() {
       const overlay = document.getElementById('modalOverlay');
@@ -7344,48 +7533,14 @@
 
     function openParentSettings() {
       Sound.click();
-      if (!parentGate) {
-        const { a, b } = gateNew();
-        parentGate = { a, b, tries: 0, cooldownUntil: 0 };
-      }
       document.getElementById('parentGateBox').style.display = 'block';
       document.getElementById('parentSettingsBox').style.display = 'none';
-      document.getElementById('parentGateQ').textContent = `${parentGate.a} + ${parentGate.b} = ?`;
-      const input = document.getElementById('parentGateInput');
-      input.value = '';
-      const wait = parentGate.cooldownUntil - Date.now();
-      setParentGateMsg(wait > 0 ? `請等 ${Math.ceil(wait / 1000)} 秒再試一次` : '');
+      const input = openGateForm('parentGate');
       showParentModal();
       input.focus();
     }
 
-    function checkParentAnswer() {
-      const gate = parentGate;
-      if (!gate) return;
-      const input = document.getElementById('parentGateInput');
-      const now = Date.now();
-      const result = gateCheck(gate, input.value, now);
-      if (result === 'wait') {
-        setParentGateMsg(`請等 ${Math.ceil((gate.cooldownUntil - now) / 1000)} 秒再試一次`);
-        return;
-      }
-      input.value = '';
-      if (result === 'ok') {
-        parentGate = null;
-        setParentGateMsg('');
-        showParentSettings();
-        return;
-      }
-      Sound.wrong();
-      if (result === 'reroll') {
-        const { a, b } = gateNew();
-        parentGate = { a, b, tries: 0, cooldownUntil: Date.now() + GATE_COOLDOWN_MS };
-        document.getElementById('parentGateQ').textContent = `${a} + ${b} = ?`;
-        setParentGateMsg(`答錯 3 次，已經換一題。請等 ${GATE_COOLDOWN_MS / 1000} 秒再試。`);
-      } else {
-        setParentGateMsg(`答案不對喔（還可以再試 ${3 - gate.tries} 次）`);
-      }
-    }
+    function checkParentAnswer() { checkGateForm('parentGate', showParentSettings); }
 
     function showParentSettings() {
       document.getElementById('parentGateBox').style.display = 'none';
@@ -7406,6 +7561,7 @@
     }
 
     function renderParentSettings() {
+      renderEyeSettings();
       const p = readProfiles();
       const me = p.children.find(c => c.id === activeChildId) || p.children[0];
       const sel = document.getElementById('parentChildSelect');
@@ -7499,6 +7655,263 @@
     }
 
     // =========================================================================
+    // 👀 護眼（M1d）：跟小小邏輯探險家共用 little_logic_eyecare_v1（讀寫、合併用 family.js）
+    // 只算在題目畫面的時間：背景分頁、任何彈出視窗（過關、貼紙簿、衣帽間、家長設定…）、「誰要玩？」都不算（QM7b）
+    // 時間到了讓孩子做完手上這一題（寬限期）再鎖；提醒只顯示文字、不朗讀（QM1）
+    // =========================================================================
+    const EYE_EXERCISES = [
+      { icon: '🌳', text: '看看窗外最遠的地方', seconds: 20 },
+      { icon: '😉', text: '用力眨眨眼睛 10 下', seconds: 10 },
+      { icon: '👀', text: '眼睛慢慢轉一圈：上、右、下、左', seconds: 15 },
+      { icon: '🙌', text: '搓熱小手，輕輕蓋住眼睛', seconds: 15 }
+    ];
+
+    let eyeState = readStoredEye() || parseEyeState(null);
+    let eyeLastTick = performance.now();
+    let eyeOverSince = null;
+    let eyeWarned = false;
+    let eyeExerciseTimer = null;
+
+    // 合併別的分頁存的狀態（規則見 family.js 的 mergeEye）
+    function mergeStoredEye() {
+      const r = mergeEye(eyeState, readStoredEye());
+      eyeState = r.state;
+      if (r.reset) {
+        eyeOverSince = null;
+        eyeWarned = false;
+      }
+    }
+
+    function saveEyeState() {
+      mergeStoredEye();
+      safeSetItem(EYE_KEY, JSON.stringify(eyeState));
+    }
+
+    // 家長動作：直接以這個分頁的狀態為準
+    function saveEyeStateAsParent() {
+      eyeState.rev = Date.now();
+      safeSetItem(EYE_KEY, JSON.stringify(eyeState));
+    }
+
+    function eyeLimitMs() { return eyeState.limitMin * 60 * 1000; }
+    function eyeLockShown() { return document.getElementById('eyeLock').classList.contains('active'); }
+
+    // 題目畫面上沒有任何視窗才算時間（所有彈出視窗都會打開 #modalOverlay）
+    function eyePaused() {
+      if (awaitingPick || childPickerOpen()) return true;
+      const overlay = document.getElementById('modalOverlay');
+      return !!overlay && overlay.style.display === 'block';
+    }
+
+    let toastTimer = null;
+    function showToast(text) {
+      const box = document.getElementById('toastBox');
+      if (!box) return;
+      box.innerHTML = zy(text);
+      box.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => box.classList.remove('show'), 3200);
+    }
+
+    function eyeTick() {
+      const now = performance.now();
+      const elapsed = Math.min(now - eyeLastTick, 2000); // 裝置休眠回來不要一次加一大段
+      eyeLastTick = now;
+
+      if (eyeState.day !== todayKey()) {   // 新的一天重新計時（鎖住的話仍要家長解鎖）
+        eyeState.day = todayKey();
+        eyeState.usedMs = 0;
+        eyeOverSince = null;
+        eyeWarned = false;
+        saveEyeState();
+        updateEyeLockMinutes();
+      }
+      if (!eyeState.enabled || eyeState.locked) return;
+      if (document.visibilityState !== 'visible' || eyePaused()) return;
+
+      eyeState.usedMs += elapsed;
+      const left = eyeLimitMs() - eyeState.usedMs;
+      if (!eyeWarned && left > 0 && left <= EYE_WARN_MS) {
+        eyeWarned = true;
+        showToast('⏰ 再玩 1 分鐘，就要讓眼睛休息囉！');
+      }
+      if (left <= 0) {
+        if (eyeOverSince === null) {
+          eyeOverSince = now;
+          showToast('⏰ 時間到囉！做完這一題就要讓眼睛休息！');
+        } else if (now - eyeOverSince > EYE_GRACE_MS && !successPending && pendingSuccess.size === 0) {
+          lockEyes();   // 答對後還在等過關視窗（或視窗還開著）就先不鎖，關掉後下一秒才鎖
+        }
+      }
+      saveEyeState();
+      if (eyeState.locked) lockEyes();   // 別的分頁已經鎖住了
+    }
+
+    function updateEyeLockMinutes() {
+      document.getElementById('eyeLockMinutes').textContent = Math.floor(eyeState.usedMs / 60000);
+    }
+
+    // 鎖定畫面的固定文字（經過 zy()）
+    function renderEyeLockText() {
+      document.getElementById('eyeLockTitle').innerHTML = zy('👀 眼睛休息時間到囉！');
+      document.getElementById('eyeLockSubA').innerHTML = zy('這次已經玩了 ');
+      document.getElementById('eyeLockSubB').innerHTML = zy(' 分鐘，跟著做護眼小體操吧！');
+      document.getElementById('eyeParentLink').innerHTML = zy('🔒 家長解鎖');
+      document.getElementById('eyeGateLabel').innerHTML = zy('請家長算出答案：');
+      document.getElementById('eyeGateBtn').innerHTML = zy('解鎖');
+    }
+
+    // 鎖的順序：關掉進行中的紀錄（M2b：locked）→ 關掉所有視窗 → 顯示鎖定畫面
+    function lockEyes() {
+      const wasShown = eyeLockShown();
+      eyeState.locked = true;
+      saveEyeState();
+      if (wasShown) return;
+      // M2b：qlogClose('locked')
+      // 別的分頁鎖住時剛好在等過關視窗：不開視窗，但星星照樣記（只 +1）
+      for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();
+      if (childPickerOpen()) closeChildPicker();   // 啟動或離開太久的「誰要玩？」（awaitingPick）解鎖後再問；點頭像開的就不再開
+      hideModals();
+      setPageInert(true);
+      document.getElementById('eyeLock').classList.add('active');
+      updateEyeLockMinutes();
+      document.getElementById('eyeUnlockBox').style.display = 'none';
+      startEyeExercises();
+    }
+
+    function startEyeExercises() {
+      clearInterval(eyeExerciseTimer);
+      let step = 0;
+      let remaining = EYE_EXERCISES[0].seconds;
+      const show = () => {
+        const ex = EYE_EXERCISES[step];
+        document.getElementById('eyeExIcon').textContent = ex.icon;
+        document.getElementById('eyeExText').innerHTML = zy(ex.text);
+        document.getElementById('eyeExStep').innerHTML = zy(`第 ${step + 1} / ${EYE_EXERCISES.length} 個動作`);
+        document.getElementById('eyeExCount').textContent = remaining;
+      };
+      show();
+      eyeExerciseTimer = setInterval(() => {
+        remaining--;
+        if (remaining > 0) {
+          document.getElementById('eyeExCount').textContent = remaining;
+          return;
+        }
+        step++;
+        if (step >= EYE_EXERCISES.length) {
+          clearInterval(eyeExerciseTimer);
+          document.getElementById('eyeExIcon').textContent = '🌟';
+          document.getElementById('eyeExText').innerHTML = zy('做得很好！請爸爸媽媽來解鎖');
+          document.getElementById('eyeExStep').textContent = '';
+          document.getElementById('eyeExCount').textContent = '';
+          return;
+        }
+        remaining = EYE_EXERCISES[step].seconds;
+        show();
+      }, 1000);
+    }
+
+    function showEyeUnlock() {
+      Sound.click();
+      document.getElementById('eyeUnlockBox').style.display = 'block';
+      openGateForm('eyeGate').focus();
+    }
+
+    function checkEyeAnswer() { checkGateForm('eyeGate', unlockEyes); }
+
+    function unlockEyes() {
+      eyeState.locked = false;
+      eyeState.usedMs = 0;
+      eyeOverSince = null;
+      eyeWarned = false;
+      saveEyeStateAsParent();
+      hideEyeLock();
+      showToast('🔓 已解鎖，重新開始計時');
+    }
+
+    // 解鎖（這一頁的家長解鎖，或別的分頁解鎖）：還在等「誰要玩？」就先問，否則出新的一題
+    function hideEyeLock() {
+      clearInterval(eyeExerciseTimer);
+      setPageInert(false);
+      document.getElementById('eyeLock').classList.remove('active');
+      if (awaitingPick) openChildPicker(false);
+      else switchMode(currentMode);
+    }
+
+    // ⚙️ 家長設定裡的護眼（跟邏輯遊戲同一個設定）
+    function renderEyeSettings() {
+      document.getElementById('parentEyeToggle').textContent = eyeState.enabled ? '✅ 開啟中（按一下關閉）' : '⛔ 已關閉（按一下開啟）';
+      const sel = document.getElementById('parentEyeLimit');
+      sel.textContent = '';
+      for (const min of EYE_LIMITS) {
+        const o = document.createElement('option');
+        o.value = String(min);
+        o.textContent = min + ' 分鐘';
+        o.selected = min === eyeState.limitMin;
+        sel.append(o);
+      }
+      sel.disabled = !eyeState.enabled;
+      document.getElementById('parentEyeUsed').textContent = Math.floor(eyeState.usedMs / 60000);
+    }
+
+    function toggleEyeCare() {
+      Sound.click();
+      eyeState.enabled = !eyeState.enabled;
+      saveEyeStateAsParent();
+      renderEyeSettings();
+    }
+
+    function setEyeLimit(min) {
+      if (!EYE_LIMITS.includes(min)) return;
+      Sound.click();
+      eyeState.limitMin = min;
+      eyeOverSince = null;
+      eyeWarned = false;
+      saveEyeStateAsParent();
+      renderEyeSettings();
+    }
+
+    function resetEyeTimer() {
+      Sound.click();
+      eyeState.usedMs = 0;
+      eyeOverSince = null;
+      eyeWarned = false;
+      saveEyeStateAsParent();
+      renderEyeSettings();
+      showToast('⏱️ 已重新計時');
+    }
+
+    // 離開超過 10 分鐘回來（條件同邏輯遊戲）：「誰要玩？」開著、2 位以上孩子 → 先問，選好（就算同一位）才出新題
+    function handleAway() {
+      const p = readProfiles();
+      const seen = lastSeenAt();
+      markSeen();
+      if (!p.askOnOpen || p.children.length < 2 || seen === 0 || Date.now() - seen <= AWAY_MS) return;
+      if (awaitingPick) return;   // 已經在等「誰要玩？」
+      // M2b：qlogClose('away')
+      for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();   // 還沒出現的過關：星星照記、不開視窗
+      if (childPickerOpen()) closeChildPicker();   // 點頭像開的（可以取消）換成不能取消的
+      hideModals();
+      awaitingPick = true;
+      openChildPicker(false);   // 護眼鎖著時不會開，解鎖後 hideEyeLock 再問
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      eyeLastTick = performance.now();
+      if (document.visibilityState === 'hidden') { markSeen(); saveEyeState(); }   // 記下「離開的時間」（邏輯遊戲也看這個 key）
+      else handleAway();
+    });
+
+    // 別的分頁（邏輯遊戲或另一個數學樂園）鎖住或解鎖時，這個分頁跟著改；解鎖後出新的一題
+    window.addEventListener('storage', e => {
+      if (e.key !== EYE_KEY) return;
+      mergeStoredEye();
+      if (eyeState.locked && !eyeLockShown()) lockEyes();
+      else if (!eyeState.locked && eyeLockShown()) hideEyeLock();
+      if (parentSettingsShown()) renderEyeSettings();
+    });
+
+    // =========================================================================
     // 🚀 初始化啟動 (所有變數與模組就緒後執行)
     // =========================================================================
     // 讀孩子名單 → 載入這位孩子的進度 → 最後才出題
@@ -7510,14 +7923,16 @@
     CheckinBook.updateBadge();
     MistakeBook.updateBadge();
     renderChildAvatar();
-    // 「誰要玩？」開著（而且有 2 位以上孩子）→ 選好孩子之前不出題；M1d：護眼鎖著 → 解鎖後才往下
+    renderEyeLockText();
+    markSeen();   // 啟動時記下「現在在看」；離開太久只在從背景回來時判斷
+    // 護眼鎖著 → 先鎖，解鎖後（hideEyeLock）才問「誰要玩？」或出題
+    // 「誰要玩？」開著（而且有 2 位以上孩子）→ 選好孩子之前不出題
     const startProfiles = readProfiles();
-    if (startProfiles.askOnOpen && startProfiles.children.length >= 2) {
-      awaitingPick = true;
-      openChildPicker(false);
-    } else {
-      switchMode(1);
-    }
+    if (startProfiles.askOnOpen && startProfiles.children.length >= 2) awaitingPick = true;
+    if (eyeState.locked) lockEyes();
+    else if (awaitingPick) openChildPicker(false);
+    else switchMode(1);
+    setInterval(eyeTick, 1000);
   </script>
 
 </body>
