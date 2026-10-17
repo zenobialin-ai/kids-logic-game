@@ -592,6 +592,7 @@ function qlogReportStats(base, childId) {
     st.subs.push({
       sub, kept: rs.length, dropped: dr, src, out, aid, own,
       firsts: firsts.length, firstOk: firsts.filter(r => r.firstAnswer && r.firstAnswer.ok).length,
+      firstStepper: firsts.filter(r => r.form === 'stepper').length,   // 天平只用 +1／−1 調到平衡：沒有「第一次作答」
       p: ps.length ? qlogMedian(ps) : null,
       t1: t1.length ? qlogMedian(t1) : null,
       during: during.length,
@@ -632,6 +633,7 @@ function qlogReportSection(st) {
     L.push('  來源：' + qlogDist(s.src, QLOG_SOURCE_LABEL));
     L.push('  結果：' + qlogDist(s.out, QLOG_OUTCOME_LABEL) + (s.out.ongoing ? '／進行中 ' + s.out.ongoing : ''));
     L.push('  第一次遇到的題目中，第一次就答對：' + s.firstOk + ' 題（第一次遇到的共 ' + s.firsts + ' 題）');
+    if (s.firstStepper) L.push('  （其中 ' + s.firstStepper + ' 題是只用 +1／−1 調到平衡，沒有點選答案）');
     if (s.p !== null) L.push('  隨機作答的答對機率（中位數）：' + qlogP(s.p));
     if (s.t1 !== null) L.push('  第一次作答前的時間（中位數，已扣掉離開畫面的時間）：' + qlogSec(s.t1));
     if (s.during) {
