@@ -2264,11 +2264,11 @@
 
 
     /* =========================================================================
-       平板直放、橫拿手機、小筆電（1100px 以下）：木托盤旁邊放不下小熊老師，
+       平板、橫拿手機、小筆電（1240px 以下）：木托盤旁邊放不下小熊老師，
        托盤會被擠到很窄（題目變成一字一行、串珠跑出托盤）。
        改成小熊在上、托盤在下，小熊縮成一列（左邊小熊、右邊對話），不把題目擠到很下面。
        ========================================================================= */
-    @media (max-width: 1100px) {
+    @media (max-width: 1240px) {
       .classroom-work-area {
         flex-direction: column-reverse;
         align-items: stretch;
@@ -2324,6 +2324,16 @@
     /* 困難題的串珠比較長，算式列放不下時換行（桌機上小熊旁邊的托盤也可能放不下） */
     .math-formula-box { flex-wrap: wrap; }
 
+    /* 桌機（托盤在小熊旁邊）：先縮小間距和內距，一般題目仍排成一行，
+       不要把「❓」單獨擠到下一行 */
+    @media (min-width: 1241px) {
+      .math-formula-box {
+        gap: clamp(12px, 1.4vw, 28px);
+        padding-left: clamp(12px, 1.4vw, 32px);
+        padding-right: clamp(12px, 1.4vw, 32px);
+      }
+    }
+
     /* 教學視窗裡的長網址不要撐破手機畫面 */
     .device-modal code { overflow-wrap: anywhere; }
 
@@ -2344,6 +2354,24 @@
       .teacher-bear-station { gap: 4px 10px; padding: 10px 12px; }
       .mascot-figure-box { width: 100px; height: 120px; }
       .mascot-svg { width: 96px; height: 114px; }
+    }
+
+    /* 對話泡泡放在小熊旁邊會太窄（一行兩三個字），改成自己一整行 */
+    @media (max-width: 640px) {
+      .teacher-bear-station {
+        grid-template-areas:
+          "bear badge"
+          "bear dress"
+          "bubble bubble";
+      }
+    }
+
+    /* 很窄的手機：困難題的串珠排不進托盤，珠子再小一點 */
+    @media (max-width: 360px) {
+      .bead {
+        width: 5.6vw;
+        height: 5.6vw;
+      }
     }
   </style>
 </head>
@@ -2660,6 +2688,9 @@
             <!-- 3. 小熊身體服裝插槽 (吊帶褲、水手服、洋裝、西裝、道服) -->
             <g id="bearBodyCostume"></g>
 
+            <!-- 長筒靴：靴筒比身體下緣高，要畫在身體前面才看得到 -->
+            <g id="bearFeetFrontCostume"></g>
+
             <!-- 蒙特梭利紅色小領結 -->
             <g id="bowTie">
               <polygon points="61,77 70,81 61,85" fill="#e53935" stroke="#b71c1c" stroke-width="1"/>
@@ -2834,8 +2865,12 @@
         '耀': 'ㄧㄠˋ',
         '耳': 'ㄦˇ',
         '聖': 'ㄕㄥˋ',
-        '背': 'ㄅㄧˋ',
-        '胸': 'ㄒㄧㄨㄥ',
+        '背': 'ㄅㄟˋ',
+        '胸': 'ㄒㄩㄥ',
+        '哇': 'ㄨㄚ',
+        '謝': 'ㄒㄧㄝˋ',
+        '件': 'ㄐㄧㄢˋ',
+        '它': 'ㄊㄚ',
         '舒': 'ㄕㄨ',
         '船': 'ㄔㄨㄢˊ',
         '芒': 'ㄇㄤˊ',
@@ -4688,12 +4723,12 @@
             items: [
         // --- 1. 頭飾與帽子 (Head Slot - 共 14 款) ---
         { id: 'pinkbow', name: '甜心粉紅蝴蝶結', icon: '🎀', cost: 0, slot: 'head', desc: '軟萌可愛的粉紅小蝴蝶結' },
-        { id: 'bunny_ears', name: '萌萌小兔耳髮箍', icon: '🐰', cost: 4, slot: 'head', desc: '粉白相間的毛茸茸兔子耳朵髮箍' },
+        { id: 'bunny_ears', name: '萌萌小兔耳髮箍', icon: '🐰', cost: 4, slot: 'head', desc: '粉白兩色的毛茸茸兔子耳朵髮箍' },
         { id: 'sunhat', name: '悠閒小草帽', icon: '👒', cost: 4, slot: 'head', desc: '遮陽防曬的夏日編織草帽' },
         { id: 'crown', name: '國王金皇冠', icon: '👑', cost: 6, slot: 'head', desc: '金光閃閃的皇家尊貴小皇冠' },
         { id: 'flower_wreath', name: '繽紛春日花環', icon: '🌸', cost: 6, slot: 'head', desc: '盛開粉紅小花與綠葉的春天花冠' },
         { id: 'glasses', name: '酷炫小墨鏡', icon: '🕶️', cost: 8, slot: 'head', desc: '帥氣又時髦的小黑超墨鏡' },
-        { id: 'pirate_hat', name: '冒險海盜雙角帽', icon: '🏴‍☠️', cost: 9, slot: 'head', desc: '帥氣威風的黑色海盜船長帽子' },
+        { id: 'pirate_hat', name: '冒險海盜雙角帽', icon: '🏴‍☠️', cost: 9, slot: 'head', desc: '帥氣威風的黑色海盜帽子' },
         { id: 'chefhat', name: '甜點小廚師帽', icon: '👨‍🍳', cost: 10, slot: 'head', desc: '蓬鬆潔白的高高廚師帽' },
         { id: 'santa_hat', name: '聖誕暖暖紅毛帽', icon: '🎅', cost: 10, slot: 'head', desc: '冬天最應景的白色毛球紅毛帽' },
         { id: 'wizard', name: '星月魔法帽', icon: '🧙', cost: 12, slot: 'head', desc: '充滿智慧的星月魔法高帽' },
@@ -4812,6 +4847,8 @@
         const backG = document.getElementById('bearBackCostume');
         const bodyG = document.getElementById('bearBodyCostume');
         const feetG = document.getElementById('bearFeetCostume');
+        const feetFrontG = document.getElementById('bearFeetFrontCostume');
+        if (feetFrontG) feetFrontG.innerHTML = '';
         const frontG = document.getElementById('bearFrontCostume');
         const bowTieG = document.getElementById('bowTie');
 
@@ -4904,27 +4941,29 @@
               </g>
             `;
           } else if (feet === 'boots_fur') {
-            feetG.innerHTML = `
+            feetG.innerHTML = '';
+            if (feetFrontG) feetFrontG.innerHTML = `
               <g class="costume-boots-fur">
-                <!-- 左雪地靴 -->
-                <path d="M35,133 L58,133 L58,148 Q47,151 34,148 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
-                <rect x="33" y="130" width="27" height="6" rx="3" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
+                <!-- 左雪地靴（整個蓋住腳掌，白色毛邊在身體前面） -->
+                <path d="M32,137 L64,137 L64,152 Q48,158 32,152 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
+                <rect x="30" y="132" width="36" height="7" rx="3.5" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
                 <!-- 右雪地靴 -->
-                <path d="M82,133 L105,133 L106,148 Q93,151 82,148 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
-                <rect x="80" y="130" width="27" height="6" rx="3" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
+                <path d="M76,137 L108,137 L108,152 Q92,158 76,152 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
+                <rect x="74" y="132" width="36" height="7" rx="3.5" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
               </g>
             `;
           } else if (feet === 'golden_boots') {
-            feetG.innerHTML = `
+            feetG.innerHTML = '';
+            if (feetFrontG) feetFrontG.innerHTML = `
               <g class="costume-golden-boots">
-                <!-- 左金靴 -->
-                <path d="M35,133 L58,133 L58,148 Q47,152 33,148 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
-                <circle cx="47" cy="141" r="2.5" fill="#e91e63"/>
-                <line x1="36" y1="138" x2="57" y2="138" stroke="#ffecb3" stroke-width="1.5"/>
+                <!-- 左金靴（整個蓋住腳掌，條紋和寶石在身體前面） -->
+                <path d="M32,134 L64,134 L65,152 Q48,158 31,152 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
+                <line x1="33" y1="140" x2="63" y2="140" stroke="#ffecb3" stroke-width="2"/>
+                <circle cx="48" cy="147" r="3" fill="#e91e63" stroke="#ad1457" stroke-width="0.8"/>
                 <!-- 右金靴 -->
-                <path d="M82,133 L105,133 L107,148 Q93,152 82,148 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
-                <circle cx="93" cy="141" r="2.5" fill="#e91e63"/>
-                <line x1="83" y1="138" x2="104" y2="138" stroke="#ffecb3" stroke-width="1.5"/>
+                <path d="M76,134 L108,134 L109,152 Q92,158 75,152 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
+                <line x1="77" y1="140" x2="107" y2="140" stroke="#ffecb3" stroke-width="2"/>
+                <circle cx="92" cy="147" r="3" fill="#e91e63" stroke="#ad1457" stroke-width="0.8"/>
               </g>
             `;
           } else {
@@ -5051,7 +5090,6 @@
                 <!-- 蜂蜜罐圖案 -->
                 <ellipse cx="70" cy="116" rx="6" ry="5" fill="#ffa726"/>
                 <rect x="66" y="110" width="8" height="3" rx="1" fill="#8d6e63"/>
-                <text x="70" y="119" font-size="6" text-anchor="middle" fill="#ffffff" font-weight="bold">HONEY</text>
               </g>
             `;
           } else if (body === 'knight_armor') {
@@ -5279,9 +5317,9 @@
           const bodyItem = this.items.find(i => i.id === data.equipped.body);
           const feetItem = this.items.find(i => i.id === data.equipped.feet);
           summaryBox.innerHTML = `
-            <span>🎩 頭部：<b>${headItem ? headItem.name : '未穿戴'}</b></span>
-            <span>👗 身體：<b>${bodyItem ? bodyItem.name : '未穿戴'}</b></span>
-            <span>👟 腳部：<b>${feetItem ? feetItem.name : '未穿戴'}</b></span>
+            <span>🎩 ${zy('頭部')}：<b>${zy(headItem ? headItem.name : '未穿戴')}</b></span>
+            <span>👗 ${zy('身體')}：<b>${zy(bodyItem ? bodyItem.name : '未穿戴')}</b></span>
+            <span>👟 ${zy('腳部')}：<b>${zy(feetItem ? feetItem.name : '未穿戴')}</b></span>
           `;
         }
 
