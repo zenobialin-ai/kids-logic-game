@@ -1619,6 +1619,9 @@
       .brand-icon { font-size: 26px; }
       /* #28：加了注音字距後標題變寬，放不下時讓標題換行，不要把右邊的按鈕擠出畫面 */
       .brand { min-width: 0; }
+      /* 標題列：關卡標籤（例如「誰是神秘怪獸」）放不下時換行，朗讀鈕才不會被擠出卡片 */
+      .game-title-box { min-width: 0; }
+      html:not(.fs-large) .level-badge { white-space: normal; }
       .brand-title { font-size: 15px; white-space: normal; }
       .header-stats { gap: 4px; flex-shrink: 0; }
       .sync-btn .btn-label { display: none; }   /* 只留圖示，標題才放得下 */
@@ -1681,7 +1684,6 @@
     /* #28：注音字距加大後，窄螢幕放不下的長標籤（「誰是神秘怪獸」）和推理的檢查按鈕要能換行，
        不然朗讀鈕會被擠出卡片、按鈕會比卡片寬。字級「大」時 378px 也會發生，所以範圍到 420px */
     @media (max-width: 420px) {
-      html:not(.fs-large) .level-badge { white-space: normal; }
       #view-deduction .btn-run, #view-maze .btn-run { white-space: normal; max-width: 100%; }
       .font-size-ctrl { flex-wrap: wrap; justify-content: center; }
     }
