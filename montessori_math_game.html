@@ -2691,6 +2691,88 @@
     // 臺灣教育部標準注音字典 (100% 完整涵蓋)
     // =========================================================================
     const ZhuyinMap = {
+        '俏': 'ㄑㄧㄠˋ',
+        '典': 'ㄉㄧㄢˇ',
+        '冒': 'ㄇㄠˋ',
+        '冬': 'ㄉㄨㄥ',
+        '厚': 'ㄏㄡˋ',
+        '呼': 'ㄏㄨ',
+        '咖': 'ㄎㄚ',
+        '啡': 'ㄈㄟ',
+        '圍': 'ㄨㄟˊ',
+        '圖': 'ㄊㄨˊ',
+        '地': 'ㄉㄧˋ',
+        '夜': 'ㄧㄝˋ',
+        '套': 'ㄊㄠˋ',
+        '室': 'ㄕˋ',
+        '寒': 'ㄏㄢˊ',
+        '尖': 'ㄐㄧㄢ',
+        '居': 'ㄐㄩ',
+        '底': 'ㄉㄧˇ',
+        '徽': 'ㄏㄨㄟ',
+        '恐': 'ㄎㄨㄥˇ',
+        '應': 'ㄧㄥˋ',
+        '拖': 'ㄊㄨㄛ',
+        '推': 'ㄊㄨㄟ',
+        '春': 'ㄔㄨㄣ',
+        '景': 'ㄐㄧㄥˇ',
+        '暖': 'ㄋㄨㄢˇ',
+        '朵': 'ㄉㄨㄛˇ',
+        '柔': 'ㄖㄡˊ',
+        '格': 'ㄍㄜˊ',
+        '毛': 'ㄇㄠˊ',
+        '河': 'ㄏㄜˊ',
+        '溜': 'ㄌㄧㄡ',
+        '溫': 'ㄨㄣ',
+        '烘': 'ㄏㄨㄥ',
+        '焙': 'ㄅㄟˋ',
+        '爪': 'ㄓㄨㄚˇ',
+        '獵': 'ㄌㄧㄝˋ',
+        '璀': 'ㄘㄨㄟˇ',
+        '璨': 'ㄘㄢˋ',
+        '環': 'ㄏㄨㄢˊ',
+        '甲': 'ㄐㄧㄚˇ',
+        '皮': 'ㄆㄧˊ',
+        '盛': 'ㄕㄥˋ',
+        '盜': 'ㄉㄠˋ',
+        '盾': 'ㄉㄨㄣˋ',
+        '眼': 'ㄧㄢˇ',
+        '睡': 'ㄕㄨㄟˋ',
+        '短': 'ㄉㄨㄢˇ',
+        '箍': 'ㄍㄨ',
+        '簷': 'ㄧㄢˊ',
+        '紋': 'ㄨㄣˊ',
+        '紛': 'ㄈㄣ',
+        '絨': 'ㄖㄨㄥˊ',
+        '綴': 'ㄓㄨㄟˋ',
+        '綿': 'ㄇㄧㄢˊ',
+        '繽': 'ㄅㄧㄣ',
+        '罐': 'ㄍㄨㄢˋ',
+        '耀': 'ㄧㄠˋ',
+        '耳': 'ㄦˇ',
+        '聖': 'ㄕㄥˋ',
+        '背': 'ㄅㄧˋ',
+        '胸': 'ㄒㄧㄨㄥ',
+        '舒': 'ㄕㄨ',
+        '船': 'ㄔㄨㄢˊ',
+        '芒': 'ㄇㄤˊ',
+        '茸': 'ㄖㄨㄥˊ',
+        '荷': 'ㄏㄜˊ',
+        '葉': 'ㄧㄝˋ',
+        '蜂': 'ㄈㄥ',
+        '蜜': 'ㄇㄧˋ',
+        '袍': 'ㄆㄠˊ',
+        '誕': 'ㄉㄢˋ',
+        '輪': 'ㄌㄨㄣˊ',
+        '邃': 'ㄙㄨㄟˋ',
+        '雪': 'ㄒㄩㄝˇ',
+        '領': 'ㄌㄧㄥˇ',
+        '騎': 'ㄑㄧˊ',
+        '髮': 'ㄈㄚˇ',
+        '鮮': 'ㄒㄧㄢ',
+        '鰭': 'ㄑㄧˊ',
+        '鹿': 'ㄌㄨˋ',
+        '麂': 'ㄐㄧˇ',
       "今": ["ㄐ", "ㄧ", "ㄣ", ""],
       "博": ["ㄅ", "ㄛ", "ˊ"],
       "印": ["ㄧ", "ㄣ", "ˋ"],
@@ -4520,29 +4602,45 @@
     const Wardrobe = {
       key: 'montessori_wardrobe',
       filter: 'all',
-      items: [
-        // --- 1. 頭飾與帽子 (Head Slot) ---
+            items: [
+        // --- 1. 頭飾與帽子 (Head Slot - 共 14 款) ---
         { id: 'pinkbow', name: '甜心粉紅蝴蝶結', icon: '🎀', cost: 0, slot: 'head', desc: '軟萌可愛的粉紅小蝴蝶結' },
+        { id: 'bunny_ears', name: '萌萌小兔耳髮箍', icon: '🐰', cost: 4, slot: 'head', desc: '粉白相間的毛茸茸兔子耳朵髮箍' },
         { id: 'sunhat', name: '悠閒小草帽', icon: '👒', cost: 4, slot: 'head', desc: '遮陽防曬的夏日編織草帽' },
         { id: 'crown', name: '國王金皇冠', icon: '👑', cost: 6, slot: 'head', desc: '金光閃閃的皇家尊貴小皇冠' },
+        { id: 'flower_wreath', name: '繽紛春日花環', icon: '🌸', cost: 6, slot: 'head', desc: '盛開粉紅小花與綠葉的春天花冠' },
         { id: 'glasses', name: '酷炫小墨鏡', icon: '🕶️', cost: 8, slot: 'head', desc: '帥氣又時髦的小黑超墨鏡' },
+        { id: 'pirate_hat', name: '冒險海盜雙角帽', icon: '🏴‍☠️', cost: 9, slot: 'head', desc: '帥氣威風的黑色海盜船長帽子' },
         { id: 'chefhat', name: '甜點小廚師帽', icon: '👨‍🍳', cost: 10, slot: 'head', desc: '蓬鬆潔白的高高廚師帽' },
+        { id: 'santa_hat', name: '聖誕暖暖紅毛帽', icon: '🎅', cost: 10, slot: 'head', desc: '冬天最應景的白色毛球紅毛帽' },
         { id: 'wizard', name: '星月魔法帽', icon: '🧙', cost: 12, slot: 'head', desc: '充滿智慧的星月魔法高帽' },
+        { id: 'dino_hood', name: '俏皮恐龍頭套', icon: '🦖', cost: 14, slot: 'head', desc: '綠色尖尖背鰭的可愛小恐龍帽' },
         { id: 'graduate', name: '小博士學位帽', icon: '🎓', cost: 15, slot: 'head', desc: '博學多聞的博士四角帽' },
+        { id: 'detective_hat', name: '神探格紋獵鹿帽', icon: '🕵️', cost: 16, slot: 'head', desc: '充滿推理智慧的英倫經典雙簷帽' },
         { id: 'astronaut', name: '太空探險鏡', icon: '👨‍🚀', cost: 20, slot: 'head', desc: '探索浩瀚宇宙的星際頭盔' },
 
-        // --- 2. 衣服與洋裝 (Body Slot) ---
+        // --- 2. 衣服與洋裝 (Body Slot - 共 12 款) ---
         { id: 'overalls', name: '藍色小吊帶褲', icon: '👖', cost: 3, slot: 'body', desc: '元氣滿滿的丹寧牛仔吊帶褲' },
+        { id: 'strawberry_dress', name: '甜心草莓洋裝', icon: '🍓', cost: 5, slot: 'body', desc: '綴滿鮮紅小草莓的可愛荷葉邊短裙' },
         { id: 'sailor', name: '蔚藍海軍水手服', icon: '⛵', cost: 7, slot: 'body', desc: '精神抖擻的清爽水手服' },
+        { id: 'pajamas', name: '藍天星星睡衣', icon: '🌙', cost: 8, slot: 'body', desc: '柔軟舒服印著滿天小星星的居家睡衣' },
+        { id: 'honey_apron', name: '甜蜜蜂蜜小圍裙', icon: '🍯', cost: 10, slot: 'body', desc: '印有蜂蜜罐圖案的嫩黃烘焙圍裙' },
         { id: 'princess', name: '夢幻粉紅公主洋裝', icon: '👗', cost: 11, slot: 'body', desc: '蕾絲花邊的優雅公主長裙' },
         { id: 'tuxedo', name: '英倫紳士西裝', icon: '🤵', cost: 14, slot: 'body', desc: '帥氣優雅的黑色西裝晚禮服' },
+        { id: 'knight_armor', name: '勇敢銀光騎士甲', icon: '🛡️', cost: 15, slot: 'body', desc: '胸前閃耀金色十字盾徽的銀色盔甲' },
         { id: 'cape', name: '超人飛行紅披風', icon: '🦸', cost: 16, slot: 'body', desc: '神勇威風的紅色超人披風' },
+        { id: 'magical_robe', name: '璀璨星河魔法袍', icon: '🌌', cost: 17, slot: 'body', desc: '閃爍深邃紫色夜空光芒的魔法師長袍' },
         { id: 'kungfu', name: '正氣功夫道服', icon: '🥋', cost: 18, slot: 'body', desc: '帥氣俐落的太極武術道服' },
+        { id: 'winter_coat', name: '暖呼呼雪花大衣', icon: '🧥', cost: 19, slot: 'body', desc: '紅色針織白色毛領的溫暖冬天大衣' },
 
-        // --- 3. 可愛鞋子 (Feet Slot) ---
+        // --- 3. 可愛鞋子 (Feet Slot - 共 7 款) ---
         { id: 'sneakers', name: '活力小紅球鞋', icon: '👟', cost: 5, slot: 'feet', desc: '健步如飛的運動防滑球鞋' },
+        { id: 'roller_skates', name: '炫彩輪滑溜冰鞋', icon: '🛼', cost: 7, slot: 'feet', desc: '底部裝有滑溜小輪子的酷炫運動溜冰鞋' },
+        { id: 'dino_slippers', name: '軟綿綿恐龍爪拖鞋', icon: '🐾', cost: 8, slot: 'feet', desc: '有三顆白色爪子的綠色絨毛室內拖鞋' },
         { id: 'rainboots', name: '亮黃防水雨靴', icon: '👢', cost: 9, slot: 'feet', desc: '雨天踩水窪的亮黃色膠靴' },
-        { id: 'ballet', name: '夢幻芭蕾舞鞋', icon: '🩰', cost: 13, slot: 'feet', desc: '輕盈旋轉的粉嫩芭蕾緞帶舞鞋' }
+        { id: 'boots_fur', name: '暖心毛邊雪地靴', icon: '🥾', cost: 11, slot: 'feet', desc: '咖啡色麂皮加上厚厚白色毛邊的防寒雪靴' },
+        { id: 'ballet', name: '夢幻芭蕾舞鞋', icon: '🩰', cost: 13, slot: 'feet', desc: '輕盈旋轉的粉嫩芭蕾緞帶舞鞋' },
+        { id: 'golden_boots', name: '皇家閃亮小金靴', icon: '✨', cost: 15, slot: 'feet', desc: '閃耀耀眼金光的尊貴小皮靴' }
       ],
       load() {
         try {
@@ -4626,7 +4724,7 @@
         this.applyToMascot();
         this.render();
       },
-      applyToMascot() {
+            applyToMascot() {
         const data = this.load();
         const backG = document.getElementById('bearBackCostume');
         const bodyG = document.getElementById('bearBodyCostume');
@@ -4692,6 +4790,60 @@
                 <circle cx="92" cy="133" r="2.2" fill="#e91e63"/>
               </g>
             `;
+          } else if (feet === 'roller_skates') {
+            feetG.innerHTML = `
+              <g class="costume-roller-skates">
+                <!-- 左溜冰鞋 -->
+                <path d="M36,134 L58,134 L58,148 L34,148 Z" fill="#00bcd4" stroke="#00838f" stroke-width="1.5"/>
+                <rect x="34" y="147" width="26" height="3" fill="#37474f" rx="1"/>
+                <circle cx="39" cy="153" r="3.5" fill="#ff4081" stroke="#c2185b" stroke-width="1"/>
+                <circle cx="55" cy="153" r="3.5" fill="#ff4081" stroke="#c2185b" stroke-width="1"/>
+                <!-- 右溜冰鞋 -->
+                <path d="M82,134 L104,134 L106,148 L82,148 Z" fill="#00bcd4" stroke="#00838f" stroke-width="1.5"/>
+                <rect x="80" y="147" width="26" height="3" fill="#37474f" rx="1"/>
+                <circle cx="85" cy="153" r="3.5" fill="#ff4081" stroke="#c2185b" stroke-width="1"/>
+                <circle cx="101" cy="153" r="3.5" fill="#ff4081" stroke="#c2185b" stroke-width="1"/>
+              </g>
+            `;
+          } else if (feet === 'dino_slippers') {
+            feetG.innerHTML = `
+              <g class="costume-dino-slippers">
+                <!-- 左恐龍爪拖鞋 -->
+                <ellipse cx="46" cy="144" rx="15" ry="9" fill="#4caf50" stroke="#2e7d32" stroke-width="1.5"/>
+                <path d="M33,148 L31,154 L36,151 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+                <path d="M40,150 L40,157 L44,152 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+                <path d="M48,149 L50,155 L53,150 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+                <!-- 右恐龍爪拖鞋 -->
+                <ellipse cx="94" cy="144" rx="15" ry="9" fill="#4caf50" stroke="#2e7d32" stroke-width="1.5"/>
+                <path d="M87,149 L84,155 L89,150 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+                <path d="M96,150 L96,157 L100,152 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+                <path d="M104,148 L107,154 L102,151 Z" fill="#ffffff" stroke="#2e7d32" stroke-width="0.8"/>
+              </g>
+            `;
+          } else if (feet === 'boots_fur') {
+            feetG.innerHTML = `
+              <g class="costume-boots-fur">
+                <!-- 左雪地靴 -->
+                <path d="M35,133 L58,133 L58,148 Q47,151 34,148 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
+                <rect x="33" y="130" width="27" height="6" rx="3" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
+                <!-- 右雪地靴 -->
+                <path d="M82,133 L105,133 L106,148 Q93,151 82,148 Z" fill="#8d6e63" stroke="#5d4037" stroke-width="1.5"/>
+                <rect x="80" y="130" width="27" height="6" rx="3" fill="#ffffff" stroke="#d7ccc8" stroke-width="1"/>
+              </g>
+            `;
+          } else if (feet === 'golden_boots') {
+            feetG.innerHTML = `
+              <g class="costume-golden-boots">
+                <!-- 左金靴 -->
+                <path d="M35,133 L58,133 L58,148 Q47,152 33,148 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
+                <circle cx="47" cy="141" r="2.5" fill="#e91e63"/>
+                <line x1="36" y1="138" x2="57" y2="138" stroke="#ffecb3" stroke-width="1.5"/>
+                <!-- 右金靴 -->
+                <path d="M82,133 L105,133 L107,148 Q93,152 82,148 Z" fill="#ffd700" stroke="#b78103" stroke-width="1.5"/>
+                <circle cx="93" cy="141" r="2.5" fill="#e91e63"/>
+                <line x1="83" y1="138" x2="104" y2="138" stroke="#ffecb3" stroke-width="1.5"/>
+              </g>
+            `;
           } else {
             feetG.innerHTML = '';
           }
@@ -4701,7 +4853,7 @@
         if (bodyG) {
           const body = data.equipped.body;
           if (bowTieG) {
-            bowTieG.style.display = (body === 'sailor' || body === 'tuxedo' || body === 'princess' || body === 'kungfu') ? 'none' : 'block';
+            bowTieG.style.display = (['sailor', 'tuxedo', 'princess', 'kungfu', 'strawberry_dress', 'pajamas', 'honey_apron', 'knight_armor', 'magical_robe', 'winter_coat'].includes(body)) ? 'none' : 'block';
           }
           if (body === 'overalls') {
             bodyG.innerHTML = `
@@ -4753,6 +4905,12 @@
                 <path d="M 60 120 Q 70 126 78 122" stroke="#fbc02d" stroke-width="1.8" fill="none"/>
               </g>
             `;
+          } else if (body === 'cape') {
+            bodyG.innerHTML = `
+              <g class="costume-cape-front">
+                <polygon points="70,88 66,98 72,98 68,108 76,96 70,96" fill="#ffeb3b" stroke="#fbc02d" stroke-width="0.8"/>
+              </g>
+            `;
           } else if (body === 'kungfu') {
             bodyG.innerHTML = `
               <g class="costume-kungfu">
@@ -4764,10 +4922,95 @@
                 <path d="M 72 122 L 76 138 L 81 138 L 76 122 Z" fill="#212121"/>
               </g>
             `;
-          } else if (body === 'cape') {
+          } else if (body === 'strawberry_dress') {
             bodyG.innerHTML = `
-              <g class="costume-cape-front">
-                <polygon points="70,88 66,98 72,98 68,108 76,96 70,96" fill="#ffeb3b" stroke="#fbc02d" stroke-width="0.8"/>
+              <g class="costume-strawberry-dress">
+                <!-- 草莓洋裝主體 -->
+                <path d="M52,86 L88,86 L100,138 Q70,146 40,138 Z" fill="#e53935" stroke="#b71c1c" stroke-width="2"/>
+                <!-- 綠色草莓葉領口 -->
+                <polygon points="56,86 63,95 70,86 77,95 84,86" fill="#43a047"/>
+                <!-- 白色小花邊裙擺 -->
+                <path d="M38,137 Q46,143 54,138 Q62,143 70,139 Q78,143 86,138 Q94,143 102,137" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                <!-- 草莓小黑籽點綴 -->
+                <ellipse cx="60" cy="105" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+                <ellipse cx="80" cy="105" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+                <ellipse cx="70" cy="118" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+                <ellipse cx="55" cy="126" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+                <ellipse cx="85" cy="126" rx="1.5" ry="2" fill="#fff" opacity="0.8"/>
+              </g>
+            `;
+          } else if (body === 'pajamas') {
+            bodyG.innerHTML = `
+              <g class="costume-pajamas">
+                <!-- 星星睡衣 -->
+                <path d="M52,86 L88,86 L98,140 Q70,144 42,140 Z" fill="#90caf9" stroke="#1e88e5" stroke-width="2"/>
+                <!-- 睡衣領口 -->
+                <polygon points="58,86 70,98 82,86" fill="#ffffff" stroke="#1e88e5" stroke-width="1.5"/>
+                <!-- 鈕扣 -->
+                <circle cx="70" cy="107" r="2" fill="#ffffff" stroke="#1e88e5" stroke-width="1"/>
+                <circle cx="70" cy="120" r="2" fill="#ffffff" stroke="#1e88e5" stroke-width="1"/>
+                <circle cx="70" cy="132" r="2" fill="#ffffff" stroke="#1e88e5" stroke-width="1"/>
+                <!-- 小黃星印花 -->
+                <polygon points="60,116 61,119 64,119 62,121 63,124 60,122 57,124 58,121 56,119 59,119" fill="#ffd54f"/>
+                <polygon points="80,126 81,129 84,129 82,131 83,134 80,132 77,134 78,131 76,129 79,129" fill="#ffd54f"/>
+              </g>
+            `;
+          } else if (body === 'honey_apron') {
+            bodyG.innerHTML = `
+              <g class="costume-honey-apron">
+                <!-- 嫩黃圍裙 -->
+                <path d="M54,88 L86,88 L94,136 Q70,140 46,136 Z" fill="#fff59d" stroke="#fbc02d" stroke-width="2"/>
+                <!-- 圍裙肩帶 -->
+                <line x1="56" y1="84" x2="62" y2="88" stroke="#fbc02d" stroke-width="3"/>
+                <line x1="84" y1="84" x2="78" y2="88" stroke="#fbc02d" stroke-width="3"/>
+                <!-- 口袋 -->
+                <rect x="58" y="108" width="24" height="18" rx="4" fill="#ffffff" stroke="#fbc02d" stroke-width="1.5"/>
+                <!-- 蜂蜜罐圖案 -->
+                <ellipse cx="70" cy="116" rx="6" ry="5" fill="#ffa726"/>
+                <rect x="66" y="110" width="8" height="3" rx="1" fill="#8d6e63"/>
+                <text x="70" y="119" font-size="6" text-anchor="middle" fill="#ffffff" font-weight="bold">HONEY</text>
+              </g>
+            `;
+          } else if (body === 'knight_armor') {
+            bodyG.innerHTML = `
+              <g class="costume-knight-armor">
+                <!-- 銀色騎士盔甲胸甲 -->
+                <path d="M50,86 L90,86 L96,128 L70,144 L44,128 Z" fill="#b0bec5" stroke="#455a64" stroke-width="2"/>
+                <!-- 護肩金邊 -->
+                <path d="M46,86 L56,86 L52,94 L42,94 Z" fill="#ffd54f" stroke="#b78103" stroke-width="1"/>
+                <path d="M94,86 L84,86 L88,94 L98,94 Z" fill="#ffd54f" stroke="#b78103" stroke-width="1"/>
+                <!-- 胸前金色十字徽章 -->
+                <rect x="68" y="98" width="4" height="20" rx="1" fill="#ffd700"/>
+                <rect x="62" y="104" width="16" height="4" rx="1" fill="#ffd700"/>
+                <circle cx="70" cy="106" r="3" fill="#e53935"/>
+              </g>
+            `;
+          } else if (body === 'magical_robe') {
+            bodyG.innerHTML = `
+              <g class="costume-magical-robe">
+                <!-- 星河魔法長袍 -->
+                <path d="M48,86 L92,86 L102,142 Q70,146 38,142 Z" fill="#311b92" stroke="#512da8" stroke-width="2"/>
+                <!-- 神秘金色滾邊領口 -->
+                <polygon points="56,86 70,102 84,86" fill="#1a237e" stroke="#ffd700" stroke-width="1.5"/>
+                <!-- 星芒與魔法紋路 -->
+                <circle cx="70" cy="104" r="2.5" fill="#00e5ff"/>
+                <polygon points="60,116 62,121 67,121 63,124 65,129 60,126 55,129 57,124 53,121 58,121" fill="#ffd700"/>
+                <polygon points="80,126 81,129 84,129 82,131 83,134 80,132 77,134 78,131 76,129 79,129" fill="#ffd700"/>
+                <line x1="70" y1="108" x2="70" y2="142" stroke="#ffd700" stroke-dasharray="2,2" stroke-width="1.5"/>
+              </g>
+            `;
+          } else if (body === 'winter_coat') {
+            bodyG.innerHTML = `
+              <g class="costume-winter-coat">
+                <!-- 暖呼呼雪花紅色大衣 -->
+                <path d="M48,86 L92,86 L100,140 Q70,144 40,140 Z" fill="#c62828" stroke="#8e0000" stroke-width="2"/>
+                <!-- 白色毛領 -->
+                <path d="M48,84 Q70,94 92,84 Q82,100 70,100 Q58,100 48,84 Z" fill="#ffffff" stroke="#cfd8dc" stroke-width="1.5"/>
+                <!-- 牛角扣 -->
+                <line x1="70" y1="100" x2="70" y2="138" stroke="#5d4037" stroke-width="1.5"/>
+                <ellipse cx="70" cy="108" rx="4" ry="2" fill="#efebe9" stroke="#5d4037" stroke-width="1"/>
+                <ellipse cx="70" cy="118" rx="4" ry="2" fill="#efebe9" stroke="#5d4037" stroke-width="1"/>
+                <ellipse cx="70" cy="128" rx="4" ry="2" fill="#efebe9" stroke="#5d4037" stroke-width="1"/>
               </g>
             `;
           } else {
@@ -4853,6 +5096,84 @@
                 <ellipse cx="70" cy="48" rx="36" ry="32" fill="#e3f2fd" fill-opacity="0.25" stroke="#90caf9" stroke-width="3"/>
                 <ellipse cx="70" cy="44" rx="28" ry="18" fill="#bbdefb" fill-opacity="0.3"/>
                 <ellipse cx="58" cy="38" rx="8" ry="4" fill="#ffffff" fill-opacity="0.6"/>
+              </g>
+            `;
+          } else if (head === 'bunny_ears') {
+            frontG.innerHTML = `
+              <g class="costume-bunny-ears">
+                <!-- 左兔耳 -->
+                <ellipse cx="50" cy="22" rx="7" ry="22" fill="#ffffff" stroke="#e0e0e0" stroke-width="1.5" transform="rotate(-15, 50, 22)"/>
+                <ellipse cx="50" cy="22" rx="4" ry="16" fill="#ff80ab" transform="rotate(-15, 50, 22)"/>
+                <!-- 右兔耳 -->
+                <ellipse cx="90" cy="22" rx="7" ry="22" fill="#ffffff" stroke="#e0e0e0" stroke-width="1.5" transform="rotate(15, 90, 22)"/>
+                <ellipse cx="90" cy="22" rx="4" ry="16" fill="#ff80ab" transform="rotate(15, 90, 22)"/>
+                <!-- 髮箍底座 -->
+                <path d="M44,40 Q70,30 96,40" fill="none" stroke="#ff4081" stroke-width="3" stroke-linecap="round"/>
+              </g>
+            `;
+          } else if (head === 'flower_wreath') {
+            frontG.innerHTML = `
+              <g class="costume-flower-wreath">
+                <!-- 春日綠葉藤蔓環 -->
+                <path d="M42,42 Q70,28 98,42" fill="none" stroke="#4caf50" stroke-width="3" stroke-linecap="round"/>
+                <!-- 小花朵 -->
+                <circle cx="46" cy="40" r="4" fill="#ff80ab"/>
+                <circle cx="46" cy="40" r="1.5" fill="#ffeb3b"/>
+                <circle cx="58" cy="34" r="4.5" fill="#ba68c8"/>
+                <circle cx="58" cy="34" r="1.5" fill="#ffeb3b"/>
+                <circle cx="70" cy="31" r="5" fill="#ff4081"/>
+                <circle cx="70" cy="31" r="2" fill="#ffeb3b"/>
+                <circle cx="82" cy="34" r="4.5" fill="#4dd0e1"/>
+                <circle cx="82" cy="34" r="1.5" fill="#ffeb3b"/>
+                <circle cx="94" cy="40" r="4" fill="#ffb74d"/>
+                <circle cx="94" cy="40" r="1.5" fill="#ffffff"/>
+              </g>
+            `;
+          } else if (head === 'pirate_hat') {
+            frontG.innerHTML = `
+              <g class="costume-pirate-hat">
+                <!-- 海盜雙角雙層帽 -->
+                <path d="M30,42 Q70,14 110,42 Q70,34 30,42 Z" fill="#212121" stroke="#ffb300" stroke-width="1.5"/>
+                <!-- 帽子頂部弧度 -->
+                <path d="M45,38 Q70,20 95,38 Z" fill="#263238"/>
+                <!-- 骷髏骨頭徽章 -->
+                <circle cx="70" cy="32" r="3" fill="#ffffff"/>
+                <rect x="66" y="36" width="8" height="2" rx="1" fill="#ffffff"/>
+              </g>
+            `;
+          } else if (head === 'santa_hat') {
+            frontG.innerHTML = `
+              <g class="costume-santa-hat">
+                <!-- 聖誕帽三角主體(微傾斜) -->
+                <path d="M44,40 C56,15 90,8 116,36 L108,40 Q70,30 44,40 Z" fill="#d32f2f" stroke="#b71c1c" stroke-width="1"/>
+                <!-- 白色毛邊滾輪 -->
+                <rect x="42" y="36" width="56" height="8" rx="4" fill="#ffffff" stroke="#cfd8dc" stroke-width="1"/>
+                <!-- 尾端白色毛球 -->
+                <circle cx="116" cy="38" r="6" fill="#ffffff" stroke="#cfd8dc" stroke-width="1"/>
+              </g>
+            `;
+          } else if (head === 'dino_hood') {
+            frontG.innerHTML = `
+              <g class="costume-dino-hood">
+                <!-- 恐龍帽子主體 -->
+                <path d="M42,42 Q70,16 98,42 Z" fill="#4caf50" stroke="#2e7d32" stroke-width="1.5"/>
+                <!-- 恐龍背鰭角角 (三個尖角) -->
+                <polygon points="52,27 57,17 62,24" fill="#ffeb3b" stroke="#fbc02d" stroke-width="1"/>
+                <polygon points="66,23 70,12 74,23" fill="#ffeb3b" stroke="#fbc02d" stroke-width="1"/>
+                <polygon points="78,24 83,17 88,27" fill="#ffeb3b" stroke="#fbc02d" stroke-width="1"/>
+              </g>
+            `;
+          } else if (head === 'detective_hat') {
+            frontG.innerHTML = `
+              <g class="costume-detective-hat">
+                <!-- 獵鹿帽冠 -->
+                <path d="M44,40 Q70,22 96,40 Z" fill="#8d6e63" stroke="#4e342e" stroke-width="1.5"/>
+                <!-- 前後帽簷 -->
+                <ellipse cx="44" cy="40" rx="8" ry="3" fill="#6d4c41"/>
+                <ellipse cx="96" cy="40" rx="8" ry="3" fill="#6d4c41"/>
+                <!-- 頂部綁帶蝴蝶結 -->
+                <circle cx="70" cy="27" r="2.5" fill="#ffab00"/>
+                <line x1="70" y1="27" x2="70" y2="40" stroke="#5d4037" stroke-width="1" stroke-dasharray="2,2"/>
               </g>
             `;
           } else {
