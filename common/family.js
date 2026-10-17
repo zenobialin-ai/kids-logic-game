@@ -354,6 +354,22 @@ function qlogFreeSpace() {
   } finally { qlogEvicting = false; }
 }
 
+// 點擊 t 事件的目標與標籤（兩個遊戲共用；capture 的掛法和範圍由各遊戲決定）
+function qlogEventTarget(el) {
+  let n = el;
+  while (n) {
+    if (n.tagName === 'BUTTON' || typeof n.onclick === 'function') return n;
+    n = n.parentElement;
+  }
+  return null;
+}
+function qlogEventLabel(el, keyboard) {
+  // minor 1：先放 trim 過的文字、再放 class；按字元切，emoji 不會被切斷
+  const t = (el.textContent || '').trim();
+  const s = el.id || (Array.from(t).slice(0, 12).join('') + ' ' + (el.className || ''));
+  return keyboard ? 'k:' + s : s;
+}
+
 // offMs：「離開畫面」由遊戲判斷（logic：切到背景 + 任何彈出視窗 + 護眼鎖住）
 function qlogIsOff() { return !!qlogConfig.isOff(); }
 function qlogOffTick() {
