@@ -83,7 +83,7 @@ owner 在 #19 要求：「在新加入的數學樂園，一樣要有排除小朋
 
 - **schema**：沿用 `issue-19-plan.md` 第 2 節的 schema v1。
   - 數學樂園的紀錄加 `game:'montessori'`。**邏輯遊戲的紀錄不加這個欄位**（沒有 `game` 就是邏輯遊戲），所以邏輯遊戲的紀錄格式完全不變。
-  - `build`：**每個遊戲各自一個**（`qlogConfig.build`）。邏輯遊戲維持 2；數學樂園從 1 開始，之後只有改到數學樂園出題、作答的 PR 才 +1。M2c 把 `offTracked` 改成 `true`（`offMs`、`activeMs`、`firstAnswer.off` 從 `null` 變成數字，意義改變），所以數學樂園的 build 在 M2c 改成 2。
+  - `build`：**每個遊戲各自一個**（`qlogConfig.build`）。邏輯遊戲維持 2；數學樂園從 1 開始，之後只有改到數學樂園出題、作答的 PR 才 +1。M2c 把 `offTracked` 改成 `true`（`offMs`、`activeMs`、`firstAnswer.off` 從 `null` 變成數字，意義改變），所以數學樂園的 build 在 M2c 改成 2；M3 加上 `beadCount`／`verticalHint` 和天平的 `actions.steps`，改成 3。
 - **key**：數學樂園的紀錄存 `montessori_qlog_v1__<id>`，**不可以**放進 `little_logic_qlog_v1__*`。key 的組法跟邏輯遊戲的 `qlogKey` 一樣：base（`little_logic_qlog_v1`／`montessori_qlog_v1`，不含底線）＋ `'__'` ＋ id。
 - **紀錄的「格式表」放在 `family.js`，依 key 查，不依目前在哪個遊戲查**：
 
@@ -166,6 +166,7 @@ qlogConfig = {
 - **點擊 `t`**：capture 階段 `click`，範圍是 `#gameContent`（天平的 +1／−1 也在裡面）。**不可以**用 `.classroom-work-area`，因為貼紙簿、衣帽間等視窗都在它裡面。
 - **離開畫面時間 `offMs`**：切到背景＋彈出視窗（`#modalOverlay` 顯示中）＋護眼鎖住。用 `MutationObserver` 監看 `#modalOverlay` 的 `style` 屬性和鎖定畫面，不要用每秒輪詢。
   - M2c 之前：數學樂園的 `qlogConfig.offTracked:false`，`offMs`、`activeMs`、`firstAnswer.off` 一律記 `null`（還算不準，不記成 0）；M2c 做好 `MutationObserver` 後改成 `true`，build 1 → 2（build 1 的這三個欄位一律是 `null`，build 2 起是數字）。
+  - 例外：下次載入才復原成 `unload` 的紀錄，`offMs`、`activeMs` 維持 `null`（復原時不知道離開後的時間，跟邏輯遊戲一樣）。
   - 「誰要玩？」（`#childPickerModal`，也是 `style.display`，不經過 `#modalOverlay`）開著時也算離開畫面。
 - **上限**：
   - 數學樂園的紀錄：每組 30 筆；所有孩子合計 **400K 字元**；每位孩子 `min(150K, 400K ÷ 孩子數)`。數學樂園一筆約 0.5～0.8K，10 組存滿約 210K，所以會先碰到容量上限、從筆數最多的那一組刪最舊的。

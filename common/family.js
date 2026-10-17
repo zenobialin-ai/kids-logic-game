@@ -490,6 +490,6 @@ function qlogGameWrong(reason) {
     if (!r || r.outcome !== null) return;
     r.wrongCountGame++;
     if (!r.gameReasons) r.gameReasons = [];
-    r.gameReasons.push(reason);
+    if (r.gameReasons.length < QLOG_MAX_EV) r.gameReasons.push(reason);   // 上限同 aids；次數以 wrongCountGame 為準
   } catch (e) {}
 }
