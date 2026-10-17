@@ -2376,6 +2376,107 @@
         height: 5.6vw;
       }
     }
+    /* =========================================================================
+       👧 M1c：孩子頭像、「誰要玩？」、⚙️ 家長設定（家長算式、孩子列樣式從邏輯遊戲複製後改）
+       ========================================================================= */
+    .child-avatar-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff8e1;
+      color: #4e342e;
+      border: 2px solid #d7ccc8;
+      font-weight: 800;
+    }
+    .child-avatar-emoji { font-size: 1.4rem; line-height: 1; }
+
+    .child-picker-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2300;
+      background: rgba(30, 45, 25, 0.55);
+      backdrop-filter: blur(3px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .child-picker-card {
+      background: #ffffff;
+      border: 6px solid #8d6e63;
+      border-radius: 28px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .child-picker-title { font-size: 2rem; font-weight: 900; color: #4e342e; margin-bottom: 16px; }
+    .child-pick-list { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 16px; }
+    .child-pick-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 3px solid #d7ccc8;
+      background: #fffdf7;
+      border-radius: 18px;
+      padding: 12px 18px;
+      min-height: 56px;
+      font-family: inherit;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #3e2723;
+      cursor: pointer;
+    }
+    .child-pick-btn.current { border-color: #8d6e63; background: #fff3e0; }
+    .child-pick-btn:active { transform: scale(0.96); }
+
+    #parentModal {
+      border: 6px solid #546e7a !important;
+      max-width: 520px !important;
+    }
+    .parent-body { padding: 16px 20px !important; }
+    .parent-gate-label { font-size: 1.15rem; color: #334155; margin-bottom: 10px; }
+    .parent-gate-row { display: flex; gap: 10px; justify-content: center; }
+    .parent-gate-input {
+      width: 110px;
+      font-size: 22px;
+      padding: 8px 10px;
+      border: 2px solid #CBD5E1;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .parent-gate-btn { padding: 10px 22px; font-size: 1.05rem; }
+    .parent-gate-msg { min-height: 22px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #DC2626; }
+    .parent-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px 0;
+      border-bottom: 1px dashed #E2E8F0;
+      font-size: 1.05rem;
+    }
+    .parent-row-label { font-weight: 800; color: #334155; }
+    .parent-note { font-size: 0.95rem; color: #64748b; padding: 6px 0 10px; line-height: 1.5; }
+    .parent-msg { font-weight: 800; color: #2e7d32; }
+    .parent-btn, .parent-select {
+      border: 2px solid #CBD5E1;
+      background: #F8FAFC;
+      color: #334155;
+      border-radius: 12px;
+      padding: 6px 12px;
+      min-height: 44px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -2385,6 +2486,7 @@
     <h1 id="appTitle"></h1>
     <div class="subtitle" id="appSubtitle"></div>
     <div class="header-action-row">
+      <button class="device-help-btn child-avatar-btn" id="childAvatarBtn" onclick="Sound.click(); openChildPicker(true)" title="換人玩" style="display:none;"></button>
       <a class="device-help-btn lobby-link" href="index.html" title="回到遊戲大廳，選別的遊戲" style="background:#6b5b95;">🏰 回遊戲大廳</a>
       <button class="reward-capsule-btn" onclick="openStickerAlbum()" title="打開貼紙收集簿">
         <span class="star-icon">⭐</span>
@@ -2412,6 +2514,7 @@
       <button class="device-help-btn" onclick="openDeviceGuide()">
         📱 平板/手機教學
       </button>
+      <button class="device-help-btn" id="parentSettingsBtn" onclick="openParentSettings()" title="家長設定" aria-label="家長設定" style="background:#546e7a;">⚙️</button>
     </div>
   </header>
 
@@ -2579,9 +2682,6 @@
       <div id="mistakesListContainer"></div>
     </div>
     <div class="modal-footer-bar">
-      <button class="action-btn" onclick="MistakeBook.clearAll()" style="background: #9e9e9e; font-size: 1.1rem; padding: 8px 16px;">
-        🗑️ 清空所有記錄
-      </button>
       <button class="action-btn" onclick="closeModal()" style="font-size: 1.2rem; padding: 10px 24px;">
         關閉
       </button>
@@ -2642,6 +2742,56 @@
 
     <!-- 底部蒙特梭利教學引導提示 -->
     <div class="pedagogy-tip" id="pedagogyTip"></div>
+  </div>
+
+  <!-- 👧 誰要玩？（M1c）：不用 #modalOverlay，點背景不會關掉；文字由程式經過 zy() 填入 -->
+  <div class="child-picker-overlay" id="childPickerModal" role="dialog" aria-modal="true">
+    <div class="child-picker-card">
+      <div class="child-picker-title" id="childPickerTitle"></div>
+      <div class="child-pick-list" id="childPickerList"></div>
+      <button class="action-btn" id="childPickerCancel" onclick="cancelChildPicker()" style="display:none;"></button>
+    </div>
+  </div>
+
+  <!-- ⚙️ 家長設定（M1c）：整區不加注音；要先過家長算式 -->
+  <div class="custom-modal" id="parentModal">
+    <div class="modal-header-bar" style="background: linear-gradient(135deg, #546e7a, #37474f);">
+      <div style="font-size: 1.6rem; font-weight: 900; color: #fff;">⚙️ 家長設定</div>
+      <button class="modal-close-btn" onclick="closeModal()" aria-label="關閉">✖</button>
+    </div>
+    <div class="modal-body-scroll parent-body">
+      <div class="parent-gate" id="parentGateBox">
+        <div class="parent-gate-label">請家長算出答案：<strong id="parentGateQ"></strong></div>
+        <div class="parent-gate-row">
+          <input type="number" inputmode="numeric" id="parentGateInput" class="parent-gate-input" aria-label="答案"
+                 onkeydown="if (event.key === 'Enter') checkParentAnswer()">
+          <button class="action-btn parent-gate-btn" onclick="checkParentAnswer()">確定</button>
+        </div>
+        <div class="parent-gate-msg" id="parentGateMsg" role="alert"></div>
+      </div>
+      <div id="parentSettingsBox" style="display:none;">
+        <div class="parent-row">
+          <span class="parent-row-label">🧒 現在在玩的孩子</span>
+          <select id="parentChildSelect" class="parent-select" onchange="parentSwitchChild(this.value)" aria-label="換孩子"></select>
+        </div>
+        <div class="parent-note">新增或刪除孩子請到小小邏輯探險家的家長設定。</div>
+        <div class="parent-row">
+          <span class="parent-row-label">📖 錯題本</span>
+          <button class="parent-btn" onclick="parentClearMistakes()">清空 <span id="parentClearName"></span> 的錯題本</button>
+        </div>
+        <div id="parentMoveBox">
+          <div class="parent-row">
+            <span class="parent-row-label">📦 把數學樂園的進度移給…</span>
+            <span>
+              <select id="parentMoveSelect" class="parent-select" aria-label="要移給哪位孩子"></select>
+              <button class="parent-btn" onclick="parentMoveProgress()">移過去</button>
+            </span>
+          </div>
+          <div class="parent-note">會把 <span id="parentMoveFrom"></span> 的星星、貼紙、衣帽間、錯題本、學習分析、難度、打卡全部搬過去（不合併），<span id="parentMoveFrom2"></span> 會變成空的。學習紀錄不搬。</div>
+        </div>
+        <div class="parent-note parent-msg" id="parentMsg" role="status"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 🧸 小熊老師工作站 (完全離開木托盤，像小老師站在桌子旁邊) -->
@@ -3704,7 +3854,11 @@
       "購": "ㄍㄡˋ",
       "存": "ㄘㄨㄣˊ",
       "摺": "ㄓㄜˊ",
-      "費": "ㄈㄟˋ"
+      "費": "ㄈㄟˋ",
+      // M1c：孩子選單（誰要玩？、小狐狸）
+      "誰": "ㄕㄟˊ",
+      "狐": "ㄏㄨˊ",
+      "狸": "˙ㄌㄧ"
     };
 
     // 解析注音字串：拆出輕聲(˙)、側邊聲調(ˊˇˋ)與注音本體符號
@@ -4821,6 +4975,8 @@
       if (wm) wm.style.display = 'none';
       const cm = document.getElementById('checkinModal');
       if (cm) cm.style.display = 'none';
+      const pm = document.getElementById('parentModal');
+      if (pm) pm.style.display = 'none';
       Mascot.setIdle();
     }
 
@@ -7037,10 +7193,11 @@
       Wardrobe.applyToMascot();
       MistakeBook.updateBadge();
       CheckinBook.updateBadge();
-      switchMode(currentMode);
+      renderChildAvatar();
+      if (!awaitingPick) switchMode(currentMode);   // 啟動時的「誰要玩？」還沒選好：不出題
     }
 
-    // 換成名單上的另一位孩子（M1c 接上頭像、家長設定；這輪只有 console 呼叫）
+    // 換成名單上的另一位孩子（頭像、「誰要玩？」、家長設定都走這裡）
     function switchChild(id) {
       if (!childOnList(id) || id === activeChildId) return false;
       saveProfiles(p => { p.active = id; return p; });
@@ -7052,10 +7209,280 @@
     window.addEventListener('storage', e => {
       if (e.key !== PROFILES_KEY) return;
       const p = readProfiles();
-      if (p.children.some(c => c.id === activeChildId)) return;
-      const c = p.children.find(x => x.id === p.active) || p.children[0];
-      applyChildSwitch(c.id, 'abandoned');
+      if (!p.children.some(c => c.id === activeChildId)) {
+        const c = p.children.find(x => x.id === p.active) || p.children[0];
+        applyChildSwitch(c.id, 'abandoned');
+      }
+      refreshChildUi();   // 加人、改名、刪人：頭像、「誰要玩？」、家長設定跟著更新
     });
+
+    // =========================================================================
+    // 👧 孩子頭像、「誰要玩？」（M1c）
+    // =========================================================================
+    const EMOJI_NAME = { '🐰': '兔子', '🐶': '小狗', '🐱': '小貓', '🐻': '小熊', '🐼': '貓熊', '🦊': '小狐狸' };
+    function animalName(c) { return EMOJI_NAME[c.emoji] || ''; }
+    // 家長設定用（不加注音）
+    function childLabel(c) { return (c.emoji || DEFAULT_EMOJI) + ' ' + (c.name || animalName(c) || c.id); }
+
+    // 自訂名字不經過 zy()（破音字會被標錯音）；沒取名字時顯示的動物名稱要加注音
+    function nameParts(c) {
+      const frag = document.createDocumentFragment();
+      const em = document.createElement('span');
+      em.className = 'child-avatar-emoji';
+      em.textContent = c.emoji || DEFAULT_EMOJI;
+      const nm = document.createElement('span');
+      if (c.name) nm.textContent = c.name;
+      else if (animalName(c)) nm.innerHTML = zy(animalName(c));
+      else nm.textContent = c.id;
+      frag.append(em, nm);
+      return frag;
+    }
+
+    // 頭像：2 位以上孩子才顯示（只有 1 位時畫面只多了 ⚙️）
+    function renderChildAvatar() {
+      const btn = document.getElementById('childAvatarBtn');
+      if (!btn) return;
+      const p = readProfiles();
+      if (p.children.length < 2) { btn.style.display = 'none'; return; }
+      const c = p.children.find(x => x.id === activeChildId) || p.children[0];
+      btn.textContent = '';
+      btn.append(nameParts(c));
+      btn.style.display = 'inline-flex';
+    }
+
+    let awaitingPick = false;        // 啟動時在等「誰要玩？」：選好之前不出題
+    let pickerCancellable = false;
+
+    function childPickerOpen() { return document.getElementById('childPickerModal').style.display === 'flex'; }
+
+    // cancellable：點頭像打開的可以「不要換」；啟動時的不能取消
+    function openChildPicker(cancellable) {
+      pickerCancellable = !!cancellable;
+      renderChildPicker();
+      document.getElementById('childPickerModal').style.display = 'flex';
+    }
+
+    function renderChildPicker() {
+      const p = readProfiles();
+      document.getElementById('childPickerTitle').innerHTML = zy('誰要玩？');
+      const list = document.getElementById('childPickerList');
+      list.textContent = '';
+      for (const c of p.children) {
+        const b = document.createElement('button');
+        b.className = 'child-pick-btn' + (c.id === activeChildId ? ' current' : '');
+        b.append(nameParts(c));
+        b.onclick = function () { pickChild(c.id); };
+        list.append(b);
+      }
+      const cancel = document.getElementById('childPickerCancel');
+      cancel.innerHTML = zy('不要換人');
+      cancel.style.display = pickerCancellable ? 'inline-block' : 'none';
+    }
+
+    function closeChildPicker() {
+      document.getElementById('childPickerModal').style.display = 'none';
+    }
+
+    function cancelChildPicker() {
+      Sound.click();
+      closeChildPicker();
+    }
+
+    function pickChild(id) {
+      Sound.click();
+      closeChildPicker();
+      if (awaitingPick) {
+        awaitingPick = false;
+        if (!switchChild(id)) switchMode(currentMode);   // 選同一位也要現在才出題
+        return;
+      }
+      switchChild(id);
+    }
+
+    // 名單變了（別的分頁加人、改名、刪人）：頭像、開著的「誰要玩？」、家長設定都重畫
+    function refreshChildUi() {
+      renderChildAvatar();
+      if (childPickerOpen()) {
+        if (readProfiles().children.length < 2) {
+          closeChildPicker();
+          if (awaitingPick) { awaitingPick = false; switchMode(currentMode); }
+        } else {
+          renderChildPicker();
+        }
+      }
+      if (parentSettingsShown()) renderParentSettings();
+    }
+
+    // =========================================================================
+    // ⚙️ 家長設定（M1c）：家長算式 → 換孩子、清空錯題本、把進度移給別的孩子（QM8）
+    // =========================================================================
+    // 家長算式的狀態關掉視窗也保留（#35：關掉再打開不能重設冷卻、已錯次數）；答對才清掉、下次出新題
+    let parentGate = null;   // { a, b, tries, cooldownUntil }
+
+    function setParentGateMsg(text) { document.getElementById('parentGateMsg').textContent = text; }
+    function setParentMsg(text) { document.getElementById('parentMsg').textContent = text; }
+
+    function showParentModal() {
+      const overlay = document.getElementById('modalOverlay');
+      if (overlay) overlay.style.display = 'block';
+      document.getElementById('parentModal').style.display = 'flex';
+    }
+
+    function openParentSettings() {
+      Sound.click();
+      if (!parentGate) {
+        const { a, b } = gateNew();
+        parentGate = { a, b, tries: 0, cooldownUntil: 0 };
+      }
+      document.getElementById('parentGateBox').style.display = 'block';
+      document.getElementById('parentSettingsBox').style.display = 'none';
+      document.getElementById('parentGateQ').textContent = `${parentGate.a} + ${parentGate.b} = ?`;
+      const input = document.getElementById('parentGateInput');
+      input.value = '';
+      const wait = parentGate.cooldownUntil - Date.now();
+      setParentGateMsg(wait > 0 ? `請等 ${Math.ceil(wait / 1000)} 秒再試一次` : '');
+      showParentModal();
+      input.focus();
+    }
+
+    function checkParentAnswer() {
+      const gate = parentGate;
+      if (!gate) return;
+      const input = document.getElementById('parentGateInput');
+      const now = Date.now();
+      const result = gateCheck(gate, input.value, now);
+      if (result === 'wait') {
+        setParentGateMsg(`請等 ${Math.ceil((gate.cooldownUntil - now) / 1000)} 秒再試一次`);
+        return;
+      }
+      input.value = '';
+      if (result === 'ok') {
+        parentGate = null;
+        setParentGateMsg('');
+        showParentSettings();
+        return;
+      }
+      Sound.wrong();
+      if (result === 'reroll') {
+        const { a, b } = gateNew();
+        parentGate = { a, b, tries: 0, cooldownUntil: Date.now() + GATE_COOLDOWN_MS };
+        document.getElementById('parentGateQ').textContent = `${a} + ${b} = ?`;
+        setParentGateMsg(`答錯 3 次，已經換一題。請等 ${GATE_COOLDOWN_MS / 1000} 秒再試。`);
+      } else {
+        setParentGateMsg(`答案不對喔（還可以再試 ${3 - gate.tries} 次）`);
+      }
+    }
+
+    function showParentSettings() {
+      document.getElementById('parentGateBox').style.display = 'none';
+      document.getElementById('parentSettingsBox').style.display = 'block';
+      setParentMsg('');
+      renderParentSettings();
+    }
+
+    function parentSettingsShown() {
+      return document.getElementById('parentModal').style.display === 'flex' &&
+             document.getElementById('parentSettingsBox').style.display === 'block';
+    }
+
+    // switchMode 會關掉所有視窗；家長在設定裡做完事情後把設定開回來（已經過了家長算式）
+    function reopenParentSettings() {
+      showParentModal();
+      showParentSettings();
+    }
+
+    function renderParentSettings() {
+      const p = readProfiles();
+      const me = p.children.find(c => c.id === activeChildId) || p.children[0];
+      const sel = document.getElementById('parentChildSelect');
+      sel.textContent = '';
+      for (const c of p.children) {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = childLabel(c);
+        o.selected = c.id === activeChildId;
+        sel.append(o);
+      }
+      document.getElementById('parentClearName').textContent = childLabel(me);
+      document.getElementById('parentMoveFrom').textContent = childLabel(me);
+      document.getElementById('parentMoveFrom2').textContent = childLabel(me);
+      const others = p.children.filter(c => c.id !== activeChildId);
+      document.getElementById('parentMoveBox').style.display = others.length ? 'block' : 'none';
+      const mv = document.getElementById('parentMoveSelect');
+      mv.textContent = '';
+      for (const c of others) {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = childLabel(c);
+        mv.append(o);
+      }
+    }
+
+    function parentSwitchChild(id) {
+      const ok = switchChild(id);
+      reopenParentSettings();
+      if (ok) setParentMsg('已經換成 ' + childLabel(readProfiles().children.find(c => c.id === id)));
+    }
+
+    // QM5：只清目前這位孩子的錯題本（MistakeBook.key 依 activeChildId）
+    function parentClearMistakes() {
+      const me = readProfiles().children.find(c => c.id === activeChildId);
+      if (!me) return;
+      if (!confirm('確定要清空 ' + childLabel(me) + ' 的錯題本嗎？')) return;
+      MistakeBook.clearAll();
+      setParentMsg('已經清空 ' + childLabel(me) + ' 的錯題本。');
+    }
+
+    // QM8 的 7 個 key（學習紀錄 montessori_qlog_v1__<id> 不搬：每一筆都記著當時的 childId）
+    const MONTESSORI_CHILD_KEYS = FAMILY_CHILD_KEYS.filter(base => base.startsWith('montessori_'));
+
+    function readJsonItem(key) {
+      try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+    }
+
+    // QM8 的「有資料」：星星 > 0、有貼紙、錯題、打卡紀錄，或答過題（第一次載入自動產生的預設值不算）
+    // 星星 key 不存在時遊戲會用答對題數算星星，所以「答過題」也算有資料
+    function hasMontessoriData(id) {
+      const k = base => childKey(base, id);
+      if ((parseInt(localStorage.getItem(k('montessori_stars')), 10) || 0) > 0) return true;
+      const st = readJsonItem(k('montessori_stickers'));
+      if (Array.isArray(st) && st.length) return true;
+      const mi = readJsonItem(k('montessori_mistakes'));
+      if (Array.isArray(mi) && mi.length) return true;
+      const ci = readJsonItem(k('montessori_checkin'));
+      if (ci && ci.records && typeof ci.records === 'object' && Object.keys(ci.records).length) return true;
+      const an = readJsonItem(k('montessori_analytics'));
+      if (an && Number(an.totalAnswered) > 0) return true;
+      return false;
+    }
+
+    // QM8：把目前這位孩子的數學樂園進度（7 個 key）整份移給另一位；目標有資料時先確認（不合併、會覆蓋）
+    function parentMoveProgress() {
+      const p = readProfiles();
+      const from = p.children.find(c => c.id === activeChildId);
+      const to = p.children.find(c => c.id === document.getElementById('parentMoveSelect').value);
+      if (!from || !to || to.id === from.id) return;
+      if (hasMontessoriData(to.id) &&
+          !confirm(childLabel(to) + ' 已經有數學樂園的進度。移過去會覆蓋 ' + childLabel(to) + ' 的進度（不會合併），確定嗎？')) return;
+      // 答對後還沒出現的過關：星星先記給目前這位，再一起搬過去
+      for (let n = cancelPendingSuccess(); n > 0; n--) addStarAndCheckReward();
+      // 先全部寫到目標，都成功才清掉目前這位（寫到一半失敗時，原本的進度還在）
+      for (const base of MONTESSORI_CHILD_KEYS) {
+        const v = localStorage.getItem(childKey(base, from.id));
+        const target = childKey(base, to.id);
+        if (v === null) {
+          localStorage.removeItem(target);
+        } else if (!safeSetItem(target, v)) {
+          reopenParentSettings();
+          setParentMsg('儲存空間不夠，沒有搬完；' + childLabel(from) + ' 的進度還在。');
+          return;
+        }
+      }
+      MONTESSORI_CHILD_KEYS.forEach(base => localStorage.removeItem(childKey(base, from.id)));
+      applyChildSwitch(from.id, 'replaced');   // 目前這位的進度已經清空：重設記憶體、重新載入、出新題
+      reopenParentSettings();
+      setParentMsg('已經移給 ' + childLabel(to) + '。如果還有其他開著數學樂園的分頁，請把它們關掉，不然它們存檔時會把舊的進度寫回 ' + childLabel(from) + '。');
+    }
 
     // =========================================================================
     // 🚀 初始化啟動 (所有變數與模組就緒後執行)
@@ -7068,8 +7495,15 @@
     Wardrobe.applyToMascot();
     CheckinBook.updateBadge();
     MistakeBook.updateBadge();
-    // M1c：「誰要玩？」開著 → 選好孩子之前不出題；M1d：護眼鎖著 → 解鎖後才往下
-    switchMode(1);
+    renderChildAvatar();
+    // 「誰要玩？」開著（而且有 2 位以上孩子）→ 選好孩子之前不出題；M1d：護眼鎖著 → 解鎖後才往下
+    const startProfiles = readProfiles();
+    if (startProfiles.askOnOpen && startProfiles.children.length >= 2) {
+      awaitingPick = true;
+      openChildPicker(false);
+    } else {
+      switchMode(1);
+    }
   </script>
 
 </body>
