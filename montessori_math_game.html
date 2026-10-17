@@ -4390,6 +4390,17 @@
       document.getElementById('successModal').style.display = 'block';
     }
 
+    // 答對後停用目前題目的所有選項（下一次出題時會重新產生按鈕）
+    function lockChoiceButtons(...containers) {
+      containers.forEach(c => {
+        if (!c) return;
+        c.querySelectorAll('button').forEach(b => {
+          b.disabled = true;
+          b.style.pointerEvents = 'none';
+        });
+      });
+    }
+
     function generateOptions(correctAnswer, min = 1, max = 15) {
       const opts = new Set([correctAnswer]);
       while (opts.size < 4) {
@@ -4564,6 +4575,11 @@
         btn.textContent = opt;
         btn.onclick = () => {
           setBalanceGuess(opt);
+          if (balanceBaseR + opt !== balanceWeightL) {
+            // 答錯的選項停用（+1／−1 微調不受影響）
+            btn.style.opacity = "0.25";
+            btn.style.pointerEvents = "none";
+          }
         };
         choicesContainer.appendChild(btn);
       });
@@ -4656,6 +4672,10 @@
       const totalR = balanceBaseR + val;
       if (totalR === balanceWeightL) {
         // 🎉 完美平衡！
+        lockChoiceButtons(
+          document.getElementById('balanceChoices'),
+          document.querySelector('.balance-tweak-bar')
+        );
         Sound.correct();
         AnalyticsBook.recordAnswer(7, true);
         const card = document.getElementById('balanceScaleCard');
@@ -5797,6 +5817,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === q.ans) {
+            lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(6, true);
             Sound.snap();
             const qCard = document.getElementById('challengeQCard');
@@ -5816,14 +5837,14 @@
             MistakeBook.record(
               6,
               "🏆 純題目挑戰",
-              q.formulaText.replace('❓', q.ans),
+              q.formulaText,
               opt,
               q.ans
             );
-            btn.style.borderColor = '#e53935';
-            btn.style.background = '#ffebee';
-            btn.style.transform = 'scale(0.95)';
+            Sound.wrong();
             Mascot.setSad("差一點點！這題稍微有難度，看著數位位值慢慢算，小熊陪你再試一次！");
+            btn.style.opacity = "0.25";
+            btn.style.pointerEvents = "none";
           }
         };
         choicesContainer.appendChild(btn);
@@ -5887,6 +5908,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === sum) {
+            lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(1, true);
             Sound.snap();
             document.getElementById('addQuestionCard').textContent = sum;
@@ -5985,6 +6007,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === remain) {
+            lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(2, true);
             Sound.snap();
             document.getElementById('subQuestionCard').textContent = remain;
@@ -6069,6 +6092,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === product) {
+            lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(3, true);
             Sound.snap();
             document.getElementById('mulQuestionCard').textContent = product;
@@ -6160,6 +6184,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === divPerPerson) {
+            lockChoiceButtons(choicesContainer);
             AnalyticsBook.recordAnswer(4, true);
             Sound.snap();
             setTimeout(() => {
@@ -6441,6 +6466,7 @@
         btn.textContent = opt;
         btn.onclick = () => {
           if (opt === bankAnswer) {
+            lockChoiceButtons(choiceBox);
             AnalyticsBook.recordAnswer(5, true);
             const ansStr = bankAnswer.toString().padStart(4, '0');
             const rTh = document.getElementById('resTh');
@@ -6484,6 +6510,7 @@
     renderNavigation();
     Wardrobe.applyToMascot();
     CheckinBook.updateBadge();
+    MistakeBook.updateBadge();
     switchMode(1);
   </script>
 
