@@ -2744,56 +2744,6 @@
     <div class="pedagogy-tip" id="pedagogyTip"></div>
   </div>
 
-  <!-- 👧 誰要玩？（M1c）：不用 #modalOverlay，點背景不會關掉；文字由程式經過 zy() 填入 -->
-  <div class="child-picker-overlay" id="childPickerModal" role="dialog" aria-modal="true">
-    <div class="child-picker-card">
-      <div class="child-picker-title" id="childPickerTitle"></div>
-      <div class="child-pick-list" id="childPickerList"></div>
-      <button class="action-btn" id="childPickerCancel" onclick="cancelChildPicker()" style="display:none;"></button>
-    </div>
-  </div>
-
-  <!-- ⚙️ 家長設定（M1c）：整區不加注音；要先過家長算式 -->
-  <div class="custom-modal" id="parentModal">
-    <div class="modal-header-bar" style="background: linear-gradient(135deg, #546e7a, #37474f);">
-      <div style="font-size: 1.6rem; font-weight: 900; color: #fff;">⚙️ 家長設定</div>
-      <button class="modal-close-btn" onclick="closeModal()" aria-label="關閉">✖</button>
-    </div>
-    <div class="modal-body-scroll parent-body">
-      <div class="parent-gate" id="parentGateBox">
-        <div class="parent-gate-label">請家長算出答案：<strong id="parentGateQ"></strong></div>
-        <div class="parent-gate-row">
-          <input type="number" inputmode="numeric" id="parentGateInput" class="parent-gate-input" aria-label="答案"
-                 onkeydown="if (event.key === 'Enter') checkParentAnswer()">
-          <button class="action-btn parent-gate-btn" onclick="checkParentAnswer()">確定</button>
-        </div>
-        <div class="parent-gate-msg" id="parentGateMsg" role="alert"></div>
-      </div>
-      <div id="parentSettingsBox" style="display:none;">
-        <div class="parent-row">
-          <span class="parent-row-label">🧒 現在在玩的孩子</span>
-          <select id="parentChildSelect" class="parent-select" onchange="parentSwitchChild(this.value)" aria-label="換孩子"></select>
-        </div>
-        <div class="parent-note">新增或刪除孩子請到小小邏輯探險家的家長設定。</div>
-        <div class="parent-row">
-          <span class="parent-row-label">📖 錯題本</span>
-          <button class="parent-btn" onclick="parentClearMistakes()">清空 <span id="parentClearName"></span> 的錯題本</button>
-        </div>
-        <div id="parentMoveBox">
-          <div class="parent-row">
-            <span class="parent-row-label">📦 把數學樂園的進度移給…</span>
-            <span>
-              <select id="parentMoveSelect" class="parent-select" aria-label="要移給哪位孩子"></select>
-              <button class="parent-btn" onclick="parentMoveProgress()">移過去</button>
-            </span>
-          </div>
-          <div class="parent-note">會把 <span id="parentMoveFrom"></span> 的星星、貼紙、衣帽間、錯題本、學習分析、難度、打卡全部搬過去（不合併），<span id="parentMoveFrom2"></span> 會變成空的。學習紀錄不搬。</div>
-        </div>
-        <div class="parent-note parent-msg" id="parentMsg" role="status"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- 🧸 小熊老師工作站 (完全離開木托盤，像小老師站在桌子旁邊) -->
   <div class="teacher-bear-station">
     <div class="teacher-badge">
@@ -2953,6 +2903,56 @@
     </div>
   </div>
 </div>
+
+  <!-- 👧 誰要玩？（M1c；放在 .classroom-work-area 外面，背景設 inert 時不受影響）：不用 #modalOverlay，點背景不會關掉；文字由程式經過 zy() 填入 -->
+  <div class="child-picker-overlay" id="childPickerModal" role="dialog" aria-modal="true">
+    <div class="child-picker-card">
+      <div class="child-picker-title" id="childPickerTitle"></div>
+      <div class="child-pick-list" id="childPickerList"></div>
+      <button class="action-btn" id="childPickerCancel" onclick="cancelChildPicker()" style="display:none;"></button>
+    </div>
+  </div>
+
+  <!-- ⚙️ 家長設定（M1c）：整區不加注音；要先過家長算式 -->
+  <div class="custom-modal" id="parentModal">
+    <div class="modal-header-bar" style="background: linear-gradient(135deg, #546e7a, #37474f);">
+      <div style="font-size: 1.6rem; font-weight: 900; color: #fff;">⚙️ 家長設定</div>
+      <button class="modal-close-btn" onclick="closeModal()" aria-label="關閉">✖</button>
+    </div>
+    <div class="modal-body-scroll parent-body">
+      <div class="parent-gate" id="parentGateBox">
+        <div class="parent-gate-label">請家長算出答案：<strong id="parentGateQ"></strong></div>
+        <div class="parent-gate-row">
+          <input type="number" inputmode="numeric" id="parentGateInput" class="parent-gate-input" aria-label="答案"
+                 onkeydown="if (event.key === 'Enter') checkParentAnswer()">
+          <button class="action-btn parent-gate-btn" onclick="checkParentAnswer()">確定</button>
+        </div>
+        <div class="parent-gate-msg" id="parentGateMsg" role="alert"></div>
+      </div>
+      <div id="parentSettingsBox" style="display:none;">
+        <div class="parent-row">
+          <span class="parent-row-label">🧒 現在在玩的孩子</span>
+          <select id="parentChildSelect" class="parent-select" onchange="parentSwitchChild(this.value)" aria-label="換孩子"></select>
+        </div>
+        <div class="parent-note">新增或刪除孩子請到小小邏輯探險家的家長設定。</div>
+        <div class="parent-row">
+          <span class="parent-row-label">📖 錯題本</span>
+          <button class="parent-btn" onclick="parentClearMistakes()">清空 <span id="parentClearName"></span> 的錯題本</button>
+        </div>
+        <div id="parentMoveBox">
+          <div class="parent-row">
+            <span class="parent-row-label">📦 把數學樂園的進度移給…</span>
+            <span>
+              <select id="parentMoveSelect" class="parent-select" aria-label="要移給哪位孩子"></select>
+              <button class="parent-btn" onclick="parentMoveProgress()">移過去</button>
+            </span>
+          </div>
+          <div class="parent-note">會把 <span id="parentMoveFrom"></span> 的星星、貼紙、衣帽間、錯題本、學習分析、難度、打卡全部搬過去（不合併），<span id="parentMoveFrom2"></span> 會變成空的。學習紀錄不搬。</div>
+        </div>
+        <div class="parent-note parent-msg" id="parentMsg" role="status"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- FAMILY:START（由 tools/build_common.py 產生，請勿手動修改；原始碼：common/family.js） -->
   <script>
@@ -3856,6 +3856,7 @@
       "摺": "ㄓㄜˊ",
       "費": "ㄈㄟˋ",
       // M1c：孩子選單（誰要玩？、小狐狸）
+      // 「狸」標輕聲只在「狐狸」裡才對（單獨的「狸」是 ㄌㄧˊ）；目前只有「小狐狸」用到
       "誰": "ㄕㄟˊ",
       "狐": "ㄏㄨˊ",
       "狸": "˙ㄌㄧ"
@@ -4981,6 +4982,8 @@
     }
 
     function switchMode(modeId) {
+      // 啟動時的「誰要玩？」還沒選好：一律不出題（安全做法：不清旗標，只有 pickChild 選好孩子才會清掉 awaitingPick 再出題）
+      if (awaitingPick) return;
       currentMode = modeId;
       renderNavigation();
       closeModal();
@@ -7257,9 +7260,19 @@
 
     // cancellable：點頭像打開的可以「不要換」；啟動時的不能取消
     function openChildPicker(cancellable) {
-      pickerCancellable = !!cancellable;
+      pickerCancellable = !!cancellable && !awaitingPick;   // 啟動時還沒選好：不能取消
       renderChildPicker();
       document.getElementById('childPickerModal').style.display = 'flex';
+      setPickerInert(true);
+      const first = document.querySelector('#childPickerList .child-pick-btn');
+      if (first) first.focus();
+    }
+
+    // 「誰要玩？」開著時背景不能用鍵盤（Tab／Enter）操作：頂端、題型按鈕、題目區、小熊都設 inert
+    function setPickerInert(on) {
+      document.querySelectorAll('header, .nav-tabs, .classroom-work-area, .teacher-bear-station').forEach(el => {
+        if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+      });
     }
 
     function renderChildPicker() {
@@ -7281,6 +7294,7 @@
 
     function closeChildPicker() {
       document.getElementById('childPickerModal').style.display = 'none';
+      setPickerInert(false);
     }
 
     function cancelChildPicker() {
