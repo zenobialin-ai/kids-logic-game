@@ -3997,6 +3997,30 @@
       "鐘": "ㄓㄨㄥ"
     };
 
+    // 詞的讀音（M1d）：比單字優先、長的詞先比對；破音字（家長、轉一圈、一樣重）、輕聲（做得、爸爸、看看…）
+    // 讀音照教育部《重編國語辭典修訂本》／邏輯遊戲的 DATA.words；字典沒收的動詞重疊（算算、數數…）第二個字標輕聲
+    const ZhuyinWords = {
+      "家長": "ㄐㄧㄚ ㄓㄤˇ",
+      "轉一圈": "ㄓㄨㄢˋ ㄧ ㄑㄩㄢ",
+      "自轉": "ㄗˋ ㄓㄨㄢˋ",
+      "轉軸": "ㄓㄨㄢˋ ㄓㄡˊ",
+      "一樣重": "ㄧ ㄧㄤˋ ㄓㄨㄥˋ",
+      "做得": "ㄗㄨㄛˋ ˙ㄉㄜ",
+      "看得": "ㄎㄢˋ ˙ㄉㄜ",
+      "變得": "ㄅㄧㄢˋ ˙ㄉㄜ",
+      "步得": "ㄅㄨˋ ˙ㄉㄜ",
+      "爸爸": "ㄅㄚˋ ˙ㄅㄚ",
+      "媽媽": "ㄇㄚ ˙ㄇㄚ",
+      "謝謝": "ㄒㄧㄝˋ ˙ㄒㄧㄝ",
+      "看看": "ㄎㄢˋ ˙ㄎㄢ",
+      "試試": "ㄕˋ ˙ㄕ",
+      "算算": "ㄙㄨㄢˋ ˙ㄙㄨㄢ",
+      "數數": "ㄕㄨˇ ˙ㄕㄨ",
+      "分分": "ㄈㄣ ˙ㄈㄣ",
+      "摸摸": "ㄇㄛ ˙ㄇㄛ"
+    };
+    const ZY_MAX_WORD = Math.max(...Object.keys(ZhuyinWords).map(w => w.length));
+
     // 解析注音字串：拆出輕聲(˙)、側邊聲調(ˊˇˋ)與注音本體符號
     function parseZhuyin(raw) {
       let isNeutral = false;
@@ -4039,14 +4063,25 @@
       if (!str || typeof str !== 'string') return str || "";
       if (!/[\u4e00-\u9fff]/.test(str)) return str;
 
-      return str.replace(/(<span class="zy-unit"[\s\S]*?<\/span>|<[^>]+>|[\u4e00-\u9fff])/g, (match) => {
-        if (match.startsWith('<span class="zy-unit"') || match.startsWith('<')) {
-          return match;
+      // 已經加過注音的 zy-unit、HTML 標籤原樣保留（zy 可以重複呼叫）；連續的中文先比對 ZhuyinWords，再逐字查 ZhuyinMap
+      return str.replace(/(<span class="zy-unit"[\s\S]*?<\/span>|<[^>]+>|[\u4e00-\u9fff]+)/g, (match) => {
+        if (match.startsWith('<')) return match;
+        let out = '';
+        for (let i = 0; i < match.length;) {
+          let n = Math.min(ZY_MAX_WORD, match.length - i);
+          for (; n >= 2; n--) {
+            const w = ZhuyinWords[match.substr(i, n)];
+            if (!w) continue;
+            const sy = w.split(' ');
+            for (let k = 0; k < n; k++) out += formatZyChar(match[i + k], sy[k]);
+            break;
+          }
+          if (n >= 2) { i += n; continue; }
+          const ch = match[i];
+          out += ZhuyinMap[ch] ? formatZyChar(ch, ZhuyinMap[ch]) : ch;
+          i++;
         }
-        if (ZhuyinMap[match]) {
-          return formatZyChar(match, ZhuyinMap[match]);
-        }
-        return match;
+        return out;
       });
     }
 
@@ -7341,7 +7376,8 @@
       MistakeBook.updateBadge();
       CheckinBook.updateBadge();
       renderChildAvatar();
-      if (!awaitingPick) switchMode(currentMode);   // 啟動時的「誰要玩？」還沒選好：不出題
+      // 啟動時的「誰要玩？」還沒選好：不出題；護眼鎖著也不出題（解鎖後 hideEyeLock 會出新題）
+      if (!awaitingPick && !eyeLockShown()) switchMode(currentMode);
     }
 
     // 換成名單上的另一位孩子（頭像、「誰要玩？」、家長設定都走這裡）
