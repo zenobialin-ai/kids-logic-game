@@ -135,7 +135,7 @@ qlogConfig = {
 | `mul` | ✖️ 乘法 | `mul:<mulNum>x<mulCount>` |
 | `div` | ➗ 除法 | `div:<totalBeads>/2` |
 | `bank.add`、`bank.sub` | 🏛️ 銀行（依 `bankOperation`） | `bank:<A>op<B>`；`bankCarrying` 記在 `difficulty` |
-| `challenge.add`、`challenge.sub`、`challenge.muldiv` | 🏆 挑戰（依 `currentChallengeData.category`：萬以內加法 → add、萬以內減法 → sub、千位乘法／千位除法 → muldiv；實作時先 grep 確認實際的 category 字串） | `challenge:<formulaText>` |
+| `challenge.add`、`challenge.sub`、`challenge.muldiv` | 🏆 挑戰（依 `currentChallengeData.category`：萬以內加法 → add、萬以內減法 → sub、千位乘法／千位除法 → muldiv；實作時先 grep 確認實際的 category 字串） | `challenge:<formulaText>`；`difficulty` 記 `currentChallengeType`（`all`／`add`／`sub`／`mul`／`div`） |
 | `balance` | ⚖️ 天平 | `balance:<左邊各部分>=<右邊底數>+?` |
 
 - **第一次遇到（`first`）**：同一位孩子、同一組在保留的紀錄裡沒有相同 `qk`；有的話是 `repeat`。
@@ -153,7 +153,7 @@ qlogConfig = {
 
   - **已經關閉的紀錄再關、再記事件都不做任何事**（R2 的通用規則）。
   - **數學樂園沒有選單頁**：除了答對以外，每一種「關閉」之後都要出新題目（會開新紀錄），時間點照第 2 節「什麼時候出題」：解鎖後、換孩子後、`away` 後選好孩子時。否則題目還在畫面上，孩子作答卻沒有被記錄。
-- **答錯**：記 `w`。
+- **答錯**：記 `w`，資料跟 schema v1 一樣是 `{ text, dup, hint }`：`text` 是點的數字；同一筆紀錄裡同一個錯的值再按一次（錯的選項只有 `pointer-events:none`，鍵盤 Enter／Space 還按得到）→ `dup:true`，只加 `wrongDupCount`；`hint` 只有挑戰的直式提示開著時是 `'r'`，其他是 `false`。
 - **`p`（純猜答對的機率）與 `form`**：
   - 7 個題型第一次作答都是 4 選 1 → `p = 1/4`、`form` 不設、`nOptions:4`。`p` 只看第一次作答，之後選項變少不影響。
   - 天平：`firstAnswer` **只看選項點擊**，另外記 `firstAnswer.stepsBefore`（第一次點選項之前按了幾次 +1／−1）。
@@ -165,6 +165,7 @@ qlogConfig = {
   - 挑戰的直式提示 → `verticalHint`（分級 `r`：直接露出答案），只在「隱藏 → 顯示」時記一次（換題時已經會重設成隱藏，約 5587 行）。
 - **點擊 `t`**：capture 階段 `click`，範圍是 `#gameContent`（天平的 +1／−1 也在裡面）。**不可以**用 `.classroom-work-area`，因為貼紙簿、衣帽間等視窗都在它裡面。
 - **離開畫面時間 `offMs`**：切到背景＋彈出視窗（`#modalOverlay` 顯示中）＋護眼鎖住。用 `MutationObserver` 監看 `#modalOverlay` 的 `style` 屬性和鎖定畫面，不要用每秒輪詢。
+  - M2c 之前：數學樂園的 `qlogConfig.offTracked:false`，`offMs`、`activeMs`、`firstAnswer.off` 一律記 `null`（還算不準，不記成 0）；M2c 做好 `MutationObserver` 後改成 `true`。
 - **上限**：
   - 數學樂園的紀錄：每組 30 筆；所有孩子合計 **400K 字元**；每位孩子 `min(150K, 400K ÷ 孩子數)`。數學樂園一筆約 0.5～0.8K，10 組存滿約 210K，所以會先碰到容量上限、從筆數最多的那一組刪最舊的。
   - 邏輯遊戲維持 1M。兩個遊戲的紀錄合計 1.4M；加上邏輯遊戲錯題本（≤400K）和數學樂園其他資料（每位孩子每年約 30K）→ **約 2.0M 字元以內**，仍在保守估計的 2.5M（Safari 以 UTF-16 bytes 計）之內，但餘裕變小（QM6）。
@@ -415,7 +416,7 @@ M1a 和 M2a 會改動邏輯遊戲現有的程式，必須證明行為完全不�
 **要讀的範圍**：7 個 `init*` 的出題和答對／答錯分支、`switchMode`、`nextQuestion`、`setChallengeType`、`setBankOp`、`toggleBankCarrying`、`setDifficulty`、`retryMistake`、`generateChallengeProblem` 裡的 category 字串。
 
 **要改的**
-- 數學樂園的 `qlogConfig`：`base:'montessori_qlog_v1'`、`build:1`、`buildOpen()`（題目快照、第 3 節的 `qk`、`module`、`sub`、`summary`、`p`、`nOptions`、`difficulty`）、`isOff()`（這輪先只看 `#modalOverlay` 和鎖定畫面）、`actionsTemplate:{steps:0}`、`onAnswerEvent` 不做事。
+- 數學樂園的 `qlogConfig`：`base:'montessori_qlog_v1'`、`build:1`、`buildOpen()`（第 3 節的 `qk`（運算數已經在 `qk`、`summary` 裡，不另存題目快照）、`module`、`sub`、`summary`、`p`、`nOptions`、`difficulty`）、`isOff()`（這輪先只看 `#modalOverlay` 和鎖定畫面）、`actionsTemplate:{steps:0}`、`onAnswerEvent` 不做事。
 - `qlogBeginQuestion()` 放在 7 個 `init*` 的結尾。
 - 第 3 節的所有結束路徑；第 2 節「什麼時候出題」。
 - `retryMistake` 改收 mistake id，下一次開題記 `via:'mistakeBook'`、`mistakeId`。
