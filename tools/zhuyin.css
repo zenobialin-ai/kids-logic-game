@@ -3,7 +3,7 @@
        innerText、語音朗讀或複製的文字。 */
     .zy-u {
       display: inline-block;
-      margin: 0 0.06em;
+      margin: 0 0.12em;   /* #28：字與字之間留空，版面不擠 */
       text-indent: 0;
       white-space: nowrap;
     }
@@ -32,6 +32,8 @@
       position: absolute;
       line-height: 1;
     }
-    .zy-t::after { left: 100%; bottom: 0.1em; margin-left: 0.05em; }
+    /* #28：聲調放在注音框裡面（右側留位置），不會壓到下一個字 */
+    .zy-t { padding-right: 0.6em; }
+    .zy-t::after { right: 0; bottom: 0.1em; }
     .zy-n { padding-top: 0.7em; }
     .zy-n::after { top: 0; left: 50%; transform: translateX(-50%); }
