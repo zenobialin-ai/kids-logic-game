@@ -25,7 +25,8 @@
  *   PLAYWRIGHT_PATH   playwright 模組的路徑（預設 'playwright'，也就是用 require 找得到的那一份）
  *                     例：PLAYWRIGHT_PATH=C:/Users/me/AppData/Local/npm-cache/_npx/xxxx/node_modules/playwright
  *   PW_CHANNEL        瀏覽器 channel（例：msedge、chrome）；沒裝 Playwright 內建 chromium 時使用
- *   REGRESS_MASK=0    不遮時間欄位（預設會遮，見下）
+ *   REGRESS_MASK=1    遮掉時間欄位（預設不遮：假時鐘暫停在固定時間，時間戳本身就是固定的，
+ *                     不遮才抓得到時間戳的改變；跟 logic_regress.js 一樣）
  *   REGRESS_HEADED=1  顯示瀏覽器視窗（除錯用）
  *   需要 Playwright 1.45 以上（用到 clock）。
  *
@@ -34,13 +35,16 @@
  *   - context.clock 安裝假時鐘並暫停在固定時間；setTimeout／Date 只在本工具呼叫 clock.runFor() 時才前進
  *     （答對後 250～500ms 才出現的過關視窗用 runFor 快轉）。
  *   - 瀏覽器一律加 --mute-audio 啟動，跑測試時不會發出任何聲音（遊戲用 WebAudio 播音效）。
+ *   - 音效 Sound 換成假的、不發聲：DOMContentLoaded 時把 Sound 的每個方法（init 以外）換成只記名字，
+ *     每一步 steps[].sounds 列出這一步呼叫過的方法（依呼叫順序）。啟動程式在 DOMContentLoaded 前就跑完，
+ *     所以啟動當下（init 那一步之前）的音效不會被記到。
  *   - 全新的 browser context（localStorage 是空的），時區固定 Asia/Taipei、語系 zh-TW。
  *   - 正確答案從頁面的全域變數讀（answerOf()；改名時只要改這裡），錯的答案 = 第一個不等於正確答案的選項。
  *
- * 【預設遮掉的欄位（換成 "<t>"；REGRESS_MASK=0 時不遮）】
+ * 【REGRESS_MASK=1 時遮掉的欄位（換成 "<t>"）】
  *   - 錯題本 montessori_mistakes*：time
  *   - 打卡 montessori_checkin*：records[*].timestamp
- *   假時鐘是固定的，所以這些值本來也固定；遮掉是為了計畫裡「遮掉時間」的約定。打卡的日期 key、lastDate 不遮。
+ *   假時鐘是固定的，所以這些值本來也固定，預設不遮。打卡的日期 key、lastDate 一律不遮。
  *
  * 【ID 代號化（一律會做）】
  *   錯題 id（'m_' + Date.now() + 亂數）依出現順序換成 <mistake#1>、<mistake#2>…
@@ -57,7 +61,7 @@
  * 【輸出】
  *   { pageErrors: { count, messages }, steps[], localStorage{} }
  *   steps[] 是每一步之後畫面上看得到的狀態（星星、貼紙、錯題本／打卡徽章、目前題型、開著的視窗、
- *   小熊的話、選項按鈕的狀態…）。localStorage{} 是所有 key（JSON 會先 parse、key 排序）。
+ *   小熊的話、選項按鈕的狀態、這一步播過的音效…）。localStorage{} 是所有 key（JSON 會先 parse、key 排序）。
  */
 'use strict';
 
@@ -66,7 +70,7 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 
 const PW = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const MASK = process.env.REGRESS_MASK !== '0';
+const MASK = process.env.REGRESS_MASK === '1';
 const T0 = Date.UTC(2026, 0, 15, 1, 0, 0);   // 台北時間 2026-01-15 09:00
 const SEED = 20260115;
 const M = '<t>';
@@ -83,6 +87,16 @@ function initScript(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  // 假的音效：只記方法名稱，不發聲（Sound 是頁面上的 const，要等主程式跑完才拿得到）
+  window.__soundLog = [];
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      /* global Sound */
+      for (const k of Object.keys(Sound)) {
+        if (typeof Sound[k] === 'function' && k !== 'init') Sound[k] = function () { window.__soundLog.push(k); };
+      }
+    } catch (e) { window.__soundLog.push('<no Sound>'); }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +195,7 @@ function makeCtx(page, clock, steps) {
         modalTitle: modals.includes('successModal') ? txt(document.getElementById('modalTitle')) : null,
         mascot: txt(document.getElementById('mascotSpeech')),
         choices,
+        sounds: (window.__soundLog || []).splice(0),
         globals: g
       };
     });

@@ -17,7 +17,7 @@ import re
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 SOURCE = os.path.join(ROOT, 'common', 'family.js')
-TARGETS = ['logic_game.html']  # montessori_math_game.html 在 M1b 加入
+TARGETS = ['logic_game.html', 'montessori_math_game.html']
 START, END = '<!-- FAMILY:START', '<!-- FAMILY:END -->'
 
 
