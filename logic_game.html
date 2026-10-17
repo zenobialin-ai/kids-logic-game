@@ -7385,15 +7385,24 @@
       soundClick();
       document.getElementById('parentGateBox').style.display = 'block';
       document.getElementById('parentSettingsBox').style.display = 'none';
-      document.getElementById('parentGateQ').textContent = newParentGate('parentGate', showParentSettings);
-      setGateMessage('parentGate', '');
+      // 沒答對前關掉再打開：沿用同一題、次數和冷卻（#35，跟數學樂園的 openGateForm 一樣）
+      const gate = parentGates.parentGate;
+      if (gate) {
+        document.getElementById('parentGateQ').textContent = `${gate.a} + ${gate.b} = ?`;
+        const wait = gate.cooldownUntil - Date.now();
+        setGateMessage('parentGate', wait > 0 ? `請等 ${Math.ceil(wait / 1000)} 秒再試一次` : '');
+      } else {
+        document.getElementById('parentGateQ').textContent = newParentGate('parentGate', showParentSettings);
+        setGateMessage('parentGate', '');
+      }
+      document.getElementById('parentGateInput').value = '';
       document.getElementById('parentModal').classList.add('active');
       document.getElementById('parentGateInput').focus();
     }
 
     function closeParentSettings() {
       soundClick();
-      delete parentGates.parentGate;
+      document.getElementById('parentGateInput').value = '';   // 只清輸入框；算式和冷卻留著（#35）
       cancelSpeech();   // 關掉時一併停掉試聽（還在念會記 cut）
       document.getElementById('parentModal').classList.remove('active');
     }
