@@ -1617,8 +1617,14 @@
       header { padding: 10px 12px; }
       .brand { gap: 6px; }
       .brand-icon { font-size: 26px; }
-      .brand-title { font-size: 15px; white-space: nowrap; }
+      /* #28：加了注音字距後標題變寬，放不下時讓標題換行，不要把右邊的按鈕擠出畫面 */
+      .brand { min-width: 0; }
+      /* 標題列：關卡標籤（例如「誰是神秘怪獸」）放不下時換行，朗讀鈕才不會被擠出卡片 */
+      .game-title-box { min-width: 0; }
+      html:not(.fs-large) .level-badge { white-space: normal; }
+      .brand-title { font-size: 15px; white-space: normal; }
       .header-stats { gap: 4px; flex-shrink: 0; }
+      .sync-btn .btn-label { display: none; }   /* 只留圖示，標題才放得下 */
       .stat-badge { padding: 3px 8px; font-size: 15px; gap: 4px; }
       .sync-btn { padding: 6px 10px; min-height: 40px; }
       /* 小朋友的手指：可點的東西至少 40px */
@@ -1673,6 +1679,13 @@
       .game-title-box { flex-wrap: wrap; gap: 6px 8px; }
       .game-title { font-size: calc(18px * var(--fs)); }
       .level-badge { white-space: nowrap; font-size: calc(15px * var(--fs)); padding: 3px 10px; }
+    }
+
+    /* #28：注音字距加大後，窄螢幕放不下的長標籤（「誰是神秘怪獸」）和推理的檢查按鈕要能換行，
+       不然朗讀鈕會被擠出卡片、按鈕會比卡片寬。字級「大」時 378px 也會發生，所以範圍到 420px */
+    @media (max-width: 420px) {
+      #view-deduction .btn-run, #view-maze .btn-run { white-space: normal; max-width: 100%; }
+      .font-size-ctrl { flex-wrap: wrap; justify-content: center; }
     }
 
     /* 按鈕只留圖示：480px 以下才需要，600px 左右還放得下文字 */
@@ -7430,7 +7443,7 @@
        innerText、語音朗讀或複製的文字。 */
     .zy-u {
       display: inline-block;
-      margin: 0 0.06em;
+      margin: 0 0.12em;   /* #28：字與字之間留空，版面不擠 */
       text-indent: 0;
       white-space: nowrap;
     }
@@ -7459,7 +7472,9 @@
       position: absolute;
       line-height: 1;
     }
-    .zy-t::after { left: 100%; bottom: 0.1em; margin-left: 0.05em; }
+    /* #28：聲調放在注音框裡面（右側留位置），不會壓到下一個字 */
+    .zy-t { padding-right: 0.6em; }
+    .zy-t::after { right: 0; bottom: 0.1em; }
     .zy-n { padding-top: 0.7em; }
     .zy-n::after { top: 0; left: 50%; transform: translateX(-50%); }
   </style>
