@@ -3429,6 +3429,22 @@
       } finally { qlogEvicting = false; }
     }
 
+    // 點擊 t 事件的目標與標籤（兩個遊戲共用；capture 的掛法和範圍由各遊戲決定）
+    function qlogEventTarget(el) {
+      let n = el;
+      while (n) {
+        if (n.tagName === 'BUTTON' || typeof n.onclick === 'function') return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+    function qlogEventLabel(el, keyboard) {
+      // minor 1：先放 trim 過的文字、再放 class；按字元切，emoji 不會被切斷
+      const t = (el.textContent || '').trim();
+      const s = el.id || (Array.from(t).slice(0, 12).join('') + ' ' + (el.className || ''));
+      return keyboard ? 'k:' + s : s;
+    }
+
     // offMs：「離開畫面」由遊戲判斷（logic：切到背景 + 任何彈出視窗 + 護眼鎖住）
     function qlogIsOff() { return !!qlogConfig.isOff(); }
     function qlogOffTick() {
@@ -4194,7 +4210,8 @@
     // 📝 學習紀錄（M2b）：紀錄核心（qlogOpen／qlogEvent／qlogClose…）在 family.js，這裡只接數學樂園專屬的部分
     // =========================================================================
     // build：之後只有改到數學樂園出題、作答的 PR 才 +1（跟邏輯遊戲的 build 分開算）
-    const MONTESSORI_LOG_BUILD = 1;
+    // 2（M2c）：offMs／activeMs／firstAnswer.off 開始記數字（build 1 一律是 null）
+    const MONTESSORI_LOG_BUILD = 2;
     // 分頁 id、紀錄 id 不用 Math.random（不能改變出題用的亂數序列）
     const qlogTab = (() => {
       try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36).padStart(6, '0').slice(-6); }
@@ -4286,16 +4303,65 @@
       build: MONTESSORI_LOG_BUILD,
       tab: qlogTab,
       buildOpen: qlogBuildOpen,
-      // offMs（M2b 先只看彈出視窗和護眼鎖；切到背景在 M2c）
-      offTracked: false,   // 離開畫面的計時在 M2c 才完整：在那之前 offMs／activeMs／firstAnswer.off 記 null
-      isOff: () => {
-        const overlay = document.getElementById('modalOverlay');
-        return (!!overlay && overlay.style.display === 'block') || eyeLockShown();
-      },
+      // offMs：切到背景 + 任何彈出視窗（#modalOverlay）+「誰要玩？」+ 護眼鎖住
+      offTracked: true,
+      isOff: () => document.visibilityState !== 'visible' || QLOG_OFF_ELS.some(q => q.on()),
       actionsTemplate: { steps: 0 },
       countAction: () => null,   // 天平的 +1／−1（actions.steps）在 M3 才記
       onAnswerEvent: () => {}    // 數學樂園沒有語音
     });
+
+    // 「離開畫面」的元素：彈出視窗都會打開 #modalOverlay（style.display）；「誰要玩？」是另一層（style.display）；護眼鎖是 class
+    const QLOG_OFF_ELS = [
+      { id: 'modalOverlay', on: () => { const el = document.getElementById('modalOverlay'); return !!el && el.style.display === 'block'; } },
+      { id: 'childPickerModal', on: () => childPickerOpen() },
+      { id: 'eyeLock', on: () => eyeLockShown() }
+    ];
+    // o = 進入不算時間的狀態，n = 離開；n 只記在記過 o 的那一筆（解鎖、選好孩子後馬上開的新一筆不會多一個 n）
+    const qlogOffState = {};   // { id: { on, rec } }
+    function qlogWatchOff() {
+      try {
+        for (const q of QLOG_OFF_ELS) {
+          const on = !!q.on();
+          const st = qlogOffState[q.id] || (qlogOffState[q.id] = { on: false, rec: null });
+          if (on === st.on) continue;   // style 改了但顯示狀態沒變
+          st.on = on;
+          const r = qlogActive && qlogActive.outcome === null ? qlogActive : null;
+          if (on) { st.rec = r ? r.id : null; if (r) qlogEvent('o', q.id); }
+          else { if (r && st.rec === r.id) qlogEvent('n', q.id); st.rec = null; }
+        }
+        qlogOffTick();
+      } catch (e) {}
+    }
+    try {
+      const watcher = new MutationObserver(qlogWatchOff);
+      for (const q of QLOG_OFF_ELS) {
+        const el = document.getElementById(q.id);
+        if (el) watcher.observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+      }
+    } catch (e) {}
+    // 點擊 t：capture 階段，只算題目區 #gameContent（貼紙簿、衣帽間等視窗不在裡面）；鍵盤觸發加 k:
+    document.addEventListener('click', e => {
+      try {
+        if (!qlogActive || qlogActive.outcome !== null) return;
+        const box = document.getElementById('gameContent');
+        if (!box || !box.contains(e.target)) return;
+        const el = qlogEventTarget(e.target);
+        if (!el) return;
+        qlogEvent('t', qlogEventLabel(el, e.detail === 0));
+      } catch (e2) {}
+    }, true);
+    document.addEventListener('pointerdown', e => {
+      try {
+        if (!qlogActive || qlogActive.outcome !== null) return;
+        const box = document.getElementById('gameContent');
+        if (!box || !box.contains(e.target)) return;
+        qlogActive.pointerDownCount++;   // 只計數，不記成事件
+      } catch (e2) {}
+    }, true);
+    setInterval(qlogHeartbeat, QLOG_HEARTBEAT_MS);
+    window.addEventListener('pagehide', () => { try { if (qlogActive) { qlogOffTick(); qlogSaveRecord(qlogActive); } } catch (e) {} });   // 只存檔、不關紀錄（下次載入復原成 unload）
+    window.addEventListener('pageshow', () => { try { if (qlogActive) { qlogOffTick(); qlogSaveRecord(qlogActive); } } catch (e) {} });
 
     // 每個 init* 出題完成時呼叫：還開著的上一筆用 replaced 關掉（在 qlogOpen 裡），再開這一題
     function qlogBeginQuestion() {
@@ -8121,7 +8187,13 @@
 
     document.addEventListener('visibilitychange', () => {
       eyeLastTick = performance.now();
-      if (document.visibilityState === 'hidden') { markSeen(); saveEyeState(); }   // 記下「離開的時間」（邏輯遊戲也看這個 key）
+      const hidden = document.visibilityState === 'hidden';
+      qlogEvent(hidden ? 'o' : 'n', 'hidden');
+      qlogOffTick();
+      if (hidden) {
+        markSeen(); saveEyeState();   // 記下「離開的時間」（邏輯遊戲也看這個 key）
+        try { if (qlogActive) qlogSaveRecord(qlogActive); } catch (e) {}   // 紀錄程式不能影響遊戲
+      }
       else handleAway();
     });
 
@@ -8139,6 +8211,7 @@
     // =========================================================================
     // 讀孩子名單 → 載入這位孩子的進度 → 最後才出題
     activeChildId = readProfiles().active;
+    qlogRecover();   // 別的分頁（已關掉）留著的數學樂園紀錄 → unload
     loadRewardData();
     loadDifficulty();
     renderNavigation();
