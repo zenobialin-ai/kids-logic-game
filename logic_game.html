@@ -2555,6 +2555,7 @@
       tab: '',                        // 分頁 id（由遊戲自己產生）
       buildOpen: () => null,          // (source) → 這一題的紀錄；沒有題目就回傳 null
       isOff: () => false,             // 目前是否算「離開畫面」
+      offTracked: true,               // false：這個遊戲還沒有完整的離開畫面計時，offMs／activeMs／firstAnswer.off 記 null
       actionsTemplate: {},            // actions 的初始欄位
       countAction: () => null,        // (type, data) → x 事件要累加的 actions 欄位（不累加就回傳 null）
       onAnswerEvent: () => {}         // (r, type) → 答題事件（w／c）的遊戲專屬處理
@@ -2748,9 +2749,9 @@
           if (data && data.dup) r.wrongDupCount++;
           else { r.wrongCount++; r.wrongCountGame++; }   // N-B：復原那條路不會跑 qlogSummarize，這裡就要算
           // M2：先 qlogOffTick() 再記 off＝作答當下的累計 offMs（不是整題的 offMs）
-          if (!r.firstAnswer) { qlogOffTick(); r.firstAnswer = { ok: false, dt: dt, off: qlogOffMs }; }
+          if (!r.firstAnswer) { qlogOffTick(); r.firstAnswer = { ok: false, dt: dt, off: qlogConfig.offTracked ? qlogOffMs : null }; }
         } else if (type === 'c' && !r.firstAnswer) {
-          qlogOffTick(); r.firstAnswer = { ok: true, dt: dt, off: qlogOffMs };
+          qlogOffTick(); r.firstAnswer = { ok: true, dt: dt, off: qlogConfig.offTracked ? qlogOffMs : null };
         }
         // R3：輔助、動作計數、漏水
         // R3 Minor 7：aids 跟 ev 一樣最多 100 筆；計數另外記，不受上限影響
@@ -2770,6 +2771,7 @@
 
     function qlogSummarize(r) {
       // M2：tapCount / wrongCount / wrongDupCount / wrongCountGame / firstAnswer 已在 qlogEvent 當下累加
+      if (!qlogConfig.offTracked) { r.offMs = null; r.activeMs = null; return; }
       r.offMs = qlogOffMs;
       r.activeMs = r.tClose - r.tOpen - r.offMs;
     }
