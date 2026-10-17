@@ -365,8 +365,11 @@ function qlogOffTick() {
 // 開一筆新紀錄：這一題的內容由遊戲組（qlogConfig.buildOpen；沒有題目就回傳 null）
 function qlogOpen(source) {
   try {
-    const rec = qlogConfig.buildOpen(source);
-    if (!rec) return null;
+    let rec;
+    try { rec = qlogConfig.buildOpen(source); }
+    catch (e) { if (qlogActive) qlogClose('replaced'); return null; }   // 組新紀錄出錯：跟搬移前一樣，上一筆照樣關成 replaced
+    if (!rec) return null;                   // 不在題目中（例如沒有 currentModule）：不動上一筆
+    rec.build = qlogConfig.build;            // build 只由各遊戲的 qlogConfig 決定（key 已存在，欄位順序不變）
     if (qlogActive) qlogClose('replaced');   // 上一筆還沒關
     qlogActive = rec;
     qlogOffMs = 0; qlogOffSince = Date.now(); qlogOffNow = qlogIsOff();
