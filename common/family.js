@@ -173,8 +173,8 @@ function gateCheck(gate, value, now) {
 const QLOG_GAMES = {
   little_logic_qlog_v1: {
     game: 'logic',
-    modules: ['pattern', 'balance', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone', 'pipes'],
-    subs: ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard'],
+    modules: ['pattern', 'balance', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone', 'pipes', 'topview'],
+    subs: ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard', 'topview'],
     maxPerSub: 30, total: 1000000, perChild: 400000   // total：所有孩子合計（字元）
   },
   montessori_qlog_v1: {
@@ -508,14 +508,15 @@ const QLOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
 const QLOG_REPORT = {
   little_logic_qlog_v1: {
     title: '🚀 小小邏輯探險家',
-    icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰' },
+    icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰', topview: '🔦' },
     subLabel: {
       pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
       blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
       gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
-      'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
+      'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰',
+      topview: '光影小偵探'
     },
-    aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' },
+    aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例', topviewCount: '柱子數提示' },
     ownLines: {},
     actionLabel: { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' },
     // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
@@ -523,7 +524,8 @@ const QLOG_REPORT = {
       maze: ['submits', 'resets', 'commands'],
       'pipes.live': ['submits', 'resets', 'rotations'],
       'pipes.hard': ['submits', 'resets', 'rotations'],
-      blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
+      blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits'],
+      topview: ['submits', 'resets']
     },
     actionMinBuild: 2   // F1（第三次複查）：R2 寫的紀錄沒有動作掛鉤
   },
