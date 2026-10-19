@@ -893,7 +893,7 @@
     .tv-cell.marked { background: #334155; border-color: #0F172A; }
     .tv-cell.lit { box-shadow: 0 0 0 3px #FDE047, 0 0 14px 2px #FACC15; }
     .tv-bear {
-      font-size: calc(15px * var(--fs));
+      font-size: calc(15px * min(var(--fs), 1));   /* 標籤寬度固定，字級不隨字級設定放大，免得折成三行蓋到方格 */
       font-weight: 800;
       color: #92400E;
       background: #FEF3C7;
@@ -907,8 +907,8 @@
     /* 菱形（簡單／普通）：方格順時針轉 45°，小熊標籤是轉動容器的兄弟（文字保持水平），
        放在第 3 排那條邊（左下緣）的中點外側 */
     .tv-diamond {
-      --tv-L: 56px;       /* 左側留給小熊標籤的空間 */
-      --tv-K: 64px;       /* 標籤中心離邊的距離 */
+      --tv-L: 64px;       /* 左側留給小熊標籤的空間 */
+      --tv-K: 72px;       /* 標籤中心離邊的距離 */
       --tv-BW: 120px;
       width: calc(var(--tv-D) + var(--tv-L));
       height: calc(var(--tv-D) + 40px);
@@ -928,8 +928,8 @@
       top: calc(var(--tv-D) / 2 + var(--tv-S) * 0.35355 + var(--tv-K) * 0.70711);
       transform: translate(-50%, -50%);
     }
-    /* 寬螢幕橫放：圖和答案格左右並排，一頁看完 */
-    @media (min-width: 900px) and (orientation: landscape) {
+    /* 寬 ≥700px（平板直放、橫放、桌機）：圖和答案格左右並排，一頁看完；更窄就上下排，需要的話捲動 */
+    @media (min-width: 700px) {
       .tv-layout { flex-direction: row; justify-content: center; align-items: center; gap: 28px; }
     }
 
