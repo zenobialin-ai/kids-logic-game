@@ -206,6 +206,7 @@
     .card-raven   { border-color: #38BDF8; background: linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 100%); }
     .card-oddone  { border-color: #2DD4BF; background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%); }
     .card-pipes   { border-color: #60A5FA; background: linear-gradient(180deg, #EFF6FF 0%, #FFFFFF 100%); }
+    .card-topview { border-color: #FACC15; background: linear-gradient(180deg, #FEFCE8 0%, #FFFFFF 100%); }
 
     .oddone-items {
       display: flex;
@@ -858,6 +859,79 @@
     .pipes-container .action-btn-group { justify-content: center; }
     .pipe-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .pipe-tip { font-weight: 800; color: #64748B; font-size: var(--font-content); text-align: center; }
+
+    /* TOPVIEW SPECIFICS (光影小偵探：俯視圖還原) */
+    .tv-layout { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .tv-canvas-wrap { max-width: 100%; }
+    #topviewCanvas { max-width: 100%; height: auto; }
+    .tv-panel { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; }
+    .tv-panel .action-btn-group { justify-content: center; }
+    /* 格子大小：窄手機（≤360px）44px；否則寬 ≤600px 或高 ≤1024px 用 48px；其餘 56px */
+    .tv-board {
+      --tv-cell: 56px;
+      --tv-gap: 4px;
+      --tv-S: calc(var(--tv-cell) * 3 + var(--tv-gap) * 2);
+      --tv-D: calc(var(--tv-S) * 1.4143);
+      position: relative;
+      max-width: 100%;
+    }
+    @media (max-width: 600px), (max-height: 1024px) { .tv-board { --tv-cell: 48px; } }
+    @media (max-width: 360px) { .tv-board { --tv-cell: 44px; } }
+    .tv-grid { display: grid; grid-template-columns: repeat(3, var(--tv-cell)); gap: var(--tv-gap); }
+    .tv-cell {
+      width: var(--tv-cell);
+      height: var(--tv-cell);
+      padding: 0;
+      border: 3px solid #94A3B8;
+      border-radius: 8px;
+      background: #FEF9C3;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .tv-cell:focus-visible { outline: 3px solid #6366F1; outline-offset: 2px; }
+    .tv-cell:disabled { cursor: default; }
+    .tv-cell.marked { background: #334155; border-color: #0F172A; }
+    .tv-cell.lit { box-shadow: 0 0 0 3px #FDE047, 0 0 14px 2px #FACC15; }
+    .tv-bear {
+      font-size: calc(15px * min(var(--fs), 1));   /* 標籤寬度固定，字級不隨字級設定放大，免得折成三行蓋到方格 */
+      font-weight: 800;
+      color: #92400E;
+      background: #FEF3C7;
+      border-radius: 12px;
+      padding: 4px 8px;
+      text-align: center;
+    }
+    /* 方格（困難）：直立方格，小熊在下緣中間 */
+    .tv-square .tv-grid { width: var(--tv-S); margin: 0 auto; }
+    .tv-square .tv-bear { width: max-content; max-width: 100%; margin: 10px auto 0; }
+    /* 菱形（簡單／普通）：方格順時針轉 45°，小熊標籤是轉動容器的兄弟（文字保持水平），
+       放在第 3 排那條邊（左下緣）的中點外側 */
+    .tv-diamond {
+      --tv-L: 64px;       /* 左側留給小熊標籤的空間 */
+      --tv-K: 72px;       /* 標籤中心離邊的距離 */
+      --tv-BW: 120px;
+      width: calc(var(--tv-D) + var(--tv-L));
+      height: calc(var(--tv-D) + 40px);
+    }
+    .tv-diamond .tv-grid {
+      position: absolute;
+      width: var(--tv-S);
+      left: calc(var(--tv-L) + var(--tv-D) / 2);
+      top: calc(var(--tv-D) / 2);
+      transform: translate(-50%, -50%) rotate(45deg);
+    }
+    .tv-diamond .tv-bear {
+      position: absolute;
+      box-sizing: border-box;
+      width: var(--tv-BW);
+      left: calc(var(--tv-L) + var(--tv-D) / 2 - var(--tv-S) * 0.35355 - var(--tv-K) * 0.70711);
+      top: calc(var(--tv-D) / 2 + var(--tv-S) * 0.35355 + var(--tv-K) * 0.70711);
+      transform: translate(-50%, -50%);
+    }
+    /* 寬 ≥700px（平板直放、橫放、桌機）：圖和答案格左右並排，一頁看完；更窄就上下排，需要的話捲動 */
+    @media (min-width: 700px) {
+      .tv-layout { flex-direction: row; justify-content: center; align-items: center; gap: 28px; }
+    }
 
     .btn-run {
       background: #10B981;
@@ -1880,6 +1954,13 @@
           <div class="card-badge" id="badge-folding">✂️ 空間對稱與心智旋轉</div>
         </div>
 
+        <div class="menu-card card-topview" onclick="startModule('topview')">
+          <div class="icon">🔦</div>
+          <h3>光影小偵探</h3>
+          <p>手電筒從上面照下來，影子會在哪裡？</p>
+          <div class="card-badge" id="badge-topview">🔦 俯視圖與心智旋轉</div>
+        </div>
+
         <div class="menu-card card-gears" onclick="startModule('gears')">
           <div class="icon">⚙️</div>
           <h3>齒輪連動旋轉</h3>
@@ -2067,6 +2148,36 @@
         <div class="action-btn-group">
           <button class="btn-clear" onclick="resetPipes()">🔄 恢復原狀</button>
           <button class="btn-run" id="btnPipeRun" onclick="runPipes()">🚰 打開水龍頭！</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODULE 11: TOPVIEW (光影小偵探：俯視圖還原) -->
+    <div id="view-topview" class="game-view">
+      <div class="game-header">
+        <div class="game-title-box">
+          <span style="font-size: 30px;">🔦</span>
+          <div class="game-title">光影小偵探</div>
+          <span class="level-badge" id="topviewLevelBadge">第 1 / 5 關</span>
+        </div>
+        <button class="speak-btn" onclick="speakCurrentPrompt(true)" title="朗讀題目" aria-label="朗讀題目">
+          <span aria-hidden="true">🔊</span> <span class="btn-label">朗讀題目</span>
+        </button>
+      </div>
+      <div class="prompt-box" id="topviewPrompt">手電筒從上面往下照，影子會在哪些格子？點一點，把影子塗上去！</div>
+      <div class="tv-layout">
+        <div class="canvas-wrap tv-canvas-wrap">
+          <canvas id="topviewCanvas" width="320" height="300" role="img" aria-label="積木堆疊的立體圖"></canvas>
+        </div>
+        <div class="tv-panel">
+          <div class="tv-board tv-diamond" id="topviewBoard">
+            <div class="tv-grid" id="topviewGrid"></div>
+            <div class="tv-bear" id="topviewBear">🐻 小熊站這裡</div>
+          </div>
+          <div class="action-btn-group">
+            <button class="btn-clear" id="topviewReset" onclick="resetTopview()">🧹 重來</button>
+            <button class="btn-run" id="topviewCheck" onclick="checkTopview()">✅ 檢查</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2534,8 +2645,8 @@
     const QLOG_GAMES = {
       little_logic_qlog_v1: {
         game: 'logic',
-        modules: ['pattern', 'balance', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone', 'pipes'],
-        subs: ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard'],
+        modules: ['pattern', 'balance', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone', 'pipes', 'topview'],
+        subs: ['pattern', 'balance.swap', 'balance.number', 'blocks', 'maze', 'deduction', 'folding', 'gears', 'raven', 'oddone.odd', 'oddone.sort', 'oddone.monster', 'pipes.live', 'pipes.hard', 'topview'],
         maxPerSub: 30, total: 1000000, perChild: 400000   // total：所有孩子合計（字元）
       },
       montessori_qlog_v1: {
@@ -2869,14 +2980,15 @@
     const QLOG_REPORT = {
       little_logic_qlog_v1: {
         title: '🚀 小小邏輯探險家',
-        icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰' },
+        icons: { pattern: '🔮', balance: '⚖️', blocks: '🧱', maze: '🤖', deduction: '🏡', folding: '🪞', gears: '⚙️', raven: '🔲', oddone: '🔍', pipes: '🚰', topview: '🔦' },
         subLabel: {
           pattern: '圖形規律', 'balance.swap': '天平換算', 'balance.number': '數字天平',
           blocks: '積木', maze: '迷宮', deduction: '動物排排坐', folding: '摺紙打孔',
           gears: '齒輪', raven: '瑞文九宮', 'oddone.odd': '找不同', 'oddone.sort': '分類',
-          'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰'
+          'oddone.monster': '怪獸', 'pipes.live': '水管即時', 'pipes.hard': '水管挑戰',
+          topview: '光影小偵探'
         },
-        aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例' },
+        aidLabel: { read: '朗讀', xrayOn: '透視鏡開', xrayOff: '透視鏡關', gearHint: '齒輪提示', gearExample: '齒輪範例', topviewCount: '柱子數提示' },
         ownLines: {},
         actionLabel: { submits: '送出', resets: '重來', rotations: '轉動', commands: '指令' },
         // R1（複查）：只列跟這一組有關的欄位（照目前的掛鉤列）；不在表上的組不顯示「動作數」
@@ -2884,7 +2996,8 @@
           maze: ['submits', 'resets', 'commands'],
           'pipes.live': ['submits', 'resets', 'rotations'],
           'pipes.hard': ['submits', 'resets', 'rotations'],
-          blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits']
+          blocks: ['submits'], gears: ['submits'], deduction: ['submits'], 'oddone.sort': ['submits'],
+          topview: ['submits', 'resets']
         },
         actionMinBuild: 2   // F1（第三次複查）：R2 寫的紀錄沒有動作掛鉤
       },
@@ -3231,7 +3344,8 @@
           gears: 0,
           raven: 0,
           oddone: 0,
-          pipes: 0
+          pipes: 0,
+          topview: 0
         },
         lastUpdated: Date.now()
       };
@@ -3606,14 +3720,16 @@
        所有函式都包在 try/catch 裡，完全不能改變遊戲行為。
        ========================================================= */
     // LOG_BUILD：之後每一個改到出題、作答或語音行為的 PR，都把當時的值 +1（owner 的 PR 也要）
-    const LOG_BUILD = 2;   // R3：語音／輔助／動作有記到，所以 +1
+    const LOG_BUILD = 3;   // #50：新增光影小偵探（R3：語音／輔助／動作有記到，所以 +1）
     const QLOG_SUBS = QLOG_GAMES.little_logic_qlog_v1.subs;   // 紀錄的格式、上限在 family.js 的 QLOG_GAMES
     // 提示分級：d 有方向性 / g 一般鼓勵 / r 直接演出答案
     const QLOG_HINT_GRADE = {
       'balance.number': 'd', 'blocks': 'd', 'maze': 'd', 'pipes.live': 'd', 'pipes.hard': 'd',
       'oddone.sort': 'd', 'oddone.monster': 'd',
       'pattern': 'g', 'balance.swap': 'g', 'deduction': 'g', 'folding': 'g', 'raven': 'g', 'oddone.odd': 'g',
-      'gears': 'r'
+      'gears': 'r',
+      // 第一次答錯的提示是一般鼓勵（g），第二次起的柱子數有方向性（d）；照最強的提示記
+      'topview': 'd'
     };
 
     let qlogTab = Math.random().toString(36).slice(2, 8);   // 這個分頁的身分
@@ -3652,6 +3768,7 @@
       if (module === 'balance' && q && q.mode === 'number') return 'multiSlot';
       if (module === 'oddone' && q && q.mode === 'monster') return 'eliminate';
       if (module === 'deduction') return 'arrange';
+      if (module === 'topview') return 'grid';
       return null;
     }
     function qlogNOptions(module, q) {
@@ -4002,6 +4119,9 @@
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
       if (pipeTimer) clearTimeout(pipeTimer);
       pipeRunning = false;
+      if (topviewAnimTimer) clearTimeout(topviewAnimTimer);
+      topviewAnimTimer = null;
+      topviewAnimating = false;
       cancelSpeech();
       document.querySelectorAll('.game-view').forEach(v => v.classList.remove('active'));
       document.getElementById('view-menu').style.display = 'block';
@@ -4055,7 +4175,8 @@
       gears: loadGearsLevel,
       raven: loadRavenLevel,
       oddone: loadOddoneLevel,
-      pipes: loadPipesLevel
+      pipes: loadPipesLevel,
+      topview: loadTopviewLevel
     };
 
     function speakCurrentPrompt(manual = false) {
@@ -4086,6 +4207,8 @@
         promptText = document.getElementById('ravenPrompt').innerText;
       } else if (currentModule === 'pipes') {
         promptText = document.getElementById('pipesPrompt').innerText;
+      } else if (currentModule === 'topview') {
+        promptText = currentQuestion.prompt;
       }
       speakText(promptText, manual ? 'manual' : 'prompt');   // R3：手動朗讀 = manual，自動 = prompt
     }
@@ -5178,7 +5301,8 @@
       gears:     { icon: '⚙️', title: '齒輪連動旋轉' },
       raven:     { icon: '🔲', title: '瑞文氏九宮矩陣' },
       oddone:    { icon: '🔍', title: '找不同小偵探' },
-      pipes:     { icon: '🚰', title: '水管接接樂' }
+      pipes:     { icon: '🚰', title: '水管接接樂' },
+      topview:   { icon: '🔦', title: '光影小偵探' }
     };
     let retryMistakeId = null;
     let questionWrongAttempts = 0; // 目前這一題答錯了幾次
@@ -5211,6 +5335,13 @@
         return Number.isInteger(q.size) && q.size >= 3 && q.size <= 5 && inRange(q.src) && inRange(q.dst) &&
           isStr(q.animal) && isStr(q.animalName) && isArr(q.tiles, row => isArr(row, okTile) && row.length === q.size) &&
           q.tiles.length === q.size && solvePipes(q) !== null;
+      },
+      topview: q => {
+        const okRow = row => isArr(row, v => Number.isInteger(v) && v >= 0 && v <= 3) && row.length === 3;
+        return isArr(q.heights, okRow) && q.heights.length === 3 &&
+          (q.layout === 'diamond' || q.layout === 'square') && (q.view === 0 || q.view === 1) &&
+          (q.layout !== 'diamond' || q.view === 0) &&
+          topviewColumnCount(q) >= 1 && topviewColumnCount(q) <= 8 && isStr(q.prompt);
       },
       oddone: q => {
         const nonEmpty = v => isStr(v) && v.length > 0;
@@ -5284,6 +5415,8 @@
       if (module === 'oddone' && q.mode === 'sort') return `分類：${q.baskets.join(' / ')}　${q.items.join(' ')}`;
       if (module === 'oddone') return q.items.join(' ');
       if (module === 'pipes') return `${q.size}×${q.size} 水管：🚰 第 ${q.src + 1} 列 → ${q.animal} 第 ${q.dst + 1} 列`;
+      // 光影小偵探只列總塊數與方格形狀，不透露哪些格子有積木
+      if (module === 'topview') return '共 ' + q.heights.flat().reduce((a, b) => a + b, 0) + ' 塊積木・' + (q.layout === 'square' ? '方格' : '菱形格');
       if (module === 'raven') return [0, 3, 6].map(i => q.grid.slice(i, i + 3).map(x => x === '?' ? '❓' : x).join('')).join(' / ');
       return '';
     }
@@ -5663,7 +5796,8 @@
       gears: genGears,
       raven: genRaven,
       oddone: genDetective,
-      pipes: genPipes
+      pipes: genPipes,
+      topview: genTopview
     };
 
     /* =========================================================
@@ -6379,6 +6513,275 @@
         speakText(msg);
       };
       pipeTimer = setTimeout(step, PIPE_STEP_MS);
+    }
+
+    /* =========================================================
+       MODULE 11: TOPVIEW (光影小偵探：俯視圖還原，issue #50)
+       畫面上是 3×3 地板上的積木柱（等角圖）加一隻小熊；孩子把「手電筒從正上方往下照」的影子塗在下面的 3×3 方格。
+       GRID 框 = 孩子點的方格（第 0 排離小熊最遠、第 2 排貼著小熊；第 0 欄在小熊左手邊）；
+       RENDER 框 = blockScreenPos(r, c, z) 用的 (r, c)。兩者的對應只有 topviewToRender 一處。
+       ========================================================= */
+    // 畫布大小與原點：方塊畫在 (ox + pos.x, oy + pos.y)，pos = blockScreenPos(r, c, z)
+    const TOPVIEW_CANVAS = { w: 320, h: 300, ox: 160, oy: 150 };
+    const TOPVIEW_PROMPT_BASIC = '手電筒從上面往下照，影子會在哪些格子？點一點，把影子塗上去！';
+    const TOPVIEW_PROMPT_HARD = '站在小熊的位置看！手電筒從上面往下照，影子會在哪些格子？';
+    // cols：有積木的格子數範圍；maxH：最高幾塊；tall：至少要有一根 ≥2 塊（讓高度成為干擾）
+    const TOPVIEW_RULES = {
+      easy:   { cols: [3, 4], maxH: 2, tall: false, layout: 'diamond', views: [0],    prompt: TOPVIEW_PROMPT_BASIC },
+      normal: { cols: [4, 6], maxH: 3, tall: true,  layout: 'diamond', views: [0],    prompt: TOPVIEW_PROMPT_BASIC },
+      hard:   { cols: [4, 6], maxH: 3, tall: true,  layout: 'square',  views: [0, 1], prompt: TOPVIEW_PROMPT_HARD }
+    };
+    const TOPVIEW_EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    const TOPVIEW_STEP_MS = 150;
+
+    let topviewMarks = [];          // 3×3 布林：孩子塗了哪些格子（GRID 框）
+    let topviewAnimating = false;   // 答對後逐格點亮的動畫中（鎖住按鈕、護眼鎖也要等）
+    let topviewAnimTimer = null;
+
+    // GRID (gr, gc) → RENDER (r, c)。view 0：小熊在左下緣（r = 2 那一邊）；view 1：小熊在右下緣（c = 2 那一邊）
+    function topviewToRender(gr, gc, view) {
+      return view === 1 ? { r: 2 - gc, c: gr } : { r: gr, c: gc };
+    }
+
+    function topviewRenderHeights(heights, view) {
+      const out = Array.from({ length: 3 }, () => [0, 0, 0]);
+      for (let gr = 0; gr < 3; gr++) {
+        for (let gc = 0; gc < 3; gc++) {
+          const { r, c } = topviewToRender(gr, gc, view);
+          out[r][c] = heights[gr][gc];
+        }
+      }
+      return out;
+    }
+
+    // V1：每根柱子的頂面都完整看得到（前面、右前面的格子不能比它高）→ 答案由圖唯一決定
+    function topviewTopsVisible(rh) {
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        const h = rh[r][c];
+        if (h === 0) continue;
+        for (let r2 = r; r2 < 3; r2++) for (let c2 = c; c2 < 3; c2++) {
+          if ((r2 !== r || c2 !== c) && rh[r2][c2] > h) return false;
+        }
+      }
+      return true;
+    }
+
+    // V4：每一格空地板至少露出一半（5×5 取樣點中 ≥10 個沒被任何方塊蓋住），孩子才看得出那格是空的
+    function topviewFloorReadable(rh) {
+      const { tileWidth: tw, tileHeight: th } = BLOCK_SIZE;
+      const hw = tw / 2, hh = th / 2;
+      const polys = [];
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        for (let z = 0; z < rh[r][c]; z++) {
+          const p = blockScreenPos(r, c, z);
+          polys.push(cubeOutline(p.x, p.y));
+        }
+      }
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        if (rh[r][c] > 0) continue;
+        const { x, y } = blockScreenPos(r, c, 0);
+        let visible = 0;
+        for (let i = 1; i < 10; i += 2) for (let j = 1; j < 10; j += 2) {
+          // 地板菱形：上 (x,y)、右 (x+hw,y+hh)、左 (x-hw,y+hh)；沿「上→右」與「上→左」兩個方向取樣
+          const s = i / 10, t = j / 10;
+          const px = x + s * hw - t * hw;
+          const py = y + s * hh + t * hh;
+          if (!polys.some(poly => insideConvex(poly, px, py))) visible++;
+        }
+        if (visible < 10) return false;
+      }
+      return true;
+    }
+
+    function genTopview(diff) {
+      const rule = TOPVIEW_RULES[diff];
+      return generateUntil(() => {
+        const n = randInt(rule.cols[0], rule.cols[1]);
+        const heights = Array.from({ length: 3 }, () => [0, 0, 0]);
+        shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, n).forEach(i => { heights[Math.floor(i / 3)][i % 3] = randInt(1, rule.maxH); });
+        if (rule.tall && !heights.flat().some(h => h >= 2)) return null;
+        const view = pick(rule.views);
+        const rh = topviewRenderHeights(heights, view);
+        if (!topviewTopsVisible(rh) || !topviewFloorReadable(rh)) return null;
+        return { heights, layout: rule.layout, view, prompt: rule.prompt };
+      });
+    }
+
+    function topviewColumnCount(q) {
+      return q.heights.flat().filter(h => h > 0).length;
+    }
+
+    function loadTopviewLevel() {
+      if (topviewAnimTimer) clearTimeout(topviewAnimTimer);
+      topviewAnimTimer = null;
+      topviewAnimating = false;
+      const q = currentQuestion;
+      topviewMarks = Array.from({ length: 3 }, () => [false, false, false]);
+      document.getElementById('topviewLevelBadge').textContent = levelBadgeText();
+      document.getElementById('topviewPrompt').textContent = q.prompt;
+      document.getElementById('topviewReset').disabled = false;
+      document.getElementById('topviewCheck').disabled = false;
+      renderTopview();
+      buildTopviewGrid();
+      speakText(q.prompt);
+    }
+
+    function renderTopview() {
+      const q = currentQuestion;
+      const canvas = document.getElementById('topviewCanvas');
+      if (!canvas || !q) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const { ox, oy } = TOPVIEW_CANVAS;
+      const { tileWidth: tw, tileHeight: th, blockHeight: bh } = BLOCK_SIZE;
+      const hw = tw / 2, hh = th / 2;
+      const rh = topviewRenderHeights(q.heights, q.view);
+
+      // 先畫 9 格地板（空格也要看得出來）
+      ctx.fillStyle = '#E2E8F0';
+      ctx.strokeStyle = '#94A3B8';
+      ctx.lineWidth = 1.5;
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        const p = blockScreenPos(r, c, 0);
+        const x = ox + p.x, y = oy + p.y;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + hw, y + hh);
+        ctx.lineTo(x, y + th);
+        ctx.lineTo(x - hw, y + hh);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 方塊由後往前畫（r + c 由小到大，再由下往上）
+      const cells = [];
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (rh[r][c] > 0) cells.push({ r, c, h: rh[r][c] });
+      cells.sort((a, b) => (a.r + a.c) - (b.r + b.c) || a.r - b.r);
+      cells.forEach(({ r, c, h }) => {
+        for (let z = 0; z < h; z++) {
+          const p = blockScreenPos(r, c, z);
+          drawIsoCube(ctx, ox + p.x, oy + p.y, tw, th, bh, false);
+        }
+      });
+
+      // 小熊最後畫，不會被蓋住：站在它那一側前緣的中點外側
+      const corner = (r, c, which) => {
+        const p = blockScreenPos(r, c, 0);
+        return which === 'left' ? [p.x - hw, p.y + hh] : which === 'right' ? [p.x + hw, p.y + hh] : [p.x, p.y + th];
+      };
+      const a = q.view === 1 ? corner(2, 2, 'bottom') : corner(2, 0, 'left');
+      const b = q.view === 1 ? corner(0, 2, 'right') : corner(2, 2, 'bottom');
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      let nx = -(b[1] - a[1]), ny = b[0] - a[0];          // 邊的法向量，取朝下（畫面外側）的那個
+      if (ny < 0) { nx = -nx; ny = -ny; }
+      const len = Math.hypot(nx, ny);
+      const push = 0.8 * tw;
+      ctx.font = '36px ' + TOPVIEW_EMOJI_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#000';
+      ctx.fillText('🐻', ox + mx + nx / len * push, oy + my + ny / len * push);
+    }
+
+    function buildTopviewGrid() {
+      const q = currentQuestion;
+      const board = document.getElementById('topviewBoard');
+      board.classList.toggle('tv-diamond', q.layout === 'diamond');
+      board.classList.toggle('tv-square', q.layout !== 'diamond');
+      const grid = document.getElementById('topviewGrid');
+      grid.innerHTML = '';
+      for (let gr = 0; gr < 3; gr++) {
+        for (let gc = 0; gc < 3; gc++) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'tv-cell';
+          btn.id = `tv-cell-${gr}-${gc}`;
+          btn.setAttribute('aria-label', `第${gr + 1}排第${gc + 1}格`);
+          btn.setAttribute('aria-pressed', 'false');
+          btn.onclick = () => toggleTopviewCell(gr, gc);
+          grid.appendChild(btn);
+        }
+      }
+    }
+
+    function refreshTopviewCells() {
+      for (let gr = 0; gr < 3; gr++) {
+        for (let gc = 0; gc < 3; gc++) {
+          const el = document.getElementById(`tv-cell-${gr}-${gc}`);
+          if (!el) continue;
+          el.classList.toggle('marked', topviewMarks[gr][gc]);
+          el.setAttribute('aria-pressed', topviewMarks[gr][gc] ? 'true' : 'false');
+        }
+      }
+    }
+
+    function toggleTopviewCell(gr, gc) {
+      if (topviewAnimating) return;
+      soundClick();
+      topviewMarks[gr][gc] = !topviewMarks[gr][gc];
+      refreshTopviewCells();
+    }
+
+    function resetTopview() {
+      if (topviewAnimating) return;
+      qlogEvent('x', 'reset');
+      soundClick();
+      topviewMarks = Array.from({ length: 3 }, () => [false, false, false]);
+      refreshTopviewCells();
+    }
+
+    function setTopviewControlsDisabled(disabled) {
+      document.getElementById('topviewReset').disabled = disabled;
+      document.getElementById('topviewCheck').disabled = disabled;
+      document.querySelectorAll('#topviewGrid .tv-cell').forEach(el => { el.disabled = disabled; });
+    }
+
+    function checkTopview() {
+      if (topviewAnimating) return;
+      const q = currentQuestion;
+      if (!topviewMarks.some(row => row.some(Boolean))) {
+        speakText('先點格子，把影子塗上去喔！');   // 還沒塗任何格子：不算送出、不算答錯
+        return;
+      }
+      qlogEvent('x', 'submit');
+      const ok = q.heights.every((row, gr) => row.every((h, gc) => (h > 0) === topviewMarks[gr][gc]));
+      if (ok) {
+        topviewAnimating = true;
+        setTopviewControlsDisabled(true);
+        const lit = [];
+        q.heights.forEach((row, gr) => row.forEach((h, gc) => { if (h > 0) lit.push(`tv-cell-${gr}-${gc}`); }));
+        let i = 0;
+        const step = () => {
+          if (currentModule !== 'topview') {   // 中途離開：什麼都不做
+            topviewAnimating = false;
+            topviewAnimTimer = null;
+            return;
+          }
+          if (i < lit.length) {
+            const el = document.getElementById(lit[i++]);
+            if (el) el.classList.add('lit');
+            soundStep();
+            topviewAnimTimer = setTimeout(step, TOPVIEW_STEP_MS);
+            return;
+          }
+          topviewAnimTimer = null;
+          topviewAnimating = false;
+          triggerVictory('光影小偵探！答對了！', `手電筒照下來，${lit.length} 根柱子的影子你都找到了！`, isLastQuestion());
+        };
+        topviewAnimTimer = setTimeout(step, TOPVIEW_STEP_MS);
+        return;
+      }
+      soundError();
+      const wrongBefore = questionWrongAttempts;
+      onWrongAnswer('塗了 ' + topviewMarks.map(row => row.map(m => m ? '⬛' : '⬜').join('')).join('／'));
+      if (questionWrongAttempts >= 2) {
+        // 800ms 內連點同一個錯答會被 onWrongAnswer 當重複，不再多記一次提示
+        if (questionWrongAttempts > wrongBefore) qlogEvent('a', 'topviewCount');
+        speakText(`提示：一共有 ${topviewColumnCount(q)} 根柱子喔！`);
+      } else {
+        speakText('再看看，手電筒從正上方照，有積木的格子才有影子喔！');
+      }
     }
 
     /* =========================================================
@@ -7157,6 +7560,9 @@
       if (currentModule === 'blocks') {
         renderBlocks();
       }
+      if (currentModule === 'topview') {
+        renderTopview();
+      }
     });
 
     // Initialize & restore saved progress（只留 script 結尾那一次呼叫）
@@ -7246,7 +7652,7 @@
         if (eyeOverSince === null) {
           eyeOverSince = now;
           eyeNotice("⏰ 時間到囉！做完這一題就要讓眼睛休息！");
-        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning && !pipeRunning) {
+        } else if (now - eyeOverSince > EYE_GRACE_MS && !document.getElementById('victoryModal').classList.contains('active') && !gearDemoRunning && !pipeRunning && !topviewAnimating) {
           qlogClose('locked');   // 在 goHome() 之前關
           goHome();
           lockEyes();
@@ -7592,7 +7998,7 @@
     /* 自動注音：把畫面上每個中文字包成「字＋右側注音」，之後動態加入的文字也會自動補上。
        不想加注音的區塊可以加上 data-no-zhuyin 屬性。 */
     (function () {
-      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ串ㄔㄨㄢˋ久ㄐㄧㄡˇ之ㄓ乘ㄔㄥˊ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圍ㄨㄟˊ園ㄩㄢˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ梭ㄙㄨㄛ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ減ㄐㄧㄢˇ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ珠ㄓㄨ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ著˙ㄓㄜ蒙ㄇㄥˊ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銀ㄧㄣˊ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","銀行":"ㄧㄣˊ ㄏㄤˊ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
+      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ串ㄔㄨㄢˋ久ㄐㄧㄡˇ之ㄓ乘ㄔㄥˊ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ光ㄍㄨㄤ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圍ㄨㄟˊ園ㄩㄢˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ堆ㄉㄨㄟ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ塗ㄊㄨˊ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ影ㄧㄥˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ柱ㄓㄨˋ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ梭ㄙㄨㄛ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ減ㄐㄧㄢˇ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ珠ㄓㄨ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ站ㄓㄢˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ筒ㄊㄨㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ菱ㄌㄧㄥˊ著˙ㄓㄜ蒙ㄇㄥˊ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銀ㄧㄣˊ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ電ㄉㄧㄢˋ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上去":"ㄕㄤˋ ˙ㄑㄩ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重來":"ㄔㄨㄥˊ ㄌㄞˊ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","銀行":"ㄧㄣˊ ㄏㄤˊ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
       const CHARS = {};
       DATA.chars.replace(/([㐀-䶿一-鿿])([^㐀-䶿一-鿿]+)/g, (m, c, z) => { CHARS[c] = z; });
       const WORDS = DATA.words;
