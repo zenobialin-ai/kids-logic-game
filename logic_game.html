@@ -6773,9 +6773,11 @@
         return;
       }
       soundError();
+      const wrongBefore = questionWrongAttempts;
       onWrongAnswer('塗了 ' + topviewMarks.map(row => row.map(m => m ? '⬛' : '⬜').join('')).join('／'));
       if (questionWrongAttempts >= 2) {
-        qlogEvent('a', 'topviewCount');
+        // 800ms 內連點同一個錯答會被 onWrongAnswer 當重複，不再多記一次提示
+        if (questionWrongAttempts > wrongBefore) qlogEvent('a', 'topviewCount');
         speakText(`提示：一共有 ${topviewColumnCount(q)} 根柱子喔！`);
       } else {
         speakText('再看看，手電筒從正上方照，有積木的格子才有影子喔！');
