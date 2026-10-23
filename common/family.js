@@ -494,6 +494,196 @@ function qlogGameWrong(reason) {
   } catch (e) {}
 }
 
+/* ---------- 朗讀（#54 S1：從 logic_game.html 搬來，兩個遊戲共用） ----------
+   語速存在同一個 key（SPEECH_RATE_KEY），每台裝置一份；另一個分頁改了會跟著改（storage 監聽）。
+   語音事件只寫進建立它的那筆紀錄（recId）。speakText 的第三個參數 opts 可省略；
+   沒傳 opts 時不建立任何計時器、不多呼叫任何 API（行為跟搬家前一字不差）。
+   opts.onDone(why)：這一句結束時剛好被呼叫一次，why 是 end／error／cut／timeout／unavailable 其中之一。 */
+// 朗讀快慢（每台裝置各自記住，不跟進度一起同步：不同裝置的語音引擎，同樣的速度聽起來快慢不一樣）
+const SPEECH_RATES = { slow: 0.7, normal: 0.85, fast: 1 };
+const SPEECH_RATE_KEY = 'little_logic_speech_rate';
+const SPEECH_START_WAIT_MS = 5000;   // 帶 onDone 時，等 onstart 的上限
+let speechRate = 'slow';
+try {
+  const saved = localStorage.getItem(SPEECH_RATE_KEY);
+  if (Object.prototype.hasOwnProperty.call(SPEECH_RATES, saved)) speechRate = saved;
+} catch (e) {}
+let speechCurrent = null;      // 這一句：{ recId, kind, done, cut, ... }
+let speechSpeaking = null;     // 還在念的那一句（start 之後、end／cut 之前）
+familyHooks.speechKindOf = (text, kind) => kind || 'other';   // 遊戲可以換成自己的判斷（logic 會）
+
+// 別的分頁改了語速：這個分頁跟著改（值不合法就不理）
+window.addEventListener('storage', function (e) {
+  try {
+    if (e.key !== SPEECH_RATE_KEY) return;
+    if (Object.prototype.hasOwnProperty.call(SPEECH_RATES, e.newValue)) speechRate = e.newValue;
+  } catch (err) {}
+});
+
+// R3（複查）：plan §2 是 zh-TW 的數量，zh-CN／zh-HK 不算；Android 可能回報 zh_TW
+function isZhTw(v) {
+  return String((v && v.lang) || '').toLowerCase().replace(/_/g, '-') === 'zh-tw';
+}
+
+// 共用的 zh-TW 語音清單：目前沒有呼叫端，保留給 #20 做語音選擇時用（數量統計請用 qlogZhVoiceCount）
+function getZhVoices() {
+  if (!('speechSynthesis' in window)) return null;
+  try { return (window.speechSynthesis.getVoices() || []).filter(isZhTw); } catch (e) { return null; }
+}
+
+// M3：iPad Safari 常常直接回傳語音清單、不觸發 voiceschanged，所以開題時就要自己數一次
+function qlogZhVoiceCount() {
+  if (!('speechSynthesis' in window)) return null;
+  try {
+    const v = window.speechSynthesis.getVoices() || [];
+    if (!v.length) return null;            // 清單還沒載入 → null
+    return v.filter(isZhTw).length;        // 清單非空但沒有 zh-TW → 0
+  } catch (e) { return null; }
+}
+
+// m-c：語音事件只寫進建立它的紀錄；那筆已經關閉就丟掉
+function qlogSpeechEvent(recId, ph, kind) {
+  try {
+    const r = qlogActive;
+    if (!r || r.id !== recId || r.outcome !== null) return;
+    qlogEvent('s', { kind: kind, ph: ph });
+  } catch (e) {}
+}
+
+// 紀錄裡的 speech 物件（放在 soundOn 前面）與朗讀欄位（放在 aids 前面）：拆成兩個，各自展開在原位置才保得住欄位順序
+function speechInfo() {
+  return { available: !!window.speechSynthesis, rateSetting: speechRate, rate: SPEECH_RATES[speechRate], voiceURI: null, voiceName: null, voiceLang: null, zhVoices: qlogZhVoiceCount(), source: 'tts' };   // M3：一律呼叫 qlogZhVoiceCount()
+}
+function speechPromptFields() {
+  return { promptSpeech: null, answeredDuringPrompt: false, answeredDuringPromptRate: null };
+}
+
+// 題目還在朗讀時就作答（qlogConfig.onAnswerEvent 用）
+function qlogSpeechAnswerEvent(r, type) {
+  if (speechSpeaking && speechSpeaking.recId === r.id &&
+      (speechSpeaking.kind === 'prompt' || speechSpeaking.kind === 'manual')) {
+    r.answeredDuringPrompt = true;
+    if (!r.answeredDuringPromptRate) r.answeredDuringPromptRate = speechSpeaking.rateSetting;   // R3 Minor 8：作答當下正在念的那一句的速度
+  }
+}
+
+// 設定語速：驗證 → 記事件（rate 是數字）→ 存起來。回傳 true／false；畫面更新與試聽由遊戲自己做
+function speechSetRate(rate) {
+  if (!Object.prototype.hasOwnProperty.call(SPEECH_RATES, rate)) return false;
+  speechRate = rate;
+  qlogEvent('s', { kind: 'rate', ph: 'rate', rate: SPEECH_RATES[rate] });   // R3：題中改速度
+  try { localStorage.setItem(SPEECH_RATE_KEY, rate); } catch (e) {}
+  return true;
+}
+
+// 估這句要念多久用的字數：漢字 1、阿拉伯數字 2（「2345」念成七個音節）、其他 0
+function speechUnits(text) {
+  let n = 0;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c >= 0x4E00 && c <= 0x9FFF) n += 1;
+    else if (c >= 0x30 && c <= 0x39) n += 2;
+  }
+  return n;
+}
+
+// 帶 onDone 的那一句結束：只會執行一次，清掉這一句的計時器，onDone 丟例外不影響朗讀與紀錄
+function speechFinish(cur, why) {
+  if (!cur || cur.finished) return;
+  cur.finished = true;
+  if (cur.timers) { cur.timers.forEach(t => clearTimeout(t)); cur.timers = []; }
+  const f = cur.onDone;
+  if (!f) return;
+  try { f(why); } catch (e) {}
+}
+
+function speakText(text, kind, opts) {
+  const onDone = (opts && typeof opts.onDone === 'function') ? opts.onDone : null;
+  if (!('speechSynthesis' in window)) {
+    if (onDone) setTimeout(function () { try { onDone('unavailable'); } catch (e) {} }, 0);
+    return;
+  }
+  cancelSpeech();                       // n3：所有 cancel 都走同一個 helper，才會記到 cut
+  const k = familyHooks.speechKindOf(text, kind);
+  const recId = qlogActive ? qlogActive.id : null;   // m-c：utterance 綁建立它的紀錄
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-TW';
+  utterance.rate = SPEECH_RATES[speechRate];         // #20：保留
+  utterance.pitch = 1.2;
+  const cur = { recId: recId, kind: k, done: false, cut: false, rateSetting: speechRate, u: utterance, onDone: onDone, finished: false, timers: [] };   // R3 Minor 8；u 掛在 cur 上：防 Chrome 回收 utterance 後 onend 永遠不來
+  speechCurrent = cur;
+  try {
+    if ((k === 'prompt' || k === 'manual') && qlogActive && qlogActive.outcome === null) {
+      qlogActive.promptSpeech = { kind: k, dt: Date.now() - qlogActive.tOpen, rate: SPEECH_RATES[speechRate], rateSetting: speechRate };
+    }
+  } catch (e) {}
+  utterance.onstart = function () {
+    try {
+      if (speechCurrent !== cur || cur.cut) return;
+      speechSpeaking = cur;
+      qlogSpeechEvent(recId, 'start', k);
+      if (cur.onDone && !cur.finished) {   // 開始念了：不再等開始，改等念完（上限 T_end）
+        cur.timers.forEach(t => clearTimeout(t));
+        const tEnd = Math.min(30000, 2000 + speechUnits(text) * 450 / SPEECH_RATES[speechRate]);
+        cur.timers = [setTimeout(function () { speechFinish(cur, 'timeout'); }, tEnd)];
+      }
+    } catch (e) {}
+  };
+  utterance.onend = function () {
+    try {
+      if (speechCurrent !== cur || cur.cut || cur.done) return;   // 被 cut 之後的 end 忽略
+      cur.done = true;
+      if (speechSpeaking === cur) speechSpeaking = null;
+      qlogSpeechEvent(recId, 'end', k);
+      speechFinish(cur, 'end');
+    } catch (e) {}
+  };
+  utterance.onerror = function (ev) {
+    try {
+      if (speechCurrent !== cur || cur.cut || cur.done) return;   // 被 cut 之後的 error 忽略
+      cur.done = true;
+      if (speechSpeaking === cur) speechSpeaking = null;
+      const err = String((ev && (ev.error || ev.errorCode)) || '');
+      const isCut = (err === 'interrupted' || err === 'canceled' || err === 'cancelled');
+      qlogSpeechEvent(recId, isCut ? 'cut' : 'error', k);
+      speechFinish(cur, isCut ? 'cut' : 'error');
+    } catch (e) {}
+  };
+  window.speechSynthesis.speak(utterance);
+  if (cur.onDone) cur.timers.push(setTimeout(function () { speechFinish(cur, 'timeout'); }, SPEECH_START_WAIT_MS));   // 等開始的上限
+}
+
+// n3：每次 cancel 都記 cut
+function cancelSpeech() {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    const cur = speechCurrent;
+    if (cur && !cur.done && !cur.cut) {   // R3 Minor 1：同一句只記一次 cut
+      qlogSpeechEvent(cur.recId, 'cut', cur.kind);
+      cur.cut = true;
+    }
+    if (speechSpeaking === cur) speechSpeaking = null;
+    speechFinish(cur, 'cut');             // 帶 onDone 的話通知「被切掉了」（要在 speechSynthesis.cancel() 之前）
+    window.speechSynthesis.cancel();
+  } catch (e) {}
+}
+
+if ('speechSynthesis' in window) {
+  try {
+    window.speechSynthesis.addEventListener('voiceschanged', function () {
+      try {
+        const n = qlogZhVoiceCount();   // F2（第三次複查）：清單還是空的時不能寫 0，要留 null
+        if (n === null) return;
+        if (qlogActive && qlogActive.outcome === null && qlogActive.speech.zhVoices === null) {
+          qlogActive.speech.zhVoices = n;
+          qlogSaveRecord(qlogActive);
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
+}
+
 /* ---------- 家長頁「📊 學習紀錄」的統計與報告文字（M4：R3 的 learningLogText 從 logic_game.html 搬來） ----------
    只列事實，不下判定：不會出現判定符號、「蒙」「猜」「可信」這類字眼、跟孩子自己的平均比快慢。
    兩個遊戲的家長頁顯示同一份報告，所以統計和報告文字都放這裡（例外：這是畫面文字，但只給家長看、不加注音）；
@@ -536,7 +726,7 @@ const QLOG_REPORT = {
       add: '加法', sub: '減法', mul: '乘法', div: '除法', 'bank.add': '銀行加法', 'bank.sub': '銀行減法',
       'challenge.add': '挑戰加法', 'challenge.sub': '挑戰減法', 'challenge.muldiv': '挑戰乘除', balance: '天平'
     },
-    aidLabel: { verticalHint: '看直式提示' },
+    aidLabel: { read: '朗讀', verticalHint: '看直式提示' },
     ownLines: { beadCount: '數串珠' },
     actionLabel: { steps: '調整' },
     actionFields: { balance: ['steps'] },   // 只有天平記動作數（+1／−1）
