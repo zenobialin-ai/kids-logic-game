@@ -1,6 +1,7 @@
 # 實作計畫：數學樂園加回朗讀、先聽題再拿教具、點珠計數、除法自己分珠子（#54）
 
 **v2**：併入計畫稽核 r1（H1、H2、M1–M7、L1–L10）與指揮官決定 Q1、Q2（2026-10-24）。
+**v2.1**：併入差異覆核 r2（Medium-1 刪除 onDone 重複的 seq 比對；L-a～L-h）。
 
 需求來源：#54（owner 已勾選）、#48 最後 5 則討論。
 **基準**：main **8a3573a**。Branch `feat/m-speech`，worktree `D:/CodeWork/Other/klg-mspeech`。
@@ -114,14 +115,14 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
 ### 2.2 數學樂園的朗讀稿：`speechPlain(text)`（S1，放在數學樂園）
 
 把畫面文字轉成朗讀稿（順序照下面；v2 依稽核 H1 改）：
-0. 去掉 HTML 標籤，`&nbsp;` 換成空白；然後刪掉**開頭的**運算 emoji 和後面的空白：`/^\s*(➕|➖|✖️?|➗)\s*/u`。
+0. 去掉 HTML 標籤，`&nbsp;` 換成空白；然後刪掉**開頭的**運算 emoji 和後面的空白：`/^\s*(➕|➖|\u2716\uFE0F?|➗)\s*/u`（✖ 一律寫成顯式跳脫，避免編輯工具吃掉不可見的 U+FE0F）。這一步是**防禦性、非必要**：第 1 步不轉、第 3 步也會刪掉開頭的 emoji，A2b 驗的是整體輸出，不是這一步。
    - 原因：加法、減法的畫面文字以 ➕／➖ 開頭（montessori:7242「`➕ 請數數看：…`」、:7329「`➖ 請數數看：…`」），v1 會念成「加 請數數看…」。
 1. 運算符號轉字，**只轉在數字或 ❓ 之間的**（用捕捉群組，不用 lookbehind：舊版 iPad Safari 不支援）：
-   - `/(\d|❓)\s*➕\s*(?=\d|❓)/gu` → `'$1 加 '`；`➖`→「減」、`✖️`／`✖`（寫成 `✖️?`）→「乘以」、`➗`→「除以」、`🟰`→「等於」同樣寫法；
+   - `/(\d|❓)\s*➕\s*(?=\d|❓)/gu` → `'$1 加 '`；`➖`→「減」、`✖️`／`✖`（寫成 `\u2716\uFE0F?`）→「乘以」、`➗`→「除以」、`🟰`→「等於」同樣寫法；
    - 最後才把 `❓`→「多少」（前面的 pattern 要靠 ❓ 判斷位置）。
    - 不在數字或 ❓ 之間的運算 emoji 不轉，交給第 3 步刪掉。例：困難題 :7238「`…滿十進一</span> ➕ 請數數看`」、:7325「`…借位退位</span> ➖ 原本有`」——去掉 HTML 後開頭是 ✨／⚡，第 0 步刪不到這個 ➕／➖，靠的是這一步不轉、第 3 步刪。
 2. （v1 的「去 HTML」已移到第 0 步。）
-3. 去掉其他 emoji：`/\p{Extended_Pictographic}|\uFE0F|\u200D/gu`；
+3. 去掉其他 emoji。**不要寫成 regex literal**（舊版 Safari 不支援 `\p{…}` 時整段 `<script>` 會語法錯誤，現有程式沒有 `\p{` 先例）：`let EMOJI_RE; try { EMOJI_RE = new RegExp('\\p{Extended_Pictographic}|\\uFE0F|\\u200D', 'gu'); } catch (e) { EMOJI_RE = /[\u2190-\u2BFF\uFE0F\u200D]|[\uD83C-\uD83E][\uDC00-\uDFFF]/g; }`；
 4. 連續空白合成一個，去頭尾。
 
 例：`➕ 請數數看：3 顆珠子加上 4 顆珠子…` →「請數數看：3 顆珠子加上 4 顆珠子…」；挑戰 `56 ➖ 16 🟰 ❓` →「56 減 16 等於 多少」（中文字之間會留一個空白；驗收用 `/等於\s*多少/` 比對，見 S1-A2）。
@@ -144,6 +145,7 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
   - 答對：在 `qlogAnswer(true, …)`／`qlogBalanceChoice`／`qlogBalanceStepperCorrect` **之後**。先記 `c`，`answeredDuringPrompt` 才算得到；cut 因為紀錄已經關了會被丟掉，可以接受。
 - **不停**：
   - 打開貼紙簿、錯題本等彈窗時繼續念，跟 logic 一樣：logic 開彈窗時也不停；
+  - 例外：**關閉家長設定頁**時 cancel，見 §3.1 改動 #14；
   - 答錯時不停；
   - 切到背景時不停：logic 也不停，各瀏覽器行為不同，交給 `T_end` 兜底。
 - S1 **只念題目**，不念答對、答錯、過關的回饋（owner 只要求讀題；想念回饋可以之後另開票）。
@@ -202,7 +204,7 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
 | 4 除法 | 已有第二參數，不變（S3 改） |
 | 5 銀行 | 預設（`carry-badge` 的「滿十進一」也會被念到，可以接受） |
 | 6 挑戰 | **改**：畫面說明是通用文字「純題目算術大挑戰：脫離實體教具…」，念它對孩子沒有幫助。朗讀稿改成 `'請算算看：' + speechPlain(q.formulaText)`，例：「請算算看：3456 加 1234 等於 多少」（`speechPlain` 會在「等於」「多少」之間留一個空白，見 §2.2）。實作時在 `currentChallengeData` 產生後才呼叫 `setInstruction`，目前順序是先 `setInstruction` 再產生題目（:7110-7114），要對調 |
-| 7 天平 | **改**：朗讀稿 = 畫面說明 + 算式，例：「天平兩邊一樣重才會完全水平！請在右盤放上足夠的珠子，讓天平平衡喔！8 等於 3 加多少？」，困難題是「6 加 7 等於 9 加多少？」。**算式要用 `balanceLeftParts` 組**（:5798-5812 在 `setInstruction` :5817 之前已設好）：左邊 `balanceLeftParts.join(' ➕ ')`，再接 `🟰 ${balanceBaseR} ➕ ❓`，整串經 `speechPlain`。**不能用 `questionDesc(7)`**（:4498 只有和 `balanceWeightL`，困難題會念成「13 等於 9 加多少」） |
+| 7 天平 | **改**：朗讀稿 = 畫面說明 + 算式，例：「天平兩邊一樣重才會完全水平！請在右盤放上足夠的珠子，讓天平平衡喔！8 等於 3 加 多少」，困難題是「6 加 7 等於 9 加 多少」（`speechPlain` 實際輸出：句末沒有問號、中文字間有一個空白）。**算式要用 `balanceLeftParts` 組**（:5798-5812 在 `setInstruction` :5817 之前已設好）：左邊 `balanceLeftParts.join(' ➕ ')`，再接 `🟰 ${balanceBaseR} ➕ ❓`，整串經 `speechPlain`。**不能用 `questionDesc(7)`**（:4498 只有和 `balanceWeightL`，困難題會念成「13 等於 9 加多少」） |
 
 **失敗語意（S1）**
 - 沒有 `speechSynthesis`：不念、不出錯；🔊 按了沒有反應（不隱藏按鈕，跟 logic 一樣）。紀錄 `speech.available:false`。
@@ -214,7 +216,7 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
 - 彈窗：繼續念。
 
 **不變式（S1）**
-- I1：logic 行為不變。logic_regress 的輸出（含 `speech[]`）跟 origin/main 一字不差；#53 合併後跟當時的 main 比。唯一新增的行為是語速的 storage 監聽（§2.1），logic_regress 測不到，由 S1-A7 驗、PR 說明列出。logic_regress 也沒有語速路徑，由 S1-A15 補。
+- I1：logic 行為不變。logic_regress 的輸出（含 `speech[]`）跟 origin/main 一字不差；#53 合併後跟當時的 main 比。唯一新增的行為是語速的 storage 監聽（§2.1）；另外 `speakText` 把 utterance `u` 掛在 `cur` 上（§2.1）會讓物件存活期變長，不影響紀錄，PR 說明一併列出；logic_regress 測不到，由 S1-A7 驗、PR 說明列出。logic_regress 也沒有語速路徑，由 S1-A15 補。
 - I2：數學樂園每一題開題時，`speakText` 只被呼叫一次，kind 是 `'prompt'`，text 等於 `currentQuestionSpeech`。朗讀稿裡沒有 `<`、`>` 和 emoji。
 - I3：數學樂園的紀錄 `speech` 物件 key 集合跟 logic 的完全相同。
 - I4：鎖住／離開時不會留下還在念的句子（`speechSynthesis.cancel` 有被呼叫）。
@@ -240,7 +242,7 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
 | S1-A12 | 回歸 | 見下方「回歸預期」 |
 | S1-A13 | 版面 | 360×640、768×1024、1280×900：🔊 ≥44×44、不擋「重新整理」、沒有水平捲動；截圖存 scratchpad |
 | S1-A14 | build 衛生 | `build_common.py` 再跑一次 `git diff --exit-code` 沒有東西。logic／index 的 ZHUYIN DATA 沒變：沒有 moedict 就改比對「logic_game.html 可見文字的漢字集合」前後相同，用 build_zhuyin 的 `visible_text` 規則寫一個小腳本 |
-| S1-A15 | logic 語速路徑（logic_regress 沒涵蓋：main 的輸出 `"kind":"rate"` 0 次） | logic 開一題，家長頁按「快」。main 與 branch 跑同一個腳本：紀錄 `ev` 都含 `['s',{kind:'rate',ph:'rate',rate:1}]`（`rate` 是數字，不是 `'fast'`）；試聽句內容與 `localStorage.little_logic_speech_rate` 兩邊相同 |
+| S1-A15 | logic 語速路徑（logic_regress 沒涵蓋：main 的輸出 `"kind":"rate"` 0 次） | logic 開一題，家長頁按「快」。main 與 branch 跑同一個腳本：紀錄 `ev` 都含 `[dt,'s',{kind:'rate',ph:'rate',rate:1}]`（`ev` 元素是三元組，family.js:429；比對時忽略 dt）（`rate` 是數字，不是 `'fast'`）；試聽句內容與 `localStorage.little_logic_speech_rate` 兩邊相同 |
 | S1-A16 | 數學樂園題目念到一半，打開貼紙簿再關掉（✖ 與點遮罩各一次） | 朗讀沒有被 cut：`ev` 沒有新的 `s:cut`，那句照樣 `s:end`。再開家長頁、關掉 → 這次有 `s:cut`（對應 S1 改動 #14：cancel 只在關的是家長頁時） |
 
 **改壞清單（S1）**
@@ -297,6 +299,7 @@ cancelSpeech(): 原樣；另外對 speechCurrent 呼叫 finish(cur,'cut')（在 
 ```js
 let promptSeq = 0;          // 每次 onQuestionShown +1
 let promptOwner = null;     // 目前負責這一題閘門的那一句（token）
+let aidGateState = { seq: 0, t0: 0, open: true };
 function onQuestionShown() {
   const seq = ++promptSeq;           // 一律先 +1（含不念的情況），舊題目的回呼才會全部失效
   const gated = document.querySelectorAll('#gameContent .aid-gated');
@@ -308,9 +311,8 @@ function speakPromptForGate(kind) {   // speakCurrentInstruction 呼叫
   const seq = promptSeq, token = {};
   promptOwner = token;
   speakText(currentQuestionSpeech, kind, { onDone: why => {
-    if (seq !== promptSeq) return;                         // 已經換題（防禦性寫法：promptOwner 與 revealAids 的 seq 比對已經擋住，可以沒有對應案例）
     if (why === 'cut' && promptOwner !== token) return;    // 被同一題較新的題目朗讀（🔊）取代：等新的那句
-    revealAids(seq, why);
+    revealAids(seq, why);                                  // 換題的擋法只在 revealAids（seq !== promptSeq 就 return），這裡不再重複比對（v2.1：避免等價突變）
   }});
 }
 function revealAids(seq, why) {       // 冪等
@@ -435,7 +437,7 @@ function onBeadTouch(el) {
 | `createBeadBar` 每根各自計數（scope 放在棒上） | A12 |
 | 銀行整題一個 scope | A18 |
 | 忘了刪 `if (!isSoundOn) return` | A19 |
-| `revealAids` 不比對 `seq` | A9b（第 1 題的 onDone 打開第 2 題的教具）。註：v1 的「onDone 沒比對 `promptSeq`」是等價突變——`promptOwner` 比對與 `revealAids` 的 seq 比對已經擋住，沒有案例會轉紅，所以改突變這裡 |
+| `revealAids` 不比對 `seq`（onDone 內已沒有第二道 seq 比對，這是唯一防線） | A9b（第 1 題遲到的 onDone('end') 打開第 2 題的教具）。註：v1／v2 的 onDone 內有重複的 seq 比對，使這條突變等價；v2.1 已刪掉那行 |
 | cut 一律忽略 | A10（永遠不出現：cut 時 `finish` 已經把計時器清掉，不會再有 timeout 兜底） |
 | cut 一律出現 | A8（重聽時提早出現） |
 | 沒有 timeout 兜底 | A5、A6 |
@@ -512,7 +514,7 @@ function onBeadTouch(el) {
 | S3-A12 | 家長頁報告（除法 1 題 + 天平 1 題） | 除法那組出現「動作數（中位數）：分珠 N」；天平那組 `steps` 中位數跟 S2 時相同（`actionMinBuild` 依欄位） |
 | S3-A13 | 困難題（N 最大 16） | 360×640 下籃子與兩個盤子不用水平捲動；截圖 |
 | S3-A14 | 注音缺字檢查（§6） | 除法畫面跟 main 同一畫面比，**新增的**缺字 0 個 |
-| S3-A15 | 回歸 | montessori_regress 的 mode 4 步驟一定會變：harness 不分珠，答案按鈕藏著，`click` 會逾時 → 情境失敗。**S3 要一起更新 harness**：<br>① 假語音加 `window.__regressSpeechFinish()`：**不推進假時鐘**，立刻觸發目前那句的 `onend`（沒有在念就什麼都不做）。mode 4 用它打開籃子，**不准用 `runFor` 等假語音念完**（約 7 秒），否則題型 5～7 的時間戳會全部往後移、整片 diff。<br>② mode 4：`__regressSpeechFinish()` → 點籃子 N 下 → 作答；檔頭「情境」補一句。<br>允許的差異：mode 4 的 `choices`、`build:6`、`actions`（`null` → `{steps:0,deals:N}`）、`ev` 裡的 `x:deal`／`t`／`s:end`，以及念完才作答帶來的 `aidGate`（變成 `{dt, why:'end'}`）、`answeredDuringPrompt`（變 false）／`answeredDuringPromptRate`；其他題型一字不差（天平 `actions` 仍是 `{"steps":…}`，不得多 `deals`）。logic_regress 一字不差 |
+| S3-A15 | 回歸 | montessori_regress 的 mode 4 步驟一定會變：harness 不分珠，答案按鈕藏著，`click` 會逾時 → 情境失敗。**S3 要一起更新 harness**：<br>① 假語音加 `window.__regressSpeechFinish()`：**不推進假時鐘**，立刻觸發目前那句的 `onend`（沒有在念就什麼都不做）。mode 4 用它打開籃子，**不准用 `runFor` 等假語音念完**（約 7 秒），否則題型 5～7 的時間戳會全部往後移、整片 diff。<br>② mode 4：`__regressSpeechFinish()` → 點籃子 N 下 → 作答；檔頭「情境」補一句。<br>允許的差異：mode 4 的 `choices`、`build:6`、`actions`（`null` → `{steps:0,deals:N}`）、`ev` 裡的 `x:deal`／`t`／`s:end`，以及念完才作答帶來的 `aidGate`（變成 `{dt, why:'end'}`）、`answeredDuringPrompt`（變 false）／`answeredDuringPromptRate`、點籃子 N 下帶來的 `tapCount`／`pointerDownCount` 各 +N（montessori:4610、:4618）；其他題型一字不差（天平 `actions` 仍是 `{"steps":…}`，不得多 `deals`）。logic_regress 一字不差 |
 
 **改壞清單（S3）**
 
