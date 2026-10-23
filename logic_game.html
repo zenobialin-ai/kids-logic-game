@@ -1452,6 +1452,8 @@
       color: #854D0E;
       font-weight: 800;
     }
+    /* 時間整段一起換行：注音把每個字包成 inline-block，光用不換行空白擋不住「秒」掉到下一行 */
+    .time-dur { white-space: nowrap; }
 
     /* 找不同：寬度放不下一排時，排成 3+2 或 2+2，避免最後一列只剩一個太顯眼（等於提示答案） */
     @media (max-width: 700px) {
@@ -4305,12 +4307,13 @@
             (rec.source !== 'first' && rec.source !== 'repeat')) { roundTimer.valid = false; return null; }
         const ms = rec.activeMs;
         if (!Number.isFinite(ms) || ms < 0) { roundTimer.valid = false; return null; }
-        const lines = ['⏱️ 這關花了 ' + fmtDuration(ms)];
+        // 有時間的那幾行寫成 [前綴, 時間]，顯示時時間包進 .time-dur
+        const lines = [['⏱️ 這關花了 ', fmtDuration(ms)]];
         let speak = '';
         if (roundTimer.id === qlogRoundId) { roundTimer.ms += ms; roundTimer.count++; }
         else roundTimer.valid = false;
         if (isLastLevel && roundTimer.valid && roundTimer.count === ROUND_SIZE && getActiveDifficulty() === 'hard') {
-          lines.push('⏱️ ' + ROUND_SIZE + ' 關總共 ' + fmtDuration(roundTimer.ms));
+          lines.push(['⏱️ ' + ROUND_SIZE + ' 關總共 ', fmtDuration(roundTimer.ms)]);
           const r = recordBestTime(currentModule, roundTimer.ms);
           if (r === 'first') lines.push('🏅 第一次的挑戰紀錄！');
           if (r === 'better') { lines.push('🎉 比上次更快了！新紀錄！'); speak = '比上次更快了！新紀錄！'; }
@@ -4369,7 +4372,12 @@
           for (const line of timing.lines) {
             const t = document.createElement('div');
             t.className = 'time-note';
-            t.textContent = line;
+            if (Array.isArray(line)) {
+              const dur = document.createElement('span');
+              dur.className = 'time-dur';
+              dur.textContent = line[1];
+              t.append(line[0], dur);
+            } else t.textContent = line;
             document.getElementById('modalMsg').appendChild(t);
           }
           if (timing.speak && !adaptMsg) { pendingTimingSpeak = timing.speak; speakText(timing.speak); }
