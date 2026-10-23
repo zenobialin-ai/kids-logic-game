@@ -4715,7 +4715,7 @@
     // =========================================================================
     // build：之後只有改到數學樂園出題、作答的 PR 才 +1（跟邏輯遊戲的 build 分開算）
     // 2（M2c）：offMs／activeMs／firstAnswer.off 開始記數字（build 1 一律是 null）
-    const MONTESSORI_LOG_BUILD = 6;   // #54 S3：除法自己分珠子（5：#54 S2 念完才出教具、點珠改數第幾顆；4：#54 S1 開題朗讀；3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
+    const MONTESSORI_LOG_BUILD = 7;   // #48 K1：天平照難度標籤改出題範圍（6：#54 S3：除法自己分珠子（5：#54 S2 念完才出教具、點珠改數第幾顆；4：#54 S1 開題朗讀；3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
     // 分頁 id、紀錄 id 不用 Math.random（不能改變出題用的亂數序列）
     const qlogTab = (() => {
       try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36).padStart(6, '0').slice(-6); }
@@ -6144,30 +6144,48 @@
       onQuestionShown();   // #54 S1：開題朗讀（要在 qlogBeginQuestion 之後）
     }
 
+    // #48 K1：天平照難度標籤出題。上限：簡單 5、普通 9（比照加減法「不進位」）、困難 20
+    const BALANCE_CAP = { easy: 5, normal: 9, hard: 20 };
+    // 簡單的 9 種合法 (L, t)：L 3~5、t 1~L-1；從這 9 種均勻抽
+    const BALANCE_EASY_PAIRS = [];
+    for (let L = 3; L <= 5; L++) for (let t = 1; t < L; t++) BALANCE_EASY_PAIRS.push([L, t]);
+    function balanceRandInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
+
     function generateBalanceProblem() {
       balanceCurrentGuess = 0;
 
       if (currentDifficulty === 'easy') {
-        // 🌱 5~10 以內基礎平衡
-        balanceWeightL = Math.floor(Math.random() * 6) + 5; // 5~10
-        balanceTargetAns = Math.floor(Math.random() * (balanceWeightL - 2)) + 1; // 1 ~ weight-2
-        balanceBaseR = balanceWeightL - balanceTargetAns;
+        // 🌱 5以內：L 3~5
+        const pr = BALANCE_EASY_PAIRS[balanceRandInt(0, BALANCE_EASY_PAIRS.length - 1)];
+        balanceWeightL = pr[0];
+        balanceTargetAns = pr[1];
         balanceLeftParts = [balanceWeightL];
       } else if (currentDifficulty === 'hard') {
-        // 🔥 雙邊運算加法平衡 (例如 6 + 7 = 9 + ?)
-        const a1 = Math.floor(Math.random() * 5) + 3; // 3~7
-        const a2 = Math.floor(Math.random() * 5) + 3; // 3~7
-        balanceWeightL = a1 + a2; // 6 ~ 14
+        // 🔥 20以內進位：兩個個位數相加 11~18（抽法同加法困難），例如 6 + 7 = 9 + ?
+        const a1 = balanceRandInt(5, 9);
+        const a2 = balanceRandInt(11 - a1, 9);
         balanceLeftParts = [a1, a2];
-        balanceTargetAns = Math.floor(Math.random() * (balanceWeightL - 3)) + 1;
-        balanceBaseR = balanceWeightL - balanceTargetAns;
+        balanceWeightL = a1 + a2;
+        balanceTargetAns = balanceRandInt(2, Math.min(9, balanceWeightL - 2));
       } else {
-        // 🌿 11~20 以內進階平衡
-        balanceWeightL = Math.floor(Math.random() * 9) + 11; // 11~19
-        balanceTargetAns = Math.floor(Math.random() * (balanceWeightL - 4)) + 2;
-        balanceBaseR = balanceWeightL - balanceTargetAns;
+        // 🌿 10以內不進位：L 6~9（其他值一律當普通）
+        balanceWeightL = balanceRandInt(6, 9);
+        balanceTargetAns = balanceRandInt(2, balanceWeightL - 2);
         balanceLeftParts = [balanceWeightL];
       }
+      balanceBaseR = balanceWeightL - balanceTargetAns;
+    }
+
+    // 4 個不重複的整數、都在 [lo, hi]、正確答案剛好一個；先從答案 ±3 內挑，不夠才放寬到整個範圍；最後洗牌
+    function balanceOptions(t, lo, hi) {
+      const pool = []; for (let v = lo; v <= hi; v++) if (v !== t) pool.push(v);
+      const near = pool.filter(v => Math.abs(v - t) <= 3);
+      const src = near.length >= 3 ? near : pool;
+      const picked = new Set([t]);
+      while (picked.size < 4) picked.add(src[Math.floor(Math.random() * src.length)]);
+      const arr = Array.from(picked);
+      for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+      return arr;
     }
 
     function renderBalanceScaleView() {
@@ -6280,7 +6298,7 @@
 
       // 渲染選項按鈕
       const choicesContainer = document.getElementById('balanceChoices');
-      const options = generateOptions(balanceTargetAns, 1, Math.max(balanceWeightL, 15));
+      const options = balanceOptions(balanceTargetAns, 1, BALANCE_CAP[currentDifficulty] || 9);
       options.forEach(opt => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
