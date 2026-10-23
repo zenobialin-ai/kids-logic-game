@@ -5449,10 +5449,11 @@
 
     // init* 在建好 DOM 之後呼叫：selectors 是要等念完才出現的容器，anchorSel 是「先聽題目」提示放的位置（放在它前面）
     function gateAids(selectors, anchorSel) {
-      const els = selectors.map(q => document.querySelector(q)).filter(Boolean);
+      const root = document.getElementById('gameContent');   // 限定在出題區：之後彈窗若也用同名 class，提示才不會插到外面、移不掉
+      const els = selectors.map(q => root.querySelector(q)).filter(Boolean);
       if (!els.length) return;
       els.forEach(el => el.classList.add('aid-gated'));
-      const anchor = document.querySelector(anchorSel) || els[0];
+      const anchor = root.querySelector(anchorSel) || els[0];
       const wait = document.createElement('div');
       wait.className = 'aid-wait';
       wait.setAttribute('aria-live', 'polite');
@@ -5467,7 +5468,10 @@
         el.classList.remove('aid-gated');
         el.classList.add('aid-reveal');
       });
-      document.querySelectorAll('#gameContent .aid-wait').forEach(el => el.remove());
+      document.querySelectorAll('#gameContent .aid-wait').forEach(el => {   // 不移除：固定高度換一句話，答案按鈕才不會在孩子伸手時往上跳
+        el.style.minHeight = el.offsetHeight + 'px';
+        el.innerHTML = zy('👆 珠子出來了，點點看、數數看！');
+      });
       try {
         if (qlogActive && qlogActive.outcome === null) qlogActive.aidGate = { dt: Date.now() - qlogActive.tOpen, why };
       } catch (e) {}
@@ -5482,10 +5486,12 @@
       promptOwner = token;
       const sb = document.getElementById('speakBtn');
       if (sb) sb.classList.remove('speak-hint');
-      speakText(currentQuestionSpeech, kind, { onDone: why => {
-        if (why === 'cut' && promptOwner !== token) return;   // 被同一題較新的題目朗讀（🔊）取代：等新的那句
-        revealAids(seq, why);
-      } });
+      try {
+        speakText(currentQuestionSpeech, kind, { onDone: why => {
+          if (why === 'cut' && promptOwner !== token) return;   // 被同一題較新的題目朗讀（🔊）取代：等新的那句
+          revealAids(seq, why);
+        } });
+      } catch (e) { revealAids(seq, 'error'); }   // 引擎同步丟例外：照樣往「顯示」走
     }
 
     // 每個 init* 在 qlogBeginQuestion() 之後呼叫：先開紀錄，promptSpeech、aidGate 才綁得到這一題
