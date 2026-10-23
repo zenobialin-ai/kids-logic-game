@@ -407,7 +407,7 @@
       background: #3e5a36;
       transform: scale(1.05);
     }
-    /* 🔊 再聽一次（#54 S1）：放在題目文字前面，最小 44×44 */
+    /* 🔊 再聽一次（#54 S1）：窄版面（<=1240px）排在題目文字前面（🔊 → 文字 → 重新整理）；寬版面（>=1241px）見下方 media，題目自己一列、🔊 排到下一列。最小 44×44 */
     .speak-btn {
       min-width: 44px;
       min-height: 44px;
@@ -415,8 +415,8 @@
       font-size: 1.2rem;
       flex-shrink: 0;
     }
-    /* 寬版面（題目列是橫排）：題目自己一列、🔊 與重新整理排到下一列，題目文字才不會被兩顆按鈕擠窄 */
-    @media (min-width: 1025px) {
+    /* 寬版面（>=1241px，跟下面的桌機版面切換點一致）：題目自己一列、🔊 與重新整理排到下一列，題目文字才不會被兩顆按鈕擠窄 */
+    @media (min-width: 1241px) {
       .instruction-bar { flex-wrap: wrap; gap: 10px 14px; }
       #instructionText { flex: 1 1 100%; order: -1; }
     }
@@ -1134,6 +1134,25 @@
       pointer-events: none;
       animation: bubbleRise 0.75s ease-out forwards;
       z-index: 100;
+    }
+    .bead-count-bubble.repeat { background: #ffe0b2; color: #5c3513; }
+    /* #54 S2：數過的珠子淡淡的外框；變淡的珠子點了只搖一下，不計數 */
+    .bead.counted, .montessori-brick.counted { outline: 2px solid rgba(255,152,0,0.55); outline-offset: 1px; border-radius: 50%; }
+    .bead-nope { animation: beadNope 0.4s ease-in-out; }
+    @keyframes beadNope {
+      0%, 100% { translate: 0 0; }
+      25% { translate: -4px 0; }
+      75% { translate: 4px 0; }
+    }
+    /* #54 S2：先聽題再拿教具。visibility 保留版面（念完時版面不跳） */
+    .aid-gated { visibility: hidden; }
+    .aid-wait { text-align: center; font-size: 1.5rem; font-weight: bold; color: #5c3513; margin: 6px 0 10px; }
+    .aid-reveal { animation: aidReveal 0.3s ease-out; }
+    @keyframes aidReveal { from { opacity: 0; } to { opacity: 1; } }
+    .speak-btn.speak-hint { animation: speakHint 0.8s ease-in-out 3; }
+    @keyframes speakHint { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+    @media (prefers-reduced-motion: reduce) {
+      .aid-reveal, .speak-btn.speak-hint, .bead-nope { animation: none; }
     }
     @keyframes bubbleRise {
       0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.6); }
@@ -4606,14 +4625,13 @@
         for (let i = 0; i < 10; i++) {
           const b = document.createElement("span");
           b.className = "bead bead-10 clickable";
-          const idx = globalIndex + 1;
-          b.title = `第 ${idx} 顆金色珠子 (十位)`;
+          b.title = "金色十珠棒的珠子";   // 不含號碼（#54 S2：位置編號會洩漏答案）
           if (globalIndex >= removedFrom) {
             b.classList.add("removed");
           }
           b.onclick = (e) => {
             e.stopPropagation();
-            onBeadTouch(b, idx);
+            onBeadTouch(b);
           };
           bar.appendChild(b);
           globalIndex++;
@@ -4630,14 +4648,13 @@
         for (let i = 0; i < remainder; i++) {
           const b = document.createElement("span");
           b.className = `bead ${colorClass} clickable`;
-          const idx = globalIndex + 1;
-          b.title = `第 ${idx} 顆珠子 (個位)`;
+          b.title = "珠子";
           if (globalIndex >= removedFrom) {
             b.classList.add("removed");
           }
           b.onclick = (e) => {
             e.stopPropagation();
-            onBeadTouch(b, idx);
+            onBeadTouch(b);
           };
           bar.appendChild(b);
           globalIndex++;
@@ -4685,7 +4702,7 @@
     // =========================================================================
     // build：之後只有改到數學樂園出題、作答的 PR 才 +1（跟邏輯遊戲的 build 分開算）
     // 2（M2c）：offMs／activeMs／firstAnswer.off 開始記數字（build 1 一律是 null）
-    const MONTESSORI_LOG_BUILD = 4;   // #54 S1：開題朗讀（3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
+    const MONTESSORI_LOG_BUILD = 5;   // #54 S2：念完才出教具、點珠改數第幾顆（4：#54 S1 開題朗讀；3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
     // 分頁 id、紀錄 id 不用 Math.random（不能改變出題用的亂數序列）
     const qlogTab = (() => {
       try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36).padStart(6, '0').slice(-6); }
@@ -4769,7 +4786,7 @@
         tOpen: now, tShown: now, tClose: null, outcome: null, recovered: false, ev: [], evTruncated: false,
         firstAnswer: null, wrongCount: 0, wrongDupCount: 0, wrongCountGame: 0, gameReasons: null,
         tapCount: 0, keyTapCount: 0, pointerDownCount: 0, offMs: null, activeMs: null,
-        ...speechPromptFields(), aids: null, aidCounts: null, actions: null, leaks: null
+        ...speechPromptFields(), aidGate: null, aids: null, aidCounts: null, actions: null, leaks: null
       };
     }
 
@@ -5368,11 +5385,10 @@
       for (let i = 0; i < count; i++) {
         const b = document.createElement("span");
         b.className = `bead ${colorClass} clickable`;
-        b.title = `第 ${i+1} 顆珠子`;
-        const idx = i + 1;
+        b.title = "珠子";
         b.onclick = (e) => {
           e.stopPropagation();
-          onBeadTouch(b, idx);
+          onBeadTouch(b);
         };
         bar.appendChild(b);
       }
@@ -5423,12 +5439,69 @@
 
     function speakCurrentInstruction(manual) {
       if (manual) qlogEvent('a', 'read');   // 朗讀鈕（跟邏輯遊戲的 speakCurrentPrompt 一樣）
-      speakText(currentQuestionSpeech, manual ? 'manual' : 'prompt');
+      speakPromptForGate(manual ? 'manual' : 'prompt');
     }
 
-    // 每個 init* 在 qlogBeginQuestion() 之後呼叫：先開紀錄，promptSpeech 才綁得到這一題
+    // #54 S2：先聽題再拿教具。念完（或失敗、逾時）才讓教具出現，失敗一律往「顯示」走
+    let promptSeq = 0;          // 每次 onQuestionShown +1（含不念的情況），舊題目的回呼才會全部失效
+    let promptOwner = null;     // 目前負責這一題閘門的那一句（token）
+    let aidGateState = { seq: 0, t0: 0, open: true };
+
+    // init* 在建好 DOM 之後呼叫：selectors 是要等念完才出現的容器，anchorSel 是「先聽題目」提示放的位置（放在它前面）
+    function gateAids(selectors, anchorSel) {
+      const root = document.getElementById('gameContent');   // 限定在出題區：之後彈窗若也用同名 class，提示才不會插到外面、移不掉
+      const els = selectors.map(q => root.querySelector(q)).filter(Boolean);
+      if (!els.length) return;
+      els.forEach(el => el.classList.add('aid-gated'));
+      const anchor = root.querySelector(anchorSel) || els[0];
+      const wait = document.createElement('div');
+      wait.className = 'aid-wait';
+      wait.setAttribute('aria-live', 'polite');
+      wait.innerHTML = zy('👂 先聽題目，珠子等一下就出來！');
+      anchor.parentNode.insertBefore(wait, anchor);
+    }
+
+    function revealAids(seq, why) {   // 冪等；換題的擋法只在這裡（seq !== promptSeq 就 return）
+      if (seq !== promptSeq || aidGateState.open) return;
+      aidGateState.open = true;
+      document.querySelectorAll('#gameContent .aid-gated').forEach(el => {
+        el.classList.remove('aid-gated');
+        el.classList.add('aid-reveal');
+      });
+      document.querySelectorAll('#gameContent .aid-wait').forEach(el => {   // 不移除：固定高度換一句話，答案按鈕才不會在孩子伸手時往上跳
+        el.style.minHeight = el.offsetHeight + 'px';
+        el.innerHTML = zy('👆 珠子出來了，點點看、數數看！');
+      });
+      try {
+        if (qlogActive && qlogActive.outcome === null) qlogActive.aidGate = { dt: Date.now() - qlogActive.tOpen, why };
+      } catch (e) {}
+      if (why === 'error' || why === 'timeout') {
+        const sb = document.getElementById('speakBtn');
+        if (sb) sb.classList.add('speak-hint');
+      }
+    }
+
+    function speakPromptForGate(kind) {
+      const seq = promptSeq, token = {};
+      promptOwner = token;
+      const sb = document.getElementById('speakBtn');
+      if (sb) sb.classList.remove('speak-hint');
+      try {
+        speakText(currentQuestionSpeech, kind, { onDone: why => {
+          if (why === 'cut' && promptOwner !== token) return;   // 被同一題較新的題目朗讀（🔊）取代：等新的那句
+          revealAids(seq, why);
+        } });
+      } catch (e) { revealAids(seq, 'error'); }   // 引擎同步丟例外：照樣往「顯示」走
+    }
+
+    // 每個 init* 在 qlogBeginQuestion() 之後呼叫：先開紀錄，promptSpeech、aidGate 才綁得到這一題
     function onQuestionShown() {
-      if (awaitingPick || eyeLockShown()) return;   // 等「誰要玩？」或護眼鎖著時不念
+      const seq = ++promptSeq;
+      const gated = document.querySelectorAll('#gameContent .aid-gated');
+      aidGateState = { seq, t0: Date.now(), open: gated.length === 0 };
+      const sb = document.getElementById('speakBtn');
+      if (sb) sb.classList.remove('speak-hint');
+      if (awaitingPick || eyeLockShown()) { revealAids(seq, 'skip'); return; }   // 等「誰要玩？」或護眼鎖著時不念，教具直接出現
       speakCurrentInstruction(false);
     }
 
@@ -5498,14 +5571,16 @@
     let beadCountStreak = 0;
     const chimeNotes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50]; // C5, D5, E5, G5, A5, C6
 
-    function onBeadTouch(el, index) {
-      qlogBeadTouch();   // M3：要在音效關掉的 return 之前記
-      if (!isSoundOn) return;
+    // #54 S2：氣泡顯示「這一顆是這一組數到的第幾顆」，不是珠子的位置
+    //   計數範圍（scope）= 最近的 [data-count-scope] 祖先，計數器存在 DOM 上（data-count-next），init* 重建 DOM 就歸零
+    //   沒數過的珠子：scope 計數 +1，珠子記住自己的號碼（data-count-n）；數過的：不加，氣泡再顯示它的號碼（淺色 repeat）
+    //   變淡的珠子（.removed）不計數、不出氣泡，只搖一下。音效關掉時計數與氣泡照樣出現，只有叮噹聲看 isSoundOn
+    function playBeadChime(n) {
       try {
         Sound.init();
         if (Sound.ctx) {
           const actx = Sound.ctx;
-          const noteFreq = chimeNotes[(index - 1) % chimeNotes.length];
+          const noteFreq = chimeNotes[(n - 1) % chimeNotes.length];
           const osc = actx.createOscillator();
           const gain = actx.createGain();
           osc.type = "sine";
@@ -5518,6 +5593,28 @@
           osc.stop(actx.currentTime + 0.35);
         }
       } catch (e) {}
+    }
+
+    function onBeadTouch(el) {
+      qlogBeadTouch();   // M3：每一下都記（含重複點、變淡的珠子）
+      if (el.classList.contains('removed')) {
+        el.classList.remove('bead-nope');
+        void el.offsetWidth;
+        el.classList.add('bead-nope');
+        setTimeout(() => el.classList.remove('bead-nope'), 450);
+        return;
+      }
+      const scope = el.closest('[data-count-scope]');
+      if (!scope) return;
+      let n = Number(el.dataset.countN) || 0;
+      const repeat = n > 0;
+      if (!repeat) {
+        n = (Number(scope.dataset.countNext) || 0) + 1;
+        scope.dataset.countNext = String(n);
+        el.dataset.countN = String(n);
+        el.classList.add('counted');
+      }
+      if (isSoundOn) playBeadChime(n);
 
       // 觸摸彈跳
       el.style.transform = "scale(1.35)";
@@ -5525,8 +5622,8 @@
 
       // 冒出數字氣泡
       const bubble = document.createElement("span");
-      bubble.className = "bead-count-bubble";
-      bubble.textContent = index;
+      bubble.className = "bead-count-bubble" + (repeat ? " repeat" : "");
+      bubble.textContent = n;
       el.style.position = "relative";
       el.appendChild(bubble);
       setTimeout(() => {
@@ -7494,7 +7591,7 @@
 
       const container = document.getElementById('gameContent');
       container.innerHTML = `
-        <div class="math-formula-box">
+        <div class="math-formula-box" data-count-scope>
           <div id="addBarA"></div>
           <div class="math-symbol">➕</div>
           <div id="addBarB"></div>
@@ -7509,6 +7606,7 @@
 
       document.getElementById('addBarA').appendChild(createBeadBar(addA, BeadStairs[addA - 1].color));
       document.getElementById('addBarB').appendChild(createBeadBar(addB, BeadStairs[addB - 1].color));
+      gateAids(['#addBarA', '#addBarB'], '.math-formula-box');   // #54 S2：念完才出現
 
       const choicesContainer = document.getElementById('addChoices');
       const options = generateOptions(sum, 2, 20);
@@ -7587,7 +7685,7 @@
             ${zy("原本有")} <strong style="font-size:2.2rem; color:#844c1c;">${subTotal}</strong> ${zy("顆，拿走了")} 
             <strong style="font-size:2.2rem; color:#c62828;">${subTake}</strong> ${zy("顆 (變淡的珠子)：")}
           </div>
-          <div id="subBeadContainer" style="display:flex; align-items:center; justify-content:center; gap:12px;"></div>
+          <div id="subBeadContainer" data-count-scope style="display:flex; align-items:center; justify-content:center; gap:12px;"></div>
           <div style="display:flex; align-items:center; gap:24px; font-size:2.6rem; font-weight:900; color:#552f0e;">
             <span>${subTotal}</span>
             <span style="color:#c62828;">➖</span>
@@ -7612,6 +7710,7 @@
         gap: "10px"
       });
       subBeadBox.appendChild(cluster);
+      gateAids(['#subBeadContainer'], '#subBeadContainer');   // #54 S2：念完才出現
 
       const choicesContainer = document.getElementById('subChoices');
       const options = generateOptions(remain, 1, 15);
@@ -7677,7 +7776,7 @@
             <strong style="color:#844c1c; font-size:2rem;">${mulNum}</strong> ${zy("顆珠子的串珠棒，一共有")} 
             <strong style="color:#844c1c; font-size:2rem;">${mulCount}</strong> ${zy("根：")}
           </div>
-          <div id="mulArrayHolder" style="display:flex; flex-direction:column; gap:10px; align-items:center;"></div>
+          <div id="mulArrayHolder" data-count-scope style="display:flex; flex-direction:column; gap:10px; align-items:center;"></div>
         </div>
 
         <div class="math-formula-box" style="margin: 12px auto; padding: 14px 28px;">
@@ -7701,6 +7800,7 @@
         const bar = createBeadBar(mulNum, BeadStairs[mulNum - 1].color);
         holder.appendChild(bar);
       }
+      gateAids(['#mulArrayHolder'], '#mulArrayHolder');   // #54 S2：念完才出現
 
       const choicesContainer = document.getElementById('mulChoices');
       const options = generateOptions(product, 4, 20);
@@ -7764,7 +7864,7 @@
           <div class="division-plate">
             <div class="plate-avatar">🐻</div>
             <div class="plate-title">${zy("小熊的盤子")}</div>
-            <div class="plate-beads-container" id="plateA"></div>
+            <div class="plate-beads-container" id="plateA" data-count-scope></div>
           </div>
 
           <div style="font-size: 3.6rem; font-weight: 900; color: #844c1c; align-self: center;">➗ 2 🟰</div>
@@ -7772,7 +7872,7 @@
           <div class="division-plate">
             <div class="plate-avatar">🐰</div>
             <div class="plate-title">${zy("小兔的盤子")}</div>
-            <div class="plate-beads-container" id="plateB"></div>
+            <div class="plate-beads-container" id="plateB" data-count-scope></div>
           </div>
         </div>
 
@@ -7787,16 +7887,15 @@
       for (let i = 0; i < divPerPerson; i++) {
         const b1 = document.createElement("span");
         b1.className = "bead bead-10 clickable";
-        const idx1 = i + 1;
-        b1.onclick = () => onBeadTouch(b1, idx1);
+        b1.onclick = () => onBeadTouch(b1);
         pA.appendChild(b1);
 
         const b2 = document.createElement("span");
         b2.className = "bead bead-10 clickable";
-        const idx2 = i + 1;
-        b2.onclick = () => onBeadTouch(b2, idx2);
+        b2.onclick = () => onBeadTouch(b2);
         pB.appendChild(b2);
       }
+      gateAids(['#plateA', '#plateB'], '.division-stage');   // #54 S2：盤子框照樣顯示，珠子念完才出現
 
       const choicesContainer = document.getElementById('divChoices');
       const options = generateOptions(divPerPerson, 1, 7);
@@ -8006,7 +8105,7 @@
         <!-- 蒙特梭利金色串珠千百十個四位元銀行操作板 -->
         <div class="bank-board">
           <!-- 千位 (綠色 / 🧱 千位立方體) -->
-          <div class="bank-column col-thousand">
+          <div class="bank-column col-thousand" data-count-scope>
             <div class="bank-col-header">${zy("千位 (1000)")}</div>
             <div class="bank-item-group" id="bankThA"></div>
             <div class="bank-op-divider">${isAdd ? '➕' : '➖'}</div>
@@ -8015,7 +8114,7 @@
           </div>
 
           <!-- 百位 (紅色 / 🔲 百位方塊片) -->
-          <div class="bank-column col-hundred">
+          <div class="bank-column col-hundred" data-count-scope>
             <div class="bank-col-header">${zy("百位 (100)")}</div>
             <div class="bank-item-group" id="bankHuA"></div>
             <div class="bank-op-divider">${isAdd ? '➕' : '➖'}</div>
@@ -8024,7 +8123,7 @@
           </div>
 
           <!-- 十位 (藍色 / 🥖 十位珠棒) -->
-          <div class="bank-column col-ten">
+          <div class="bank-column col-ten" data-count-scope>
             <div class="bank-col-header">${zy("十位 (10)")}</div>
             <div class="bank-item-group" id="bankTeA"></div>
             <div class="bank-op-divider">${isAdd ? '➕' : '➖'}</div>
@@ -8033,7 +8132,7 @@
           </div>
 
           <!-- 個位 (綠色 / 🟡 個位金珠) -->
-          <div class="bank-column col-unit">
+          <div class="bank-column col-unit" data-count-scope>
             <div class="bank-col-header">${zy("個位 (1)")}</div>
             <div class="bank-item-group" id="bankUnA"></div>
             <div class="bank-op-divider">${isAdd ? '➕' : '➖'}</div>
@@ -8059,7 +8158,7 @@
           item.title = title;
           item.onclick = (e) => {
             e.stopPropagation();
-            onBeadTouch(item, i + 1);
+            onBeadTouch(item);
           };
           el.appendChild(item);
         }
@@ -8080,6 +8179,7 @@
       // 個位：🟡 珠珠
       fillItems("bankUnA", bankA.un, "🟡", "個位珠珠");
       fillItems("bankUnB", bankB.un, "🟡", "個位珠珠", !isAdd);
+      gateAids(['#bankThA', '#bankThB', '#bankHuA', '#bankHuB', '#bankTeA', '#bankTeB', '#bankUnA', '#bankUnB'], '.bank-board');   // #54 S2：念完才出現
 
       // 產生 4 個四位數選項 (包含正確答案與干擾項)
       const options = generateBankOptions(bankAnswer);
@@ -8402,6 +8502,7 @@
       const others = p.children.filter(c => c.id !== activeChildId);
       document.getElementById('parentMoveBox').style.display = others.length ? 'block' : 'none';
       const mv = document.getElementById('parentMoveSelect');
+      const mvPrev = mv.value;   // 重建前先記住選了誰，重建後還在就還原
       mv.textContent = '';
       for (const c of others) {
         const o = document.createElement('option');
@@ -8409,6 +8510,7 @@
         o.textContent = childLabel(c);
         mv.append(o);
       }
+      if (mvPrev && others.some(c => c.id === mvPrev)) mv.value = mvPrev;
       document.querySelectorAll('.parent-btn[data-rate]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.rate === speechRate);
         btn.setAttribute('aria-pressed', btn.dataset.rate === speechRate);
