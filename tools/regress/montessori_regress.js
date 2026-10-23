@@ -39,6 +39,9 @@
  *     每一步 steps[].sounds 列出這一步呼叫過的方法（依呼叫順序）。啟動程式在 DOMContentLoaded 前就跑完，
  *     所以啟動當下（init 那一步之前）的音效不會被記到。
  *     串珠的叮噹聲等直接用 Sound.ctx 發聲（不經過 Sound 的方法），也不會出現在 sounds 裡。
+ *   - speechSynthesis 換成假的、不發聲（照抄 logic_regress.js；getVoices 回傳 []）：speak 後 setTimeout(0) 觸發 onstart，
+ *     字數 × 150ms 後觸發 onend；cancel() 對正在念／排隊的句子觸發 onerror({ error: 'interrupted' })。計時器走頁面的（假時鐘控制）。
+ *     念過的句子依序記在輸出的 speech[]（重新整理前後的合併起來）。
  *   - 全新的 browser context（localStorage 是空的），時區固定 Asia/Taipei、語系 zh-TW。
  *   - 正確答案從頁面的全域變數讀（answerOf()；改名時只要改這裡），錯的答案 = 第一個不等於正確答案的選項。
  *
@@ -62,7 +65,7 @@
  *   7. 重新整理頁面
  *
  * 【輸出】
- *   { pageErrors: { count, messages }, steps[], localStorage{} }
+ *   { pageErrors: { count, messages }, steps[], speech[], localStorage{} }
  *   steps[] 是每一步之後畫面上看得到的狀態（星星、貼紙、錯題本／打卡徽章、目前題型、開著的視窗、
  *   小熊的話、選項按鈕的狀態、這一步播過的音效…）。localStorage{} 是所有 key（JSON 會先 parse、key 排序）。
  */
@@ -90,6 +93,43 @@ function initScript(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  // 假語音：不發聲。開始念 = setTimeout(0) 後觸發 onstart；念完 = 字數 × 150ms 後觸發 onend；
+  // cancel() 對正在念與排隊中的句子觸發 onerror({ error: 'interrupted' })。計時器走頁面的（假時鐘控制）。
+  window.__regressSpeech = [];
+  let queue = [], cur = null, timer = null;
+  const fire = (u, type, extra) => { try { const f = u['on' + type]; if (typeof f === 'function') f.call(u, Object.assign({ type, utterance: u }, extra || {})); } catch (e) {} };
+  const next = () => {
+    if (cur || !queue.length) return;
+    cur = queue.shift();
+    fake.speaking = true;
+    const u = cur;
+    timer = window.setTimeout(() => {
+      fire(u, 'start');
+      timer = window.setTimeout(() => {
+        if (cur !== u) return;
+        cur = null; fake.speaking = false; timer = null;
+        fire(u, 'end');
+        next();
+      }, String(u.text || '').length * 150);
+    }, 0);
+  };
+  const fake = {
+    speaking: false, pending: false, paused: false, onvoiceschanged: null,
+    speak(u) { try { window.__regressSpeech.push(String(u && u.text)); queue.push(u); next(); } catch (e) {} },
+    cancel() {
+      const all = (cur ? [cur] : []).concat(queue);
+      queue = []; cur = null; fake.speaking = false;
+      if (timer) { window.clearTimeout(timer); timer = null; }
+      all.forEach(u => fire(u, 'error', { error: 'interrupted' }));
+    },
+    pause() {}, resume() {},
+    getVoices() { return []; },
+    addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true; }
+  };
+  try { Object.defineProperty(window, 'speechSynthesis', { value: fake, configurable: true, writable: true }); } catch (e) {}
+  if (typeof window.SpeechSynthesisUtterance !== 'function') {
+    window.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  }
   // 假的音效：只記方法名稱，不發聲（Sound 是頁面上的 const，要等主程式跑完才拿得到）
   window.__soundLog = [];
   document.addEventListener('DOMContentLoaded', () => {
@@ -340,7 +380,7 @@ async function main() {
   }
   const url = pathToFileURL(path.resolve(file)).href;
   const browser = await PW.chromium.launch({ channel: process.env.PW_CHANNEL || undefined, args: ['--mute-audio'], headless: process.env.REGRESS_HEADED !== '1' });
-  const out = { pageErrors: { count: 0, messages: [] }, steps: [], localStorage: {} };
+  const out = { pageErrors: { count: 0, messages: [] }, steps: [], speech: [], localStorage: {} };
   let failed = false;
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'zh-TW', timezoneId: 'Asia/Taipei', reducedMotion: 'reduce' });
@@ -355,12 +395,16 @@ async function main() {
     await ready();
     const x = makeCtx(page, context.clock, out.steps);
     try {
-      await run(x, async () => { await page.reload(); await ready(); });
+      await run(x, async () => {
+        out.speech = out.speech.concat(await page.evaluate(() => window.__regressSpeech || []));   // 重新整理會清掉頁面上的紀錄，先收起來
+        await page.reload(); await ready();
+      });
     } catch (e) {
       failed = true;
       out.error = String(e && e.message).split('\n')[0];
       process.stderr.write(`FAILED: ${e && e.stack}\n`);
     }
+    out.speech = out.speech.concat(await page.evaluate(() => window.__regressSpeech || []).catch(() => []));
     const raw = await page.evaluate(() => {
       const o = {};
       for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); }
