@@ -415,6 +415,11 @@
       font-size: 1.2rem;
       flex-shrink: 0;
     }
+    /* 寬版面（題目列是橫排）：題目自己一列、🔊 與重新整理排到下一列，題目文字才不會被兩顆按鈕擠窄 */
+    @media (min-width: 1025px) {
+      .instruction-bar { flex-wrap: wrap; gap: 10px 14px; }
+      #instructionText { flex: 1 1 100%; order: -1; }
+    }
     .action-btn .zy-stem,
     .action-btn .zy-neutral,
     .action-btn .zy-tone {
@@ -8372,6 +8377,11 @@
       showParentModal();
       showParentSettings();
     }
+
+    // 另一個分頁改了語速：家長頁開著的話，重畫才看得到哪個按鈕亮著（family.js 的監聽只改變數）
+    window.addEventListener('storage', e => {
+      try { if (e.key === SPEECH_RATE_KEY && parentSettingsShown()) renderParentSettings(); } catch (err) {}
+    });
 
     function renderParentSettings() {
       renderEyeSettings();
