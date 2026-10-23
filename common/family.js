@@ -694,7 +694,7 @@ const QLOG_RATE_LABEL = { slow: '慢', normal: '普通', fast: '快' };
 // 每個遊戲的報告設定（key 跟 QLOG_GAMES 一樣；報告依 QLOG_GAMES 的順序列）
 //   icons：模組圖示（logic 的跟 MODULE_INFO 一致）；subLabel：子題型名稱
 //   aidLabel：列在「用了哪些輔助」；ownLines：不算輔助、自己一行的操作（數串珠是蒙特梭利本來就要做的操作）
-//   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）
+//   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）；可以是數字，或 { 欄位: build } 依欄位給
 const QLOG_REPORT = {
   little_logic_qlog_v1: {
     title: '🚀 小小邏輯探險家',
@@ -728,9 +728,9 @@ const QLOG_REPORT = {
     },
     aidLabel: { read: '朗讀', verticalHint: '看直式提示' },
     ownLines: { beadCount: '數串珠' },
-    actionLabel: { steps: '調整' },
-    actionFields: { balance: ['steps'] },   // 只有天平記動作數（+1／−1）
-    actionMinBuild: 3                        // 數學樂園 build 3（M3）起才記 actions.steps
+    actionLabel: { steps: '調整', deals: '分珠' },
+    actionFields: { balance: ['steps'], div: ['deals'] },   // 天平記調整（+1／−1）、除法記分珠
+    actionMinBuild: { steps: 3, deals: 6 }   // 依欄位：steps 從 build 3（M3）、deals 從 build 6（#54 S3）起才有記
   }
 };
 
@@ -773,10 +773,16 @@ function qlogReportStats(base, childId) {
     const fields = rep.actionFields[sub] || null;   // R1（複查）
     let actDone = null, act = null;
     if (fields) {
-      actDone = done.filter(r => Number(r.build) >= rep.actionMinBuild);
+      // actionMinBuild 可以是數字（整個遊戲一個），或 { 欄位: build }（依欄位；沒列到的欄位不篩）
+      const minB = f => typeof rep.actionMinBuild === 'object' && rep.actionMinBuild ? (Number(rep.actionMinBuild[f]) || 0) : rep.actionMinBuild;
       act = {};
+      actDone = [];
       // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
-      for (const f of fields) act[f] = qlogMedian(actDone.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+      for (const f of fields) {
+        const ds = done.filter(r => Number(r.build) >= minB(f));
+        if (ds.length > actDone.length) actDone = ds;   // actN：任一欄位有紀錄就算有（單欄位的組跟以前相同）
+        act[f] = qlogMedian(ds.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+      }
     }
     const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
     const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
