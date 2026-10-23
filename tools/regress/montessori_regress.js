@@ -249,7 +249,7 @@ function makeCtx(page, clock, steps) {
       try { g.currentMode = currentMode; } catch (e) { g.currentMode = '<n/a>'; }               // eslint-disable-line no-undef
       try { g.currentDifficulty = currentDifficulty; } catch (e) { g.currentDifficulty = '<n/a>'; } // eslint-disable-line no-undef
       try { g.userStars = userStars; } catch (e) { g.userStars = '<n/a>'; }                     // eslint-disable-line no-undef
-      try { g.userBonusStars = window.userBonusStars === undefined ? null : window.userBonusStars; } catch (e) { g.userBonusStars = '<n/a>'; }
+      try { g.userBonusStars = userBonusStars; } catch (e) { g.userBonusStars = null; }
       const modals = ['successModal', 'stickerAlbumModal', 'wardrobeModal', 'checkinModal', 'mistakesModal', 'analyticsModal', 'deviceGuideModal']
         .filter(id => shown(document.getElementById(id)));
       const badge = id => { const el = document.getElementById(id); return el ? { text: txt(el), shown: shown(el) } : null; };

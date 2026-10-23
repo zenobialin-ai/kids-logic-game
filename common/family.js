@@ -27,7 +27,7 @@ const AWAY_MS = 10 * 60 * 1000;
 const FAMILY_KEY_GROUPS = [
   { child: ['little_logic_save_v1', 'little_logic_mistakes_v1', 'little_logic_gears_intro_v1'], id: ['little_logic_qlog_v1'] },
   { child: ['montessori_mistakes', 'montessori_analytics', 'montessori_diff', 'montessori_stars',
-            'montessori_stickers', 'montessori_wardrobe', 'montessori_checkin'], id: ['montessori_qlog_v1'] }
+            'montessori_stickers', 'montessori_wardrobe', 'montessori_checkin', 'montessori_bonus_stars'], id: ['montessori_qlog_v1'] }
 ];
 const FAMILY_CHILD_KEYS = FAMILY_KEY_GROUPS.flatMap(g => g.child);
 const FAMILY_ID_KEYS = FAMILY_KEY_GROUPS.flatMap(g => g.id);
