@@ -42,6 +42,8 @@
  *   - speechSynthesis 換成假的、不發聲（照抄 logic_regress.js；getVoices 回傳 []）：speak 後 setTimeout(0) 觸發 onstart，
  *     字數 × 150ms 後觸發 onend；cancel() 對正在念／排隊的句子觸發 onerror({ error: 'interrupted' })。計時器走頁面的（假時鐘控制）。
  *     念過的句子依序記在輸出的 speech[]（重新整理前後的合併起來）。
+ *     window.__regressSpeechFinish()（#54 S3）：不推進假時鐘，立刻讓「目前這一句」結束（觸發 onstart（還沒觸發的話）與 onend）；沒有在念就什麼都不做。
+ *     除法要念完才出現籃子，用這個打開它；不用 runFor 等假語音念完（約 7 秒），否則後面題型的時間戳全部往後移。
  *   - 全新的 browser context（localStorage 是空的），時區固定 Asia/Taipei、語系 zh-TW。
  *   - 正確答案從頁面的全域變數讀（answerOf()；改名時只要改這裡），錯的答案 = 第一個不等於正確答案的選項。
  *
@@ -57,6 +59,7 @@
  *
  * 【情境】（一位孩子、一個分頁）
  *   1. 7 個題型依序：答錯一次 → 答對一次 → 「再來一題」；天平再用 +1 微調答對一題
+ *      （除法先 __regressSpeechFinish() 打開籃子、點籃子分完珠子，答案按鈕才出現）
  *   2. 貼紙簿：打開、關閉
  *   3. 打卡：打開、打卡、關閉
  *   4. 換裝：打開、用星星換「萌萌小兔耳髮箍」、穿上、關閉
@@ -101,9 +104,11 @@ function initScript(seed) {
   const next = () => {
     if (cur || !queue.length) return;
     cur = queue.shift();
+    curStarted = false;
     fake.speaking = true;
     const u = cur;
     timer = window.setTimeout(() => {
+      curStarted = true;
       fire(u, 'start');
       timer = window.setTimeout(() => {
         if (cur !== u) return;
@@ -112,6 +117,16 @@ function initScript(seed) {
         next();
       }, String(u.text || '').length * 150);
     }, 0);
+  };
+  let curStarted = false;
+  window.__regressSpeechFinish = () => {
+    const u = cur;
+    if (!u) return;
+    if (timer) { window.clearTimeout(timer); timer = null; }
+    if (!curStarted) { curStarted = true; fire(u, 'start'); }
+    cur = null; fake.speaking = false;
+    fire(u, 'end');
+    next();
   };
   const fake = {
     speaking: false, pending: false, paused: false, onvoiceschanged: null,
@@ -281,12 +296,19 @@ function makeCtx(page, clock, steps) {
     return snap(label);
   }
 
+  // 除法（#54 S3）：念完才出現籃子 → 讓目前那句立刻念完（不推進假時鐘）→ 點籃子 N 下；分完答案按鈕才會出現
+  async function dealAll() {
+    await page.evaluate(() => window.__regressSpeechFinish());
+    const n = await page.evaluate(() => divPerPerson * divPeople);   // eslint-disable-line no-undef
+    for (let i = 0; i < n; i++) await click('#divBasket');
+  }
+
   async function closeModalIn(id) {
     await click(`#${id} .modal-close-btn`, 0);
     await tick(50);
   }
 
-  return { page, tick, click, snap, switchTo, answer, closeModalIn };
+  return { page, tick, click, snap, switchTo, answer, dealAll, closeModalIn };
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +321,7 @@ async function run(x, reload) {
   for (let mode = 1; mode <= 7; mode++) {
     await x.switchTo(mode);
     await x.snap(`mode${mode}: open`);
+    if (mode === 4) await x.dealAll();   // #54 S3：除法要先分完珠子，答案按鈕才會出現
     await x.answer(mode, true, `mode${mode}: wrong`);
     await x.answer(mode, false, `mode${mode}: correct`);
     await x.click('#nextBtnText');

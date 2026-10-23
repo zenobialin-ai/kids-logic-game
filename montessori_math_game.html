@@ -1148,11 +1148,18 @@
     .aid-gated { visibility: hidden; }
     .aid-wait { text-align: center; font-size: 1.5rem; font-weight: bold; color: #5c3513; margin: 6px 0 10px; }
     .aid-reveal { animation: aidReveal 0.3s ease-out; }
+    /* #54 S3：除法的籃子。籃子裡的珠子由 JS 一顆顆搬進盤子；搬過去的珠子跳一下（只用 CSS，沒有計時器） */
+    .div-basket { display: block; width: calc(100% - 24px); max-width: 380px; margin: 4px auto 0; padding: 12px 16px 8px; background: #f3dfb4; border: 5px solid #b5833b; border-radius: 14px 14px 44px 44px; font: inherit; color: #5c3513; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+    .div-basket:disabled { cursor: default; background: #ece3cc; border-color: #c9b98f; }
+    .div-basket-beads { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-content: flex-start; pointer-events: none; }
+    .div-basket-label { display: block; min-height: 2.4rem; margin-top: 6px; font-size: 1.4rem; font-weight: bold; line-height: 1.8; }
+    .bead-dealt { animation: beadDealt 0.3s ease-out; }
+    @keyframes beadDealt { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
     @keyframes aidReveal { from { opacity: 0; } to { opacity: 1; } }
     .speak-btn.speak-hint { animation: speakHint 0.8s ease-in-out 3; }
     @keyframes speakHint { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
     @media (prefers-reduced-motion: reduce) {
-      .aid-reveal, .speak-btn.speak-hint, .bead-nope { animation: none; }
+      .aid-reveal, .speak-btn.speak-hint, .bead-nope, .bead-dealt { animation: none; }
     }
     @keyframes bubbleRise {
       0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.6); }
@@ -3828,7 +3835,7 @@
     // 每個遊戲的報告設定（key 跟 QLOG_GAMES 一樣；報告依 QLOG_GAMES 的順序列）
     //   icons：模組圖示（logic 的跟 MODULE_INFO 一致）；subLabel：子題型名稱
     //   aidLabel：列在「用了哪些輔助」；ownLines：不算輔助、自己一行的操作（數串珠是蒙特梭利本來就要做的操作）
-    //   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）
+    //   actionFields：有列「動作數」的組和欄位；actionMinBuild：從哪個 build 起才有記動作數（之前的紀錄不算，會被拉低）；可以是數字，或 { 欄位: build } 依欄位給
     const QLOG_REPORT = {
       little_logic_qlog_v1: {
         title: '🚀 小小邏輯探險家',
@@ -3862,9 +3869,9 @@
         },
         aidLabel: { read: '朗讀', verticalHint: '看直式提示' },
         ownLines: { beadCount: '數串珠' },
-        actionLabel: { steps: '調整' },
-        actionFields: { balance: ['steps'] },   // 只有天平記動作數（+1／−1）
-        actionMinBuild: 3                        // 數學樂園 build 3（M3）起才記 actions.steps
+        actionLabel: { steps: '調整', deals: '分珠' },
+        actionFields: { balance: ['steps'], div: ['deals'] },   // 天平記調整（+1／−1）、除法記分珠
+        actionMinBuild: { steps: 3, deals: 6 }   // 依欄位：steps 從 build 3（M3）、deals 從 build 6（#54 S3）起才有記
       }
     };
 
@@ -3907,10 +3914,16 @@
         const fields = rep.actionFields[sub] || null;   // R1（複查）
         let actDone = null, act = null;
         if (fields) {
-          actDone = done.filter(r => Number(r.build) >= rep.actionMinBuild);
+          // actionMinBuild 可以是數字（整個遊戲一個），或 { 欄位: build }（依欄位；沒列到的欄位不篩）
+          const minB = f => typeof rep.actionMinBuild === 'object' && rep.actionMinBuild ? (Number(rep.actionMinBuild[f]) || 0) : rep.actionMinBuild;
           act = {};
+          actDone = [];
           // R2（複查）：這些紀錄的每一筆都要算進去；actions 是 null 或缺欄位就當成 0
-          for (const f of fields) act[f] = qlogMedian(actDone.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+          for (const f of fields) {
+            const ds = done.filter(r => Number(r.build) >= minB(f));
+            if (ds.length > actDone.length) actDone = ds;   // actN：任一欄位有紀錄就算有（單欄位的組跟以前相同）
+            act[f] = qlogMedian(ds.map(r => (r.actions && typeof r.actions[f] === 'number') ? r.actions[f] : 0));
+          }
         }
         const minNum = done.filter(r => typeof r.minActions === 'number' && isFinite(r.minActions)).map(r => r.minActions);
         const minSteps = done.filter(r => r.minActions && typeof r.minActions === 'object' && Number.isFinite(r.minActions.steps)).map(r => r.minActions.steps);
@@ -4702,7 +4715,7 @@
     // =========================================================================
     // build：之後只有改到數學樂園出題、作答的 PR 才 +1（跟邏輯遊戲的 build 分開算）
     // 2（M2c）：offMs／activeMs／firstAnswer.off 開始記數字（build 1 一律是 null）
-    const MONTESSORI_LOG_BUILD = 5;   // #54 S2：念完才出教具、點珠改數第幾顆（4：#54 S1 開題朗讀；3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
+    const MONTESSORI_LOG_BUILD = 6;   // #54 S3：除法自己分珠子（5：#54 S2 念完才出教具、點珠改數第幾顆；4：#54 S1 開題朗讀；3：M3 加了 beadCount／verticalHint 輔助和天平的 actions.steps）
     // 分頁 id、紀錄 id 不用 Math.random（不能改變出題用的亂數序列）
     const qlogTab = (() => {
       try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0].toString(36).padStart(6, '0').slice(-6); }
@@ -4799,7 +4812,7 @@
       offTracked: true,
       isOff: () => document.visibilityState !== 'visible' || QLOG_OFF_ELS.some(q => q.on()),
       actionsTemplate: { steps: 0 },
-      countAction: (type, data) => (type === 'x' && (data === '+1' || data === '-1')) ? 'steps' : null,   // 天平的 +1／−1 → actions.steps
+      countAction: (type, data) => type !== 'x' ? null : (data === '+1' || data === '-1') ? 'steps' : data === 'deal' ? 'deals' : null,   // 天平的 +1／−1 → actions.steps；除法分一顆 → actions.deals（範本不放 deals，其他題型的紀錄才不會多出這個欄位）
       onAnswerEvent: qlogSpeechAnswerEvent   // 題目還在朗讀時就作答
     });
 
@@ -5448,7 +5461,8 @@
     let aidGateState = { seq: 0, t0: 0, open: true };
 
     // init* 在建好 DOM 之後呼叫：selectors 是要等念完才出現的容器，anchorSel 是「先聽題目」提示放的位置（放在它前面）
-    function gateAids(selectors, anchorSel) {
+    // revealText（選填）：念完後 .aid-wait 換成的那一句（原始文字，revealAids 才套注音）；不給就用預設的「珠子出來了」
+    function gateAids(selectors, anchorSel, revealText) {
       const root = document.getElementById('gameContent');   // 限定在出題區：之後彈窗若也用同名 class，提示才不會插到外面、移不掉
       const els = selectors.map(q => root.querySelector(q)).filter(Boolean);
       if (!els.length) return;
@@ -5457,6 +5471,7 @@
       const wait = document.createElement('div');
       wait.className = 'aid-wait';
       wait.setAttribute('aria-live', 'polite');
+      if (revealText) wait.dataset.reveal = revealText;
       wait.innerHTML = zy('👂 先聽題目，珠子等一下就出來！');
       anchor.parentNode.insertBefore(wait, anchor);
     }
@@ -5470,7 +5485,7 @@
       });
       document.querySelectorAll('#gameContent .aid-wait').forEach(el => {   // 不移除：固定高度換一句話，答案按鈕才不會在孩子伸手時往上跳
         el.style.minHeight = el.offsetHeight + 'px';
-        el.innerHTML = zy('👆 珠子出來了，點點看、數數看！');
+        el.innerHTML = zy(el.dataset.reveal || '👆 珠子出來了，點點看、數數看！');
       });
       try {
         if (qlogActive && qlogActive.outcome === null) qlogActive.aidGate = { dt: Date.now() - qlogActive.tOpen, why };
@@ -7839,6 +7854,8 @@
     // 4. ➗ 除法模組：公平分給好朋友
     // =========================================================================
     let divPerPerson = 3, divPeople = 2;
+    // #54 S3：算式 N ÷ 2 = ? 什麼時候變成結果。'answer' = 答對時（跟其他題型的 ❓ 卡一樣）；'dealt' = 分完當下（測試用）
+    let DIV_RESULT_REVEAL = 'answer';
     function initDivision() {
       divPeople = 2;
       if (currentDifficulty === 'easy') {
@@ -7851,20 +7868,23 @@
       const totalBeads = divPerPerson * divPeople;
       setInstruction(
         `➗ 請公平平分：一共有 ${totalBeads} 顆珠子，公平分給小熊和小兔，每隻小動物分到幾顆？`,
-        `一共有 ${totalBeads} 顆珠子，公平分給小熊和小兔，每隻小動物可以分到幾顆呢？`
+        `${totalBeads} 除以 2 等於多少？一共有 ${totalBeads} 顆珠子，公平分給小熊和小兔，每隻小動物可以分到幾顆呢？`
       );
 
       const container = document.getElementById('gameContent');
       container.innerHTML = `
-        <div style="text-align:center; font-size:1.65rem; font-weight:bold; color:#552f0e; margin-bottom:8px;">
-          🧺 ${zy("籃子裡一共有")} <strong style="font-size:2.2rem; color:#c67c00;">${totalBeads}</strong> ${zy("顆金色糖果珠，平分給 2 隻小動物：")}
-        </div>
+        <div class="big-formula-display" id="divFormula"><span>${totalBeads}</span> <span class="op">÷</span> <span>2</span> <span class="op">=</span> <span id="divQuestionCard" style="color:#d84315;">?</span></div>
+
+        <button type="button" class="div-basket" id="divBasket" aria-label="籃子，點一下分一顆">
+          <span class="div-basket-beads" id="divBasketBeads"></span>
+          <span class="div-basket-label" id="divBasketLabel">🧺</span>
+        </button>
 
         <div class="division-stage">
           <div class="division-plate">
             <div class="plate-avatar">🐻</div>
             <div class="plate-title">${zy("小熊的盤子")}</div>
-            <div class="plate-beads-container" id="plateA" data-count-scope></div>
+            <div class="plate-beads-container" id="plateA" style="min-height:92px;"></div>
           </div>
 
           <div style="font-size: 3.6rem; font-weight: 900; color: #844c1c; align-self: center;">➗ 2 🟰</div>
@@ -7872,32 +7892,61 @@
           <div class="division-plate">
             <div class="plate-avatar">🐰</div>
             <div class="plate-title">${zy("小兔的盤子")}</div>
-            <div class="plate-beads-container" id="plateB" data-count-scope></div>
+            <div class="plate-beads-container" id="plateB" style="min-height:92px;"></div>
           </div>
         </div>
 
-        <div style="text-align:center; font-size:1.6rem; font-weight:bold; color:#5c3513; margin-top:18px; margin-bottom:14px;">
+        <div id="divAsk" style="display:none; text-align:center; font-size:1.6rem; font-weight:bold; color:#5c3513; margin-top:18px; margin-bottom:14px;">
           ${zy("👇 看看每隻小動物分到幾顆？點選答案：")}
         </div>
-        <div class="choice-area" id="divChoices"></div>
+        <div class="choice-area" id="divChoices" style="display:none;"></div>
       `;
 
       const pA = document.getElementById('plateA');
       const pB = document.getElementById('plateB');
-      for (let i = 0; i < divPerPerson; i++) {
-        const b1 = document.createElement("span");
-        b1.className = "bead bead-10 clickable";
-        b1.onclick = () => onBeadTouch(b1);
-        pA.appendChild(b1);
-
-        const b2 = document.createElement("span");
-        b2.className = "bead bead-10 clickable";
-        b2.onclick = () => onBeadTouch(b2);
-        pB.appendChild(b2);
-      }
-      gateAids(['#plateA', '#plateB'], '.division-stage');   // #54 S2：盤子框照樣顯示，珠子念完才出現
-
+      const basket = document.getElementById('divBasket');
+      const basketBeads = document.getElementById('divBasketBeads');
+      const basketLabel = document.getElementById('divBasketLabel');
+      const askBox = document.getElementById('divAsk');
       const choicesContainer = document.getElementById('divChoices');
+      for (let i = 0; i < totalBeads; i++) {
+        const b = document.createElement("span");
+        b.className = "bead bead-10";
+        basketBeads.appendChild(b);
+      }
+      // 籃子的高度固定在「滿的時候」，珠子搬走後下面的盤子不會往上跳
+      if (basketBeads.offsetHeight) basketBeads.style.minHeight = basketBeads.offsetHeight + 'px';
+      // 籃子在念完前先藏著；念完時等待的那一句換成「點籃子」（跟藏的時候同一個位置）
+      gateAids(['#divBasket'], '#divBasket', '🧺 點籃子，分給小熊和小兔！');   // #54 S3
+
+      const showDivResult = () => {
+        const card = document.getElementById('divQuestionCard');
+        if (card) { card.textContent = divPerPerson; card.style.color = "#2e7d32"; }
+      };
+
+      // 點籃子 = 搬一顆到盤子（小熊、小兔輪流）。同步完成、沒有計時器；dealt 到 N 就不再搬
+      let dealt = 0;
+      basket.onclick = () => {
+        if (dealt >= totalBeads) return;
+        const bead = basketBeads.querySelector('.bead');   // dealt < N 時籃子裡一定還有珠子
+        const plate = dealt % 2 === 0 ? pA : pB;
+        bead.classList.add('clickable', 'bead-dealt');
+        bead.onclick = () => onBeadTouch(bead);   // 搬走以後點它是「數珠子」，不是再分一次
+        plate.appendChild(bead);
+        dealt++;
+        qlogEvent('x', 'deal');
+        if (isSoundOn) playBeadChime(dealt);
+        if (dealt >= totalBeads) {
+          basket.disabled = true;
+          basketLabel.innerHTML = '✅ ' + zy('分完了！');
+          pA.setAttribute('data-count-scope', '');   // 分完才能一顆顆點著數（途中沒有 scope，onBeadTouch 不會出氣泡）
+          pB.setAttribute('data-count-scope', '');
+          askBox.style.display = '';
+          choicesContainer.style.display = '';
+          if (DIV_RESULT_REVEAL === 'dealt') showDivResult();
+        }
+      };
+
       const options = generateOptions(divPerPerson, 1, 7);
       options.forEach(opt => {
         const btn = document.createElement('button');
@@ -7906,6 +7955,7 @@
         btn.onclick = () => {
           if (opt === divPerPerson) {
             lockChoiceButtons(choicesContainer);
+            showDivResult();
             AnalyticsBook.recordAnswer(4, true);
             qlogAnswer(true, opt);
             Sound.snap();
@@ -7917,7 +7967,7 @@
             qlogAnswer(false, opt);
             MistakeBook.record(4, "➗ 除法平分", questionDesc(4), opt, divPerPerson);
             Sound.wrong();
-            Mascot.setSad("盤子裡珠子不一樣多喔，再分分看！");
+            Mascot.setSad("再數數看，每個盤子裡有幾顆呢？");
             btn.style.opacity = "0.25";
             btn.style.pointerEvents = "none";
           }
