@@ -1443,6 +1443,16 @@
       font-weight: 800;
     }
 
+    /* #53：挑戰等級的過關時間 */
+    .time-note {
+      margin-top: 8px;
+      padding: 8px 14px;
+      border-radius: 14px;
+      background: #FEF9C3;
+      color: #854D0E;
+      font-weight: 800;
+    }
+
     /* 找不同：寬度放不下一排時，排成 3+2 或 2+2，避免最後一列只剩一個太顯眼（等於提示答案） */
     @media (max-width: 700px) {
       .choice-btn.oddone-item { width: 72px; height: 72px; font-size: 38px; }
@@ -2433,6 +2443,7 @@
           <select id="logChildSelect" onchange="logViewChildId = this.value; renderLearningLog()" aria-label="要看哪位孩子"></select>
         </div>
         <div class="parent-note" id="learningLogBox" data-no-zhuyin style="white-space:pre-wrap;"></div>
+        <div class="parent-note" id="bestTimesBox" data-no-zhuyin style="white-space:pre-wrap;"></div>
         <div class="parent-row" data-no-zhuyin>
           <span class="parent-row-label">複製、清空的範圍</span>
           <select id="logScopeSelect" aria-label="複製、清空的範圍"><option value="this">這個遊戲</option><option value="both">兩個遊戲</option></select>
@@ -3365,6 +3376,12 @@
 
     function saveToLocalStorage() {
       if (!childOnList(getActiveChildId())) return;   // 被別的分頁刪掉時，不能把他的 key 寫回來
+      // #53：最快紀錄只會變小；別的分頁剛寫的紀錄不能被這個分頁的舊記憶體蓋掉。失敗就略過，照舊存檔（星星一定要存得下來）
+      try {
+        const saved = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, activeChildId)));
+        const m = mergeBestTimes(userProgress.bestTimes, saved && typeof saved === 'object' ? saved.bestTimes : null);
+        if (Object.keys(m).length) userProgress.bestTimes = m; else delete userProgress.bestTimes;
+      } catch (e) {}
       try {
         userProgress.stars = starsEarned;
         userProgress.lastUpdated = Date.now();
@@ -3720,7 +3737,7 @@
        所有函式都包在 try/catch 裡，完全不能改變遊戲行為。
        ========================================================= */
     // LOG_BUILD：之後每一個改到出題、作答或語音行為的 PR，都把當時的值 +1（owner 的 PR 也要）
-    const LOG_BUILD = 3;   // #50：新增光影小偵探（R3：語音／輔助／動作有記到，所以 +1）
+    const LOG_BUILD = 4;   // #53：挑戰計時（破紀錄會朗讀）
     const QLOG_SUBS = QLOG_GAMES.little_logic_qlog_v1.subs;   // 紀錄的格式、上限在 family.js 的 QLOG_GAMES
     // 提示分級：d 有方向性 / g 一般鼓勵 / r 直接演出答案
     const QLOG_HINT_GRADE = {
@@ -3734,6 +3751,10 @@
 
     let qlogTab = Math.random().toString(36).slice(2, 8);   // 這個分頁的身分
     let qlogRoundId = '';
+    // #53：這一輪的挑戰計時（只在記憶體；重新整理或中途離開就作廢）
+    let roundTimer = { id: '', ms: 0, count: 0, valid: false };
+    let lastTiming = null;          // { roundId, level, lines }：同一題又觸發一次 triggerVictory 時沿用
+    let pendingTimingSpeak = '';    // 齒輪示範完才念
 
     // 紀錄核心（qlogOpen／qlogEvent／qlogClose…）在 family.js；這裡只接邏輯遊戲專屬的部分
     Object.assign(qlogConfig, {
@@ -3982,11 +4003,17 @@
     // 舊版同步碼沒有 adaptive 欄位時，沿用本機的設定（讀目標孩子的 key）
     function keepLocalSettings(imported, childId) {
       let local = userProgress;
+      let saved = null;   // 目標孩子的存檔（缺失或損壞就是 null）
       try {
-        const saved = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, childId || activeChildId)));
-        if (saved && typeof saved === 'object') local = saved;
+        const s = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, childId || activeChildId)));
+        if (s && typeof s === 'object') { local = s; saved = s; }
       } catch (e) {}
       if (!hasOwn(imported, 'adaptive') && hasOwn(local, 'adaptive')) imported.adaptive = local.adaptive;
+      // #53：最快紀錄只從目標孩子的存檔合併（local 退回 userProgress 時不能把別的孩子的紀錄帶進來），取較小值
+      try {
+        const m = mergeBestTimes(saved ? saved.bestTimes : null, imported.bestTimes);
+        if (Object.keys(m).length) imported.bestTimes = m; else delete imported.bestTimes;
+      } catch (e) {}
       return imported;
     }
 
@@ -4115,6 +4142,7 @@
       retryMistakeId = null;
       if (pendingAdaptMsg && currentModule) pendingAdaptNotice[currentModule] = pendingAdaptMsg;
       pendingAdaptMsg = '';
+      pendingTimingSpeak = '';
       if (mazeTimer) clearInterval(mazeTimer);
       if (gearAnimId) cancelAnimationFrame(gearAnimId);
       if (pipeTimer) clearTimeout(pipeTimer);
@@ -4143,6 +4171,9 @@
       currentModule = modName;
       currentLevel = 0;
       qlogRoundId = qlogId(modName + ':' + Date.now() + ':' + Math.random());
+      roundTimer = { id: qlogRoundId, ms: 0, count: 0, valid: !mistake };   // #53
+      lastTiming = null;
+      pendingTimingSpeak = '';
 
       const view = document.getElementById(`view-${modName}`);
       if (view) view.classList.add('active');
@@ -4213,9 +4244,87 @@
       speakText(promptText, manual ? 'manual' : 'prompt');   // R3：手動朗讀 = manual，自動 = prompt
     }
 
+    // #53：時間顯示格式（秒數至少 1 秒）
+    function fmtDuration(ms) {
+      const s = Math.max(1, Math.round(ms / 1000));
+      if (s < 60) return `${s} 秒`;
+      if (s % 60 === 0) return `${s / 60} 分鐘`;
+      return `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
+    }
+
+    // #53：最快紀錄 userProgress.bestTimes = { [module]: { ms, at } }
+    function normBestTimes(x) {
+      const out = {};
+      if (!x || typeof x !== 'object' || Array.isArray(x)) return out;
+      for (const k of Object.keys(x)) {
+        if (!hasOwn(MODULE_INFO, k)) continue;
+        const e = x[k];
+        if (!(e && typeof e === 'object' && Number.isFinite(e.ms) && e.ms > 0)) continue;
+        out[k] = { ms: e.ms, at: Number.isFinite(e.at) ? e.at : 0 };
+      }
+      return out;
+    }
+
+    function mergeBestTimes(a, b) {
+      const na = normBestTimes(a), nb = normBestTimes(b);
+      const out = {};
+      for (const k of Object.keys(MODULE_INFO)) {
+        if (hasOwn(na, k) && hasOwn(nb, k)) out[k] = nb[k].ms < na[k].ms ? nb[k] : na[k];
+        else if (hasOwn(na, k)) out[k] = na[k];
+        else if (hasOwn(nb, k)) out[k] = nb[k];
+      }
+      return out;
+    }
+
+    // 回傳 'first' | 'better' | 'same' | null(失敗)；比較用整秒，嚴格小於才算新紀錄
+    function recordBestTime(mod, ms) {
+      try {
+        if (!hasOwn(MODULE_INFO, mod) || !Number.isFinite(ms) || ms < 0) return null;
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(childKey(SAVE_KEY, activeChildId))); } catch (e) {}
+        userProgress.bestTimes = mergeBestTimes(userProgress.bestTimes, saved && typeof saved === 'object' ? saved.bestTimes : null);
+        const old = hasOwn(userProgress.bestTimes, mod) ? userProgress.bestTimes[mod] : null;
+        let result = 'first';
+        if (old) result = Math.round(ms / 1000) < Math.round(old.ms / 1000) ? 'better' : 'same';
+        if (result === 'first' || result === 'better') {
+          userProgress.bestTimes[mod] = { ms: Math.max(1, Math.round(ms)), at: Date.now() };
+          saveToLocalStorage();
+        }
+        return result;
+      } catch (e) { console.warn('recordBestTime', e); return null; }
+    }
+
+    // #53：挑戰題的單關時間與整輪時間。rec 是 qlogClose 之前抓的 qlogActive。回傳 { lines, speak } 或 null
+    function challengeTiming(rec, isLastLevel) {
+      try {
+        // 同一題又觸發一次（例如對已 focus 的答案鈕再按 Enter）：沿用第一次的結果，不重複累計
+        if (!rec && lastTiming && lastTiming.roundId === qlogRoundId && lastTiming.level === currentLevel) {
+          return { lines: lastTiming.lines, speak: '' };
+        }
+        if (retryMistakeId || !rec || rec.difficulty !== 'hard' ||
+            (rec.source !== 'first' && rec.source !== 'repeat')) { roundTimer.valid = false; return null; }
+        const ms = rec.activeMs;
+        if (!Number.isFinite(ms) || ms < 0) { roundTimer.valid = false; return null; }
+        const lines = ['⏱️ 這關花了 ' + fmtDuration(ms)];
+        let speak = '';
+        if (roundTimer.id === qlogRoundId) { roundTimer.ms += ms; roundTimer.count++; }
+        else roundTimer.valid = false;
+        if (isLastLevel && roundTimer.valid && roundTimer.count === ROUND_SIZE && getActiveDifficulty() === 'hard') {
+          lines.push('⏱️ ' + ROUND_SIZE + ' 關總共 ' + fmtDuration(roundTimer.ms));
+          const r = recordBestTime(currentModule, roundTimer.ms);
+          if (r === 'first') lines.push('🏅 第一次的挑戰紀錄！');
+          if (r === 'better') { lines.push('🎉 比上次更快了！新紀錄！'); speak = '比上次更快了！新紀錄！'; }
+        }
+        lastTiming = { roundId: qlogRoundId, level: currentLevel, lines };
+        return { lines, speak };
+      } catch (e) { roundTimer.valid = false; console.warn('challengeTiming', e); return null; }
+    }
+
     function triggerVictory(title, msg, isLastLevel = false) {
+      const rec = qlogActive;   // #53：要在 qlogClose 之前抓
       qlogEvent('c', null);
       qlogClose('correct');   // 第一行：過關視窗裡再按 🏠 也不會被關兩次
+      const timing = challengeTiming(rec, isLastLevel);
       soundSuccess();
       launchConfetti();
       // 錯題重做只給 1 顆星；答對當下就移除錯題，重新整理也不能重複刷星
@@ -4254,12 +4363,25 @@
         document.getElementById('modalMsg').appendChild(note);
         speakText(adaptMsg.replace(/^\S+\s/, ''));
       }
+      // #53：過關時間（任何失敗只會不顯示，不能影響過關）
+      try {
+        if (timing) {
+          for (const line of timing.lines) {
+            const t = document.createElement('div');
+            t.className = 'time-note';
+            t.textContent = line;
+            document.getElementById('modalMsg').appendChild(t);
+          }
+          if (timing.speak && !adaptMsg) { pendingTimingSpeak = timing.speak; speakText(timing.speak); }
+        }
+      } catch (e) { console.warn('timing display', e); }
       modal.classList.add('active');
     }
 
     function nextQuestionOrFinish() {
       const modal = document.getElementById('victoryModal');
       modal.classList.remove('active');
+      pendingTimingSpeak = '';
 
       // 護眼時間到了：讓孩子做完手上這一題，答對後就休息
       if (eyeLimitReached()) {
@@ -7223,7 +7345,11 @@
         const modal = document.getElementById('victoryModal');
         modal.classList.remove('active');
         speakText("答對了！我們一起看看齒輪怎麼轉！");
-        runGearDemo(() => modal.classList.add('active'));
+        runGearDemo(() => {
+          modal.classList.add('active');
+          // #53：破紀錄那句在「答對了！…」被蓋掉，示範完才補念
+          if (pendingTimingSpeak) { const s = pendingTimingSpeak; pendingTimingSpeak = ''; speakText(s); }
+        });
       } else {
         // 只有兩個選項，答錯後剩下的一定是對的；所以不讓孩子直接點另一個，而是示範一次再換一題
         soundError();
@@ -7879,6 +8005,25 @@
         }
         box.textContent = qlogReportText(logViewChildId, logViewName(), 'both');
       } catch (e) { console.warn('renderLearningLog', e); }
+      renderBestTimes();
+    }
+
+    // #53：挑戰最快紀錄（自己的 try/catch，失敗只是不顯示）
+    function renderBestTimes() {
+      try {
+        const box = document.getElementById('bestTimesBox');
+        if (!box) return;
+        const bt = normBestTimes(readProgressForChild(logViewChildId).bestTimes);
+        const lines = ['⏱️ 挑戰最快紀錄（挑戰等級 5 關都完成才會記）'];
+        for (const mod of Object.keys(MODULE_INFO)) {
+          if (!hasOwn(bt, mod)) continue;
+          let s = MODULE_INFO[mod].title + '：' + fmtDuration(bt[mod].ms);
+          if (bt[mod].at > 0) { const d = new Date(bt[mod].at); s += '（' + (d.getMonth() + 1) + '/' + d.getDate() + '）'; }
+          lines.push(s);
+        }
+        if (lines.length === 1) lines.push('還沒有紀錄');
+        box.textContent = lines.join('\n');
+      } catch (e) { console.warn('renderBestTimes', e); }
     }
 
     function copyTextToClipboard(text, label) {
@@ -7998,7 +8143,7 @@
     /* 自動注音：把畫面上每個中文字包成「字＋右側注音」，之後動態加入的文字也會自動補上。
        不想加注音的區塊可以加上 data-no-zhuyin 屬性。 */
     (function () {
-      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ串ㄔㄨㄢˋ久ㄐㄧㄡˇ之ㄓ乘ㄔㄥˊ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ光ㄍㄨㄤ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圍ㄨㄟˊ園ㄩㄢˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ堆ㄉㄨㄟ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ塗ㄊㄨˊ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ影ㄧㄥˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ柱ㄓㄨˋ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ梭ㄙㄨㄛ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ減ㄐㄧㄢˇ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ珠ㄓㄨ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ站ㄓㄢˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ筒ㄊㄨㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ菱ㄌㄧㄥˊ著˙ㄓㄜ蒙ㄇㄥˊ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銀ㄧㄣˊ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ電ㄉㄧㄢˋ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上去":"ㄕㄤˋ ˙ㄑㄩ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重來":"ㄔㄨㄥˊ ㄌㄞˊ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","銀行":"ㄧㄣˊ ㄏㄤˊ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
+      const DATA = {"chars":"一ㄧ三ㄙㄢ上ㄕㄤˋ下ㄒㄧㄚˋ不ㄅㄨˋ並ㄅㄧㄥˋ中ㄓㄨㄥ串ㄔㄨㄢˋ久ㄐㄧㄡˇ之ㄓ乘ㄔㄥˊ九ㄐㄧㄡˇ也ㄧㄝˇ了˙ㄌㄜ二ㄦˋ互ㄏㄨˋ些ㄒㄧㄝ交ㄐㄧㄠ享ㄒㄧㄤˇ人ㄖㄣˊ什ㄕㄣˊ仔ㄗㄞˇ他ㄊㄚ代ㄉㄞˋ令ㄌㄧㄥˋ以ㄧˇ件ㄐㄧㄢˋ企ㄑㄧˋ伍ㄨˇ休ㄒㄧㄡ位ㄨㄟˋ住ㄓㄨˋ作ㄗㄨㄛˋ你ㄋㄧˇ來ㄌㄞˊ例ㄌㄧˋ依ㄧ保ㄅㄠˇ修ㄒㄧㄡ俯ㄈㄨˇ個ㄍㄜˋ們˙ㄇㄣ做ㄗㄨㄛˋ停ㄊㄧㄥˊ偵ㄓㄣ偶ㄡˇ傳ㄔㄨㄢˊ像ㄒㄧㄤˋ優ㄧㄡ先ㄒㄧㄢ光ㄍㄨㄤ免ㄇㄧㄢˇ兔ㄊㄨˋ入ㄖㄨˋ全ㄑㄩㄢˊ兩ㄌㄧㄤˇ共ㄍㄨㄥˋ其ㄑㄧˊ具ㄐㄩˋ再ㄗㄞˋ出ㄔㄨ分ㄈㄣ切ㄑㄧㄝˋ列ㄌㄧㄝˋ判ㄆㄢˋ利ㄌㄧˋ刪ㄕㄢ到ㄉㄠˋ刺ㄘˋ前ㄑㄧㄢˊ剛ㄍㄤ剩ㄕㄥˋ剪ㄐㄧㄢˇ劃ㄏㄨㄚˋ力ㄌㄧˋ功ㄍㄨㄥ加ㄐㄧㄚ助ㄓㄨˋ動ㄉㄨㄥˋ化ㄏㄨㄚˋ匯ㄏㄨㄟˋ區ㄑㄩ升ㄕㄥ半ㄅㄢˋ卡ㄎㄚˇ即ㄐㄧˊ原ㄩㄢˊ厲ㄌㄧˋ去ㄑㄩˋ友ㄧㄡˇ反ㄈㄢˇ口ㄎㄡˇ另ㄌㄧㄥˋ只ㄓˇ可ㄎㄜˇ台ㄊㄞˊ右ㄧㄡˋ各ㄍㄜˋ合ㄏㄜˊ同ㄊㄨㄥˊ向ㄒㄧㄤˋ否ㄈㄡˇ吧˙ㄅㄚ呀ㄧㄚ告ㄍㄠˋ呢˙ㄋㄜ和ㄏㄜˊ咬ㄧㄠˇ哎ㄞ哪ㄋㄚˇ唷ㄧㄛ問ㄨㄣˋ啟ㄑㄧˇ喔ㄛ喜ㄒㄧˇ單ㄉㄢ嗎˙ㄇㄚ器ㄑㄧˋ囉ㄌㄨㄛ四ㄙˋ回ㄏㄨㄟˊ因ㄧㄣ固ㄍㄨˋ圈ㄑㄩㄢ國ㄍㄨㄛˊ圍ㄨㄟˊ園ㄩㄢˊ圓ㄩㄢˊ圖ㄊㄨˊ在ㄗㄞˋ地ㄉㄧˋ址ㄓˇ坐ㄗㄨㄛˋ型ㄒㄧㄥˊ執ㄓˊ基ㄐㄧ堆ㄉㄨㄟ報ㄅㄠˋ場ㄔㄤˇ塊ㄎㄨㄞˋ塗ㄊㄨˊ填ㄊㄧㄢˊ壁ㄅㄧˋ壓ㄧㄚ外ㄨㄞˋ多ㄉㄨㄛ大ㄉㄚˋ天ㄊㄧㄢ太ㄊㄞˋ失ㄕ奇ㄑㄧˊ奠ㄉㄧㄢˋ奪ㄉㄨㄛˊ好ㄏㄠˇ如ㄖㄨˊ始ㄕˇ媽ㄇㄚ子˙ㄗ孔ㄎㄨㄥˇ字ㄗˋ存ㄘㄨㄣˊ孩ㄏㄞˊ學ㄒㄩㄝˊ它ㄊㄚ安ㄢ完ㄨㄢˊ定ㄉㄧㄥˋ宮ㄍㄨㄥ害ㄏㄞˋ家ㄐㄧㄚ密ㄇㄧˋ察ㄔㄚˊ實ㄕˊ寫ㄒㄧㄝˇ寶ㄅㄠˇ專ㄓㄨㄢ尋ㄒㄩㄣˊ對ㄉㄨㄟˋ導ㄉㄠˇ小ㄒㄧㄠˇ少ㄕㄠˇ就ㄐㄧㄡˋ尾ㄨㄟˇ屋ㄨ展ㄓㄢˇ層ㄘㄥˊ屬ㄕㄨˇ工ㄍㄨㄥ左ㄗㄨㄛˇ差ㄔㄚ己ㄐㄧˇ已ㄧˇ布ㄅㄨˋ師ㄕ帶ㄉㄞˋ常ㄔㄤˊ幫ㄅㄤ平ㄆㄧㄥˊ幾ㄐㄧˇ序ㄒㄩˋ底ㄉㄧˇ度ㄉㄨˋ廳ㄊㄧㄥ式ㄕˋ引ㄧㄣˇ張ㄓㄤ彈ㄉㄢˋ彎ㄨㄢ形ㄒㄧㄥˊ彩ㄘㄞˇ影ㄧㄥˇ往ㄨㄤˇ很ㄏㄣˇ律ㄌㄩˋ後ㄏㄡˋ徑ㄐㄧㄥˋ得˙ㄉㄜ從ㄘㄨㄥˊ復ㄈㄨˋ徵ㄓㄥ心ㄒㄧㄣ必ㄅㄧˋ快ㄎㄨㄞˋ怎ㄗㄣˇ思ㄙ怪ㄍㄨㄞˋ恢ㄏㄨㄟ恭ㄍㄨㄥ息ㄒㄧˊ想ㄒㄧㄤˇ意ㄧˋ愛ㄞˋ感ㄍㄢˇ慢ㄇㄢˋ慧ㄏㄨㄟˋ懂ㄉㄨㄥˇ應ㄧㄥ成ㄔㄥˊ我ㄨㄛˇ或ㄏㄨㄛˋ戰ㄓㄢˋ戲ㄒㄧˋ戶ㄏㄨˋ房ㄈㄤˊ所ㄙㄨㄛˇ手ㄕㄡˇ才ㄘㄞˊ打ㄉㄚˇ扣ㄎㄡˋ找ㄓㄠˇ把ㄅㄚˇ抽ㄔㄡ拿ㄋㄚˊ指ㄓˇ按ㄢˋ挑ㄊㄧㄠ掃ㄙㄠˇ掉ㄉㄧㄠˋ排ㄆㄞˊ探ㄊㄢˋ接ㄐㄧㄝ推ㄊㄨㄟ描ㄇㄧㄠˊ提ㄊㄧˊ換ㄏㄨㄢˋ搓ㄘㄨㄛ摺ㄓㄜˊ撐ㄔㄥ撞ㄓㄨㄤˋ擊ㄐㄧˊ操ㄘㄠ據ㄐㄩˋ支ㄓ收ㄕㄡ放ㄈㄤˋ效ㄒㄧㄠˋ敏ㄇㄧㄣˇ敗ㄅㄞˋ整ㄓㄥˇ數ㄕㄨˋ文ㄨㄣˊ料ㄌㄧㄠˋ新ㄒㄧㄣ方ㄈㄤ於ㄩˊ旋ㄒㄩㄢˊ星ㄒㄧㄥ是ㄕˋ時ㄕˊ普ㄆㄨˇ智ㄓˋ更ㄍㄥˋ最ㄗㄨㄟˋ會ㄏㄨㄟˋ有ㄧㄡˇ朋ㄆㄥˊ朗ㄌㄤˇ朝ㄔㄠˊ期ㄑㄧˊ木ㄇㄨˋ本ㄅㄣˇ東ㄉㄨㄥ板ㄅㄢˇ果ㄍㄨㄛˇ某ㄇㄡˇ查ㄔㄚˊ柱ㄓㄨˋ根ㄍㄣ格ㄍㄜˊ桃ㄊㄠˊ案ㄢˋ條ㄊㄧㄠˊ梨ㄌㄧˊ梭ㄙㄨㄛ棒ㄅㄤˋ楚ㄔㄨˇ樂ㄌㄜˋ標ㄅㄧㄠ樣ㄧㄤˋ橘ㄐㄩˊ機ㄐㄧ橫ㄏㄥˊ檔ㄉㄤˇ檢ㄐㄧㄢˇ櫻ㄧㄥ次ㄘˋ正ㄓㄥˋ步ㄅㄨˋ歸ㄍㄨㄟ每ㄇㄟˇ比ㄅㄧˇ氏ㄕˋ水ㄕㄨㄟˇ決ㄐㄩㄝˊ沒ㄇㄟˊ油ㄧㄡˊ沿ㄧㄢˊ法ㄈㄚˇ注ㄓㄨˋ洞ㄉㄨㄥˋ活ㄏㄨㄛˊ流ㄌㄧㄡˊ淨ㄐㄧㄥˋ混ㄏㄨㄣˋ清ㄑㄧㄥ減ㄐㄧㄢˇ測ㄘㄜˋ源ㄩㄢˊ準ㄓㄨㄣˇ漏ㄌㄡˋ演ㄧㄢˇ瀏ㄌㄧㄡˊ為ㄨㄟˋ無ㄨˊ照ㄓㄠˋ熊ㄒㄩㄥˊ熟ㄕㄡˊ熱ㄖㄜˋ爸ㄅㄚˋ牆ㄑㄧㄤˊ牛ㄋㄧㄡˊ牠ㄊㄚ物ㄨˋ特ㄊㄜˋ狀ㄓㄨㄤˋ狐ㄏㄨˊ狗ㄍㄡˇ狸ㄌㄧˊ猜ㄘㄞ猴ㄏㄡˊ獅ㄕ獲ㄏㄨㄛˋ獸ㄕㄡˋ率ㄌㄩˋ玩ㄨㄢˊ珠ㄓㄨ現ㄒㄧㄢˋ理ㄌㄧˇ瑞ㄖㄨㄟˋ瓜ㄍㄨㄚ用ㄩㄥˋ留ㄌㄧㄡˊ略ㄌㄩㄝˋ畫ㄏㄨㄚˋ當ㄉㄤ疊ㄉㄧㄝˊ痕ㄏㄣˊ登ㄉㄥ發ㄈㄚ白ㄅㄞˊ的˙ㄉㄜ目ㄇㄨˋ直ㄓˊ相ㄒㄧㄤ看ㄎㄢˋ真ㄓㄣ眨ㄓㄚˇ眼ㄧㄢˇ睛ㄐㄧㄥ矩ㄐㄩˇ石ㄕˊ砝ㄈㄚˇ破ㄆㄛˋ確ㄑㄩㄝˋ碼ㄇㄚˇ礙ㄞˋ示ㄕˋ神ㄕㄣˊ秒ㄇㄧㄠˇ秘ㄇㄧˋ秩ㄓˋ移ㄧˊ程ㄔㄥˊ種ㄓㄨㄥˇ稱ㄔㄥ積ㄐㄧ空ㄎㄨㄥ穿ㄔㄨㄢ窗ㄔㄨㄤ立ㄌㄧˋ站ㄓㄢˋ符ㄈㄨˊ第ㄉㄧˋ筆ㄅㄧˇ等ㄉㄥˇ筒ㄊㄨㄥˇ答ㄉㄚˊ算ㄙㄨㄢˋ管ㄍㄨㄢˇ箭ㄐㄧㄢˋ箱ㄒㄧㄤ範ㄈㄢˋ簡ㄐㄧㄢˇ籃ㄌㄢˊ精ㄐㄧㄥ糖ㄊㄤˊ紀ㄐㄧˋ紅ㄏㄨㄥˊ納ㄋㄚˋ純ㄔㄨㄣˊ紙ㄓˇ級ㄐㄧˊ索ㄙㄨㄛˇ紫ㄗˇ累ㄌㄟˋ細ㄒㄧˋ結ㄐㄧㄝˊ給ㄍㄟˇ經ㄐㄧㄥ綠ㄌㄩˋ維ㄨㄟˊ網ㄨㄤˇ線ㄒㄧㄢˋ編ㄅㄧㄢ練ㄌㄧㄢˋ縫ㄈㄥˋ總ㄗㄨㄥˇ繞ㄖㄠˋ繹ㄧˋ繼ㄐㄧˋ續ㄒㄩˋ缺ㄑㄩㄝ置ㄓˋ羊ㄧㄤˊ習ㄒㄧˊ翻ㄈㄢ老ㄌㄠˇ考ㄎㄠˇ而ㄦˊ聽ㄊㄧㄥ背ㄅㄟˋ胡ㄏㄨˊ能ㄋㄥˊ腦ㄋㄠˇ自ㄗˋ至ㄓˋ與ㄩˇ色ㄙㄜˋ花ㄏㄨㄚ草ㄘㄠˇ莓ㄇㄟˊ菜ㄘㄞˋ菱ㄌㄧㄥˊ著˙ㄓㄜ蒙ㄇㄥˊ蓋ㄍㄞˋ蔔ㄅㄛˊ蔬ㄕㄨ蔽ㄅㄧˋ蕉ㄐㄧㄠ藍ㄌㄢˊ藏ㄘㄤˊ蘋ㄆㄧㄥˊ蘿ㄌㄨㄛˊ虎ㄏㄨˇ處ㄔㄨˋ號ㄏㄠˋ蛙ㄨㄚ蝟ㄨㄟˋ行ㄒㄧㄥˊ衡ㄏㄥˊ表ㄅㄧㄠˇ袋ㄉㄞˋ被ㄅㄟˋ補ㄅㄨˇ裝ㄓㄨㄤ裡ㄌㄧˇ製ㄓˋ複ㄈㄨˋ西ㄒㄧ要ㄧㄠˋ規ㄍㄨㄟ視ㄕˋ覺ㄐㄩㄝˊ覽ㄌㄢˇ觀ㄍㄨㄢ角ㄐㄧㄠˇ解ㄐㄧㄝˇ計ㄐㄧˋ訊ㄒㄩㄣˋ訓ㄒㄩㄣˋ記ㄐㄧˋ設ㄕㄜˋ試ㄕˋ該ㄍㄞ認ㄖㄣˋ說ㄕㄨㄛ誰ㄕㄟˊ調ㄉㄧㄠˋ請ㄑㄧㄥˇ證ㄓㄥˋ護ㄏㄨˋ讀ㄉㄨˊ變ㄅㄧㄢˋ讓ㄖㄤˋ豎ㄕㄨˋ象ㄒㄧㄤˋ豬ㄓㄨ貓ㄇㄠ貼ㄊㄧㄝ資ㄗ走ㄗㄡˇ起ㄑㄧˇ超ㄔㄠ足ㄗㄨˊ跟ㄍㄣ跨ㄎㄨㄚˋ路ㄌㄨˋ蹺ㄑㄧㄠ躲ㄉㄨㄛˇ載ㄗㄞˋ輔ㄈㄨˇ輕ㄑㄧㄥ輪ㄌㄨㄣˊ輯ㄐㄧˊ轉ㄓㄨㄢˋ農ㄋㄨㄥˊ近ㄐㄧㄣˋ迷ㄇㄧˊ送ㄙㄨㄥˋ逆ㄋㄧˋ透ㄊㄡˋ途ㄊㄨˊ這ㄓㄜˋ通ㄊㄨㄥ速ㄙㄨˋ連ㄌㄧㄢˊ週ㄓㄡ進ㄐㄧㄣˋ遇ㄩˋ遊ㄧㄡˊ過ㄍㄨㄛˋ達ㄉㄚˊ遠ㄩㄢˇ遮ㄓㄜ選ㄒㄩㄢˇ避ㄅㄧˋ還ㄏㄞˊ邊ㄅㄧㄢ邏ㄌㄨㄛˊ那ㄋㄚˋ部ㄅㄨˋ都ㄉㄡ重ㄓㄨㄥˋ量ㄌㄧㄤˋ金ㄐㄧㄣ針ㄓㄣ鈕ㄋㄧㄡˇ銀ㄧㄣˊ銳ㄖㄨㄟˋ錄ㄌㄨˋ錯ㄘㄨㄛˋ鎖ㄙㄨㄛˇ鏡ㄐㄧㄥˋ鐘ㄓㄨㄥ鑑ㄐㄧㄢˋ長ㄓㄤˇ閉ㄅㄧˋ開ㄎㄞ間ㄐㄧㄢ關ㄍㄨㄢ附ㄈㄨˋ降ㄐㄧㄤˋ陣ㄓㄣˋ除ㄔㄨˊ陸ㄌㄨˋ隊ㄉㄨㄟˋ隔ㄍㄜˊ障ㄓㄤˋ隨ㄙㄨㄟˊ險ㄒㄧㄢˇ隻ㄓ雙ㄕㄨㄤ雞ㄐㄧ離ㄌㄧˊ難ㄋㄢˊ電ㄉㄧㄢˋ需ㄒㄩ靈ㄌㄧㄥˊ青ㄑㄧㄥ非ㄈㄟ面ㄇㄧㄢˋ音ㄧㄣ頁ㄧㄝˋ項ㄒㄧㄤˋ順ㄕㄨㄣˋ預ㄩˋ領ㄌㄧㄥˇ頭ㄊㄡˊ頸ㄐㄧㄥˇ顆ㄎㄜ題ㄊㄧˊ顏ㄧㄢˊ類ㄌㄟˋ飛ㄈㄟ首ㄕㄡˇ香ㄒㄧㄤ馬ㄇㄚˇ驗ㄧㄢˋ體ㄊㄧˇ魔ㄇㄛˊ鳳ㄈㄥˋ鵝ㄜˊ鹿ㄌㄨˋ麼˙ㄇㄜ黃ㄏㄨㄤˊ點ㄉㄧㄢˇ齒ㄔˇ龍ㄌㄨㄥˊ","words":{"一個":"ㄧ ˙ㄍㄜ","上去":"ㄕㄤˋ ˙ㄑㄩ","上面":"ㄕㄤˋ ˙ㄇㄧㄢ","仔細":"ㄗˇ ㄒㄧˋ","再數":"ㄗㄞˋ ㄕㄨˇ","切換為":"ㄑㄧㄝ ㄏㄨㄢˋ ㄨㄟˊ","剩下":"ㄕㄥˋ ˙ㄒㄧㄚ","奇偶":"ㄐㄧ ㄡˇ","奪得":"ㄉㄨㄛˊ ㄉㄜˊ","媽媽":"ㄇㄚ ˙ㄇㄚ","寶藏":"ㄅㄠˇ ㄗㄤˋ","對稱":"ㄉㄨㄟˋ ㄔㄥˋ","幾個":"ㄐㄧˇ ˙ㄍㄜ","挑戰":"ㄊㄧㄠˇ ㄓㄢˋ","數一數":"ㄕㄨˇ ㄧ ㄕㄨˇ","數成":"ㄕㄨˇ ㄔㄥˊ","旋轉":"ㄒㄩㄢˊ ㄓㄨㄢˇ","東西":"ㄉㄨㄥ ˙ㄒㄧ","熟練":"ㄕㄨˊ ㄌㄧㄢˋ","爸爸":"ㄅㄚˋ ˙ㄅㄚ","狐狸":"ㄏㄨˊ ˙ㄌㄧ","獲得":"ㄏㄨㄛˋ ㄉㄜˊ","相機":"ㄒㄧㄤˋ ㄐㄧ","看看":"ㄎㄢˋ ˙ㄎㄢ","石頭":"ㄕˊ ˙ㄊㄡ","空缺":"ㄎㄨㄥˋ ㄑㄩㄝ","空著":"ㄎㄨㄥˋ ˙ㄓㄜ","第一個":"ㄉㄧˋ ㄧ ˙ㄍㄜ","累積":"ㄌㄟˇ ㄐㄧ","胡蘿蔔":"ㄏㄨˊ ㄌㄨㄛˊ ˙ㄅㄛ","試試看":"ㄕˋ ˙ㄕ ㄎㄢˋ","調整":"ㄊㄧㄠˊ ㄓㄥˇ","調整為":"ㄊㄧㄠˊ ㄓㄥˇ ㄨㄟˊ","轉彎":"ㄓㄨㄢˇ ㄨㄢ","轉移":"ㄓㄨㄢˇ ㄧˊ","農場":"ㄋㄨㄥˊ ㄔㄤˊ","這個":"ㄓㄜˋ ˙ㄍㄜ","過來":"ㄍㄨㄛˋ ˙ㄌㄞ","重來":"ㄔㄨㄥˊ ㄌㄞˊ","重新":"ㄔㄨㄥˊ ㄒㄧㄣ","重複":"ㄔㄨㄥˊ ㄈㄨˋ","銀行":"ㄧㄣˊ ㄏㄤˊ","長頸鹿":"ㄔㄤˊ ㄐㄧㄥˇ ㄌㄨˋ","雙重":"ㄕㄨㄤ ㄔㄨㄥˊ"}};
       const CHARS = {};
       DATA.chars.replace(/([㐀-䶿一-鿿])([^㐀-䶿一-鿿]+)/g, (m, c, z) => { CHARS[c] = z; });
       const WORDS = DATA.words;
