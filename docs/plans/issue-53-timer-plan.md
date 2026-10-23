@@ -1,6 +1,7 @@
 # #53 過關計時（挑戰等級）— 實作計畫 v2
 
 v2：併入計畫稽核 r1（ACCEPT WITH FIXES：H1、M1–M6、L1–L7）。
+v2.1：併入差異覆核 r2（ACCEPT WITH FIXES：B5b 時機、B9 拆 a/b、L-A–L-I）。
 
 範圍：只改 `logic_game.html`。`common/family.js`、`montessori_math_game.html` 不動（byte-identical）；`index.html` 只允許 `build_zhuyin.py` 重寫後**仍 byte-identical**。
 行號是 main 8a3573a 的值，會漂移：**動手前先 grep 函式名確認位置**。
@@ -55,7 +56,8 @@ let pendingTimingSpeak = '';    // 齒輪示範完才念
 - 在 `adaptMsg` 的 note 之後、`modal.classList.add('active')` 之前，整段包 try/catch：
   - `timing` 不是 null → `timing.lines` 每行 append 一個 `<div class="time-note">`（樣式仿 `.adapt-note` :1437）到 `#modalMsg`。
   - `timing.speak` 有值且這次沒有 `adaptMsg` → `pendingTimingSpeak = timing.speak; speakText(timing.speak);`
-- **齒輪**（:7222-7226）：triggerVictory 之後馬上 `speakText("答對了！我們一起看看齒輪怎麼轉！")` 會把破紀錄那句 cancel 掉。把 `runGearDemo` 的 callback 改成：modal 出現後，若 `pendingTimingSpeak` 有值就 `speakText(pendingTimingSpeak)`。所有念完／不念的路徑都把 `pendingTimingSpeak` 清成 `''`（`startModule`、`nextQuestionOrFinish`、齒輪 callback 念完後）。
+- **齒輪**（:7222-7226）：triggerVictory 之後馬上 `speakText("答對了！我們一起看看齒輪怎麼轉！")` 會把破紀錄那句 cancel 掉。把 `runGearDemo` 的 callback 改成：modal 出現後，若 `pendingTimingSpeak` 有值就 `speakText(pendingTimingSpeak)`。所有念完／不念的路徑都把 `pendingTimingSpeak` 清成 `''`（`startModule`、`nextQuestionOrFinish`、`goHome()`、齒輪 callback 念完後）。
+- `timing.speak && !adaptMsg` 的 `!adaptMsg` 是防禦性條件，實務上不可達（有 speak 代表 hard 且沒降級，此時 adaptMsg 為空），不需要 B 覆蓋。齒輪示範（`GEAR_DEMO_STEP_MS=700`，:7011）可能比「答對了！…」那句短，補念會切掉前一句，與既有 :7253 行為相同，不算缺陷。
 
 ### 3.3 `challengeTiming(rec, isLastLevel)`（新函式，放在 `triggerVictory` 前）
 ```
@@ -79,19 +81,19 @@ try {
   }
   lastTiming = { roundId: qlogRoundId, level: currentLevel, lines };
   return { lines, speak };
-} catch (e) { console.warn('challengeTiming', e); return null; }
+} catch (e) { roundTimer.valid = false; console.warn('challengeTiming', e); return null; }
 ```
-`count === ROUND_SIZE` 與 `valid` 是重複的防線（任一關沒算到時 `valid` 已是 false），保留兩者。
+`count === ROUND_SIZE` 與 `valid` 互為防線（任一關沒算到時 `valid` 已是 false），保留兩者；任何例外都會設 `valid=false`。
 
 ### 3.4 最快紀錄的儲存
 - 位置：`userProgress.bestTimes = { [module]: { ms, at } }`（per-child，同 `childKey(SAVE_KEY, id)`）。`defaultProgress()`（:3334）**不加**這個欄位。
-- `normBestTimes(x)`：不是 plain object（null、陣列、字串…）→ `{}`；每個 entry 不符合 `Number.isFinite(e.ms) && e.ms > 0` 就丟掉（比照 :4361 `adaptiveTier` 的正規化）。
+- `normBestTimes(x)`：不是 plain object（null、陣列、字串…）→ `{}`；key 只收 `hasOwn(MODULE_INFO, k)`（擋 `__proto__` 與任意 key）；entry 判斷用 `e && typeof e === 'object' && Number.isFinite(e.ms) && e.ms > 0`，不符合就丟掉；`at` 不是有限數字時改 0（家長頁就省略日期）。比照 :4361 `adaptiveTier` 的正規化。
 - `mergeBestTimes(a, b)`：兩邊各自 `normBestTimes` 後，每個 module 取 `ms` 較小的那筆。
 - `recordBestTime(mod, ms)`：先 `userProgress.bestTimes = mergeBestTimes(userProgress.bestTimes, 存檔裡的 bestTimes)`；比較 `Math.round(ms/1000)` 與既有 `Math.round(old.ms/1000)`；沒有既有 → `'first'`；嚴格小於 → `'better'`；否則 `'same'`。first／better 時寫入 `{ ms: Math.round(ms), at: Date.now() }` 再 `saveToLocalStorage()`。
-- **多分頁（I3）**：`saveToLocalStorage()`（:3366）在 `JSON.stringify` 之前，讀存檔裡的 `bestTimes` 與記憶體 `mergeBestTimes`，結果放回 `userProgress.bestTimes`（兩邊都空就不新增欄位）。只合併 `bestTimes`，其他欄位維持「整包後寫者勝」。
-- **匯入／同步**：`keepLocalSettings(imported, childId)`（:3983）在 adaptive 那行之後：`const m = mergeBestTimes(local.bestTimes, imported.bestTimes); if (Object.keys(m).length) imported.bestTimes = m;`
+- **多分頁（I3）**：`saveToLocalStorage()`（:3366）在 `JSON.stringify` 之前，讀存檔裡的 `bestTimes` 與記憶體 `mergeBestTimes`，結果放回 `userProgress.bestTimes`（兩邊都空就不新增欄位）。只合併 `bestTimes`，其他欄位維持「整包後寫者勝」。合併**自己一層 try/catch**，失敗就略過合併、照舊存檔，不要和 `safeSetItem` 共用同一個 try（I1：星星一定要存得下來）。
+- **匯入／同步**：`keepLocalSettings(imported, childId)`（:3983）在 adaptive 那行之後，`bestTimes` **只從 `saved`（目標孩子的存檔）合併**；`local` 退回 `userProgress`（:3984，目標孩子存檔缺失或損壞）時不合併 `bestTimes`，避免把上一位孩子的紀錄帶進來。`const m = mergeBestTimes(saved ? saved.bestTimes : null, imported.bestTimes); if (Object.keys(m).length) imported.bestTimes = m; else delete imported.bestTimes;`
 - 舊版頁面讀新資料：`readProgressForChild`（:3482-3487）回傳整個物件、`saveToLocalStorage` 整包 stringify（:3371），欄位會保留（稽核 P6 已實證）。舊版頁面**匯入**同步碼會整包換掉 → 已知限制（I3 例外）。
-- 目前沒有「清空進度」的功能（:2430 只是說明文字）；`deleteChild`（:3597-3599）刪 key 時紀錄一起刪掉，預期行為。
+- 目前沒有「清空進度」的功能（:2430 只是說明文字）；`deleteChild`（:3597-3599）刪 key 時紀錄一起刪掉，預期行為。`clearLearningLog`（:7890）只清學習紀錄，不影響 `bestTimes`；目前沒有任何方式重設最快紀錄，時鐘跳動造成的異常小值會永久存在，列為已知限制。
 
 ### 3.5 家長頁
 `#learningLogBox`（:2435）之後加：
@@ -131,26 +133,28 @@ try {
 - B3 再一輪比較慢 → 只有 `5 關總共`；`bestTimes` 不變。
 - B3b 假時鐘讓兩輪加總**整秒相同** → 第二輪沒有 `新紀錄`。
 - B4 普通：5 關都沒有 `⏱️`；`bestTimes` 沒有新增。
-- B5 挑戰＋自動調整開：自動調整的連錯計數只在記憶體，**第 1、2 關都要錯到門檻**（各錯 2 次再答對；齒輪與分類錯 1 次就算，照 `applyAdaptOutcome` 實際門檻確認）→ 第 3 關起是普通、沒有時間；第 5 關沒有 `5 關總共`；`bestTimes` 不變。
-- B5b 挑戰＋自動調整開，先設 `adaptStreaks[mod] = {correct:0, wrong:1}`，第 5 關錯 2 次再答對 → 第 5 關有 `這關花了`、沒有 `5 關總共`；`bestTimes` 不變。
+- B5 挑戰＋自動調整開：自動調整的連錯計數只在記憶體，**第 1、2 關都要錯到門檻**（各錯 2 次再答對；齒輪與分類錯 1 次就算，照 `applyAdaptOutcome` 實際門檻確認）→ 第 3 關起是普通、沒有時間；第 5 關沒有 `5 關總共`；`bestTimes` 不變。錯的時候要用**不同**的錯誤選項，間隔大於 `DOUBLE_TAP_MS` 800ms（:4307、:4380；用 `page.clock` 時 `performance.now` 也被接管，要 tick 過去）。
+- B5b 挑戰＋自動調整開，**此孩子此遊戲沒有既有紀錄**：第 1–4 關第一次就答對；**第 4 關過關後、第 5 關第一次作答前**在頁面內執行 `adaptStreaks[mod] = {correct:0, wrong:1}`（不能在 startModule 前設：第 1–4 關過關會把它歸零，:4347-4348）。第 5 關用兩個不同的錯誤選項各按一次（間隔 > 800ms，同 B5），再答對 → 第 5 關有 `這關花了`、沒有 `5 關總共`、`bestTimes` 沒有這個遊戲。
 - B6 錯題本重做一題挑戰題 → 沒有時間。
 - B7 第 3 關切到背景 10 秒（或開家長設定再關）→ 顯示秒數不含那 10 秒（與紀錄 `activeMs` 一致）。
 - B8 過關前把 `qlogActive` 設 null → 不顯示時間、該輪沒有整輪時間、星星 +3、能進下一關。
-- B9 匯入合併：本機 100000／匯入 200000 → 100000；反過來 → 100000；匯入沒有 `bestTimes` → 保留本機；本機 `bestTimes` 是字串、匯入有效 → 用匯入值。
+- B9a 在頁面內直接呼叫 `keepLocalSettings(importedObj, childId)`，驗證回傳物件的 `bestTimes`：本機存檔 100000／匯入 200000 → 100000；反過來 → 100000；匯入沒有 → 保留本機；本機字串、匯入有效 → 匯入值；目標孩子沒有存檔、`userProgress` 有別人的紀錄 → 不帶入（L-D）；匯入只有壞值且本機沒有 → 回傳物件沒有 `bestTimes`。
+- B9b 走 `importSyncCode()` 全流程，驗證存檔結果與 B9a 一致。
 - B10 家長頁：B1 後 `#bestTimesBox` 有「水管接接樂：…」；換到沒紀錄的孩子顯示 `還沒有紀錄`。
 - B11 `fmtDuration`：0→`1 秒`、59400→`59 秒`、59600→`1 分鐘`、200000→`3 分 20 秒`。
 - B12 挑戰＋齒輪：第 1 關答錯 → 示範 → 換題答對 → 這關沒有 `⏱️`；第 5 關沒有 `5 關總共`；`bestTimes` 不變。
-- B13 挑戰題答對後，對已 focus 的答案鈕再按一次 Enter → 時間那行還在；在第 5 關做 → 整輪照常成立、紀錄只寫一次。
+- B13 用 `pattern`（選項鈕答對後不 disable，:5830-5849；水管的送出鈕答對後 disabled，:6482，無法重現）。挑戰題答對後，對已 focus 的答案鈕再按一次 Enter；第 2 關與第 5 關各做一次 → 重複後的 modalMsg 與第一次逐字相同；第 5 關整輪照常成立，且兩次觸發前後 `bestTimes.pattern.at` 相同（紀錄只寫一次）。
 - B14 多分頁：同一個 browser context 開兩頁（同一孩子）。A 頁寫入 `bestTimes.pipes`；B 頁（記憶體沒有這欄）執行會存檔的動作（例如 `addStars(1)`）→ 存檔裡的 `bestTimes.pipes` 還在。
+- B14b B 頁記憶體沒有紀錄、A 頁已寫 `pipes=100000`，B 頁完整跑一輪較慢的挑戰水管 5 關 → 不能出現 `第一次的挑戰紀錄`，存檔仍是 100000。
 - B15 `bestTimes` 損壞成字串或陣列時，挑戰 5 關 → `第一次的挑戰紀錄`，且存檔被修正成正常物件。
 
 **C. 改壞驗紅**（每條要讓列出的 B 轉紅，報告附對照表）
-① `rec.difficulty !== 'hard'` → `=== 'easy'`（B4）；② `const rec = qlogActive` 移到 `qlogClose` 之後（B1）；③ `startModule` 不重設 `roundTimer`（B2）；④ 比紀錄 `<` → `<=`（B3b）；⑤ `keepLocalSettings` 直接用匯入值（B9）；⑥ 拿掉 `rec.source` 檢查（B12）；⑦ 拿掉 `getActiveDifficulty() === 'hard'`（B5b）；⑧ 拿掉 `lastTiming` 分支（B13）；⑨ `saveToLocalStorage` 不合併（B14）；⑩ 齒輪 callback 不補念（B2g）。
+① `rec.difficulty !== 'hard'` → `=== 'easy'`（B4）；② `const rec = qlogActive` 移到 `qlogClose` 之後（B1）；③ `startModule` 不重設 `roundTimer`（B2）；④ 比紀錄 `<` → `<=`（B3b）；⑤ `keepLocalSettings` 直接用匯入值（B9a；對 B9b 是等價突變，因為 `importSyncCode`／`applyImport` 之後的 `saveToLocalStorage` 合併〔:4086、:3529〕會補回同樣結果，報告註明）；⑥ 拿掉 `rec.source` 檢查（B12）；⑦ 拿掉 `getActiveDifficulty() === 'hard'`（B5b）；⑧ 拿掉 `lastTiming` 分支（B13）；⑨ `saveToLocalStorage` 不合併（B14）；⑩ 齒輪 callback 不補念（B2g）；⑪ 拿掉 `recordBestTime` 的先合併（B14b）。
 `count === ROUND_SIZE` 與 I2 的 `valid = false` 互為重複防線，單獨拿掉是**等價突變**，報告註明即可。
 
-**D. 畫面**：390×844 與 1024×768 各截一張「第 5 關新紀錄」的過關視窗，確認注音不重疊、不超出視窗。截圖放 scratch。
+**D. 畫面**：390×844 與 1024×768 各截一張「第 5 關新紀錄」的過關視窗，確認注音不重疊、不超出視窗。截圖放 scratch。同時 `evaluate` 取破紀錄那行「更」的注音內容，斷言 `=== 'ㄍㄥˋ'`。
 
 ## 6. 交付
-- commit 訊息照 repo 慣例（`feat: …（#53）`），git 身分 `Arcrek-coder <226868523+Arcrek-coder@users.noreply.github.com>`，結尾加 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`。
+- commit 訊息照 repo 慣例（`feat: …（#53）`），git 身分 `Arcrek-coder <226868523+Arcrek-coder@users.noreply.github.com>`，結尾加 `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`（實作者是 Sonnet）。
 - **不要 push、不要開 PR。**
 - 報告：每條驗收的實跑結果、改壞對照表、注音處理、所有判斷點（附 file:line），不確定的標「未驗證」；提到 main 既有的重複給星問題與 #52 LOG_BUILD。
