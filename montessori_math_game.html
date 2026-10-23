@@ -7914,8 +7914,6 @@
         b.className = "bead bead-10";
         basketBeads.appendChild(b);
       }
-      // 籃子的高度固定在「滿的時候」，珠子搬走後下面的盤子不會往上跳
-      if (basketBeads.offsetHeight) basketBeads.style.minHeight = basketBeads.offsetHeight + 'px';
       // 籃子在念完前先藏著；念完時等待的那一句換成「點籃子」（跟藏的時候同一個位置）
       gateAids(['#divBasket'], '#divBasket', '🧺 點籃子，分給小熊和小兔！');   // #54 S3
 
@@ -7928,7 +7926,11 @@
       let dealt = 0;
       basket.onclick = () => {
         if (dealt >= totalBeads) return;
-        const bead = basketBeads.querySelector('.bead');   // dealt < N 時籃子裡一定還有珠子
+        const bead = basketBeads.querySelector('.bead:not(.bead-ghost)');   // dealt < N 時籃子裡一定還有珠子
+        const ghost = bead.cloneNode(false);   // 原位留一顆看不見的佔位：籃子大小不變（任何寬度、轉向後都一樣），下面的盤子不會往上跳
+        ghost.classList.add('bead-ghost');
+        ghost.style.visibility = 'hidden';
+        bead.replaceWith(ghost);
         const plate = dealt % 2 === 0 ? pA : pB;
         bead.classList.add('clickable', 'bead-dealt');
         bead.onclick = () => onBeadTouch(bead);   // 搬走以後點它是「數珠子」，不是再分一次
@@ -7943,6 +7945,8 @@
           pB.setAttribute('data-count-scope', '');
           askBox.style.display = '';
           choicesContainer.style.display = '';
+          document.querySelectorAll('#gameContent .aid-wait').forEach(el => { el.innerHTML = zy('👇 分完了，看下面，點選答案！'); });   // 上面那句還寫「點籃子」會跟籃子的「分完了」矛盾
+          try { choicesContainer.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}   // 答案可能在畫面外：捲到答案按鈕整排看得到（上面的「看看每隻小動物分到幾顆」跟著進來）
           if (DIV_RESULT_REVEAL === 'dealt') showDivResult();
         }
       };
