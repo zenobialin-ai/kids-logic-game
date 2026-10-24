@@ -3168,7 +3168,7 @@
     const FAMILY_KEY_GROUPS = [
       { child: ['little_logic_save_v1', 'little_logic_mistakes_v1', 'little_logic_gears_intro_v1'], id: ['little_logic_qlog_v1'] },
       { child: ['montessori_mistakes', 'montessori_analytics', 'montessori_diff', 'montessori_stars',
-                'montessori_stickers', 'montessori_wardrobe', 'montessori_checkin'], id: ['montessori_qlog_v1'] }
+                'montessori_stickers', 'montessori_wardrobe', 'montessori_checkin', 'montessori_bonus_stars'], id: ['montessori_qlog_v1'] }
     ];
     const FAMILY_CHILD_KEYS = FAMILY_KEY_GROUPS.flatMap(g => g.child);
     const FAMILY_ID_KEYS = FAMILY_KEY_GROUPS.flatMap(g => g.id);
@@ -5115,7 +5115,7 @@
         const totalAns = data.totalAnswered || 0;
         const totalCor = data.totalCorrect || 0;
         const rate = totalAns > 0 ? Math.round((totalCor / totalAns) * 100) : 100;
-        const starCount = (typeof userStars !== 'undefined') ? userStars : totalCor;
+        const starCount = (typeof userStars !== 'undefined') ? availableStars() : totalCor;
         const unlockedCount = unlockedStickerIds.length;   // #48：讀實際解鎖的貼紙（原本讀不存在的 userUnlockedStickers，一直退回估計值）
 
         let bearAdvice = "太棒了！每做一題都在變得更聰明，小熊隨時為你加油打氣喔！🧸✨";
@@ -5774,13 +5774,17 @@
     ];
 
     let userStars = 0;
+    let userBonusStars = 0;   // #48 K2：打卡獎勵星，存 montessori_bonus_stars（每位孩子一份）
+    // 可用星星 = 答對星 + 打卡星；頂端、貼紙簿、過關、學習分析、衣帽間都顯示這個數字
+    function availableStars() { return Math.max(0, userStars) + Math.max(0, userBonusStars); }
     let unlockedStickerIds = [];
 
     function loadRewardData() {
       try {
         const savedStars = localStorage.getItem(childKey('montessori_stars', activeChildId));
+        userBonusStars = Math.max(0, parseInt(localStorage.getItem(childKey('montessori_bonus_stars', activeChildId)), 10) || 0);
         if (savedStars !== null) {
-          userStars = parseInt(savedStars, 10) || 0;
+          userStars = Math.max(0, parseInt(savedStars, 10) || 0);
         } else {
           // 首次載入或相容舊存檔：從歷史答對題數扣除已兌換服裝的星星數
           const analytics = (typeof AnalyticsBook !== 'undefined') ? AnalyticsBook.load() : { totalCorrect: 0 };
@@ -5807,6 +5811,7 @@
     function saveRewardData() {
       try {
         saveChildItem(childKey('montessori_stars', activeChildId), userStars);
+        saveChildItem(childKey('montessori_bonus_stars', activeChildId), userBonusStars);
         saveChildItem(childKey('montessori_stickers', activeChildId), JSON.stringify(unlockedStickerIds));
       } catch (e) {
         console.warn("LocalStorage save failed:", e);
@@ -5816,7 +5821,7 @@
 
     function updateHeaderRewardDisplay() {
       const starEl = document.getElementById('headerStarCount');
-      if (starEl) starEl.textContent = userStars;
+      if (starEl) starEl.textContent = availableStars();
       const badgeEl = document.getElementById('headerStickerBadge');
       if (badgeEl) badgeEl.textContent = `${unlockedStickerIds.length}/${STICKER_DEFS.length}`;
     }
@@ -5876,7 +5881,7 @@
       const analytics = (typeof AnalyticsBook !== 'undefined') ? AnalyticsBook.load() : { totalCorrect: 0 };
       const lifetimeScore = Math.max(analytics.totalCorrect || 0, userStars);
       document.getElementById('albumStarSummary').innerHTML = 
-        zy(`⭐ 目前持有 ${userStars} 顆星星（累計答對 ${lifetimeScore} 題）`);
+        zy(`⭐ 目前持有 ${availableStars()} 顆星星（累計答對 ${lifetimeScore} 題）`);
 
       // 下一張貼紙提示
       const nextSticker = STICKER_DEFS.find(s => !unlockedStickerIds.includes(s.id));
@@ -6083,7 +6088,7 @@
         Mascot.setHappy("太棒了！答對了！跳跳跳！");
         rewardContainer.innerHTML = `
           <div class="star-reward-tip">
-            ${zy("⭐ 獲得 1 顆星星！累計：" + userStars + " 顆")}
+            ${zy("⭐ 獲得 1 顆星星！累計：" + availableStars() + " 顆")}
           </div>
         `;
       }
@@ -6538,9 +6543,7 @@
         } catch(e) {}
       },
       getAvailableStars() {
-        const base = (typeof userStars !== 'undefined') ? userStars : 0;
-        const bonus = (typeof userBonusStars !== 'undefined') ? userBonusStars : 0;
-        return Math.max(0, base + bonus);
+        return availableStars();
       },
       setFilter(filter, btn) {
         this.filter = filter;
@@ -6569,10 +6572,11 @@
         const data = this.load();
         if (!data.unlocked.includes(itemId)) {
           // 實質扣除星星
-          if (typeof userStars !== 'undefined') {
-            userStars = Math.max(0, userStars - item.cost);
-            saveRewardData(); // 儲存並即時更新頂部導航列星星顯示
-          }
+          // 先扣打卡星，不夠再扣答對星（上面已確認 availableStars() >= cost）
+          const fromBonus = Math.min(userBonusStars, item.cost);
+          userBonusStars -= fromBonus;
+          userStars -= (item.cost - fromBonus);
+          saveRewardData(); // 儲存並即時更新頂部導航列星星顯示
           data.unlocked.push(itemId);
           this.save(data);
           Sound.correct();
@@ -7181,8 +7185,8 @@
         this.save(data);
 
         // 獎勵額外星星
-        if (typeof userBonusStars === 'undefined') window.userBonusStars = 0;
-        window.userBonusStars += 2;
+        userBonusStars += 2;
+        saveRewardData();   // 存檔並更新頂端星星數字
         Mascot.setHappy(`太棒了！今天成功打卡囉！連續學習第 ${data.streak} 天，獎勵 2 顆星星！🐾✨`);
 
         this.updateBadge();
@@ -8312,7 +8316,7 @@
       userStars = 0;
       unlockedStickerIds = [];
       currentDifficulty = 'normal';
-      delete window.userBonusStars;   // 打卡獎勵星只在這一頁的記憶體裡，不能帶到另一位
+      userBonusStars = 0;   // 打卡星存在 montessori_bonus_stars，換人時重讀
       stampedStickers = [];
     }
 
