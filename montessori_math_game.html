@@ -5211,6 +5211,16 @@
       if (m) m.style.display = 'flex';
     }
 
+    // #48 K3：音效開關（每台裝置一份，不跟孩子、不同步）。唯一的發聲出口是 soundOut()：靜音時回傳 null，而且不建立 AudioContext
+    const SOUND_KEY = 'montessori_sound_v1';   // 值 'on' / 'off'；不是 'off' 一律當成開
+    function readSoundPref() { try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch (e) { return true; } }
+    let isSoundOn = readSoundPref();
+    function soundOut() {
+      if (!isSoundOn) return null;
+      Sound.init();
+      return Sound.ctx || null;
+    }
+
     // 原生 Web Audio API 清脆音效
     const Sound = {
       ctx: null,
@@ -5222,8 +5232,7 @@
       },
       click() {
         try {
-          this.init();
-          if (!this.ctx) return;
+          if (!soundOut()) return;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = "sine";
@@ -5239,8 +5248,7 @@
       },
       wrong() {
         try {
-          this.init();
-          if (!this.ctx) return;
+          if (!soundOut()) return;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = "sine";
@@ -5256,8 +5264,7 @@
       },
       snap() {
         try {
-          this.init();
-          if (!this.ctx) return;
+          if (!soundOut()) return;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = "triangle";
@@ -5273,8 +5280,7 @@
       },
       correct() {
         try {
-          this.init();
-          if (!this.ctx) return;
+          if (!soundOut()) return;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
           osc.type = "sine";
@@ -5293,8 +5299,7 @@
       },
       cheer() {
         try {
-          this.init();
-          if (!this.ctx) return;
+          if (!soundOut()) return;
           const notes = [523.25, 659.25, 783.99, 1046.50];
           notes.forEach((freq, idx) => {
             const osc = this.ctx.createOscillator();
@@ -5419,18 +5424,25 @@
     // =========================================================================
     // 🔊 溫柔女聲語音朗讀引擎 (保證100%鎖定涵涵/雅婷/美佳台灣溫柔女聲)
     // =========================================================================
-    let isSoundOn = true;
     let currentRawInstruction = "";
     let currentQuestionSpeech = "";
 
-    function toggleSound() {
-      isSoundOn = !isSoundOn;
+    function renderSoundButton() {
       const btn = document.getElementById('soundToggleBtn');
       if (btn) {
         btn.textContent = isSoundOn ? "🔔 音效" : "🔕 靜音";
         btn.style.background = isSoundOn ? "#4a6c42" : "#888888";
       }
     }
+    function toggleSound() {
+      isSoundOn = !isSoundOn;
+      try { localStorage.setItem(SOUND_KEY, isSoundOn ? 'on' : 'off'); } catch (e) {}   // 不用 safeSetItem：失敗時它會清學習紀錄，不值得
+      renderSoundButton();
+    }
+    // 另一個分頁切換音效 → 這一頁跟著變
+    window.addEventListener('storage', function (e) {
+      if (e.key === SOUND_KEY) { isSoundOn = readSoundPref(); renderSoundButton(); }
+    });
 
     // #54 S1：朗讀核心（speakText／cancelSpeech／語速）在 common/family.js，這裡只放數學樂園專屬的部分
     // 畫面文字 → 朗讀稿：去 HTML、運算符號轉字（只轉在數字或 ❓ 之間的）、去 emoji、合併空白
@@ -5592,9 +5604,8 @@
     //   變淡的珠子（.removed）不計數、不出氣泡，只搖一下。音效關掉時計數與氣泡照樣出現，只有叮噹聲看 isSoundOn
     function playBeadChime(n) {
       try {
-        Sound.init();
-        if (Sound.ctx) {
-          const actx = Sound.ctx;
+        const actx = soundOut();
+        if (actx) {
           const noteFreq = chimeNotes[(n - 1) % chimeNotes.length];
           const osc = actx.createOscillator();
           const gain = actx.createGain();
@@ -5629,7 +5640,7 @@
         el.dataset.countN = String(n);
         el.classList.add('counted');
       }
-      if (isSoundOn) playBeadChime(n);
+      playBeadChime(n);
 
       // 觸摸彈跳
       el.style.transform = "scale(1.35)";
@@ -5849,9 +5860,8 @@
     // 播放貼紙獲得慶祝大和弦 (Fanfare)
     Sound.fanfare = function() {
       try {
-        Sound.init();
-        if (!Sound.ctx) return;
-        const actx = Sound.ctx;
+        const actx = soundOut();
+        if (!actx) return;
         const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5, E5, G5, C6, E6
         notes.forEach((freq, idx) => {
           const osc = actx.createOscillator();
@@ -7959,7 +7969,7 @@
         plate.appendChild(bead);
         dealt++;
         qlogEvent('x', 'deal');
-        if (isSoundOn) playBeadChime(dealt);
+        playBeadChime(dealt);
         if (dealt >= totalBeads) {
           basket.disabled = true;
           basketLabel.innerHTML = '✅ ' + zy('分完了！');
@@ -8982,6 +8992,7 @@
     loadRewardData();
     loadDifficulty();
     renderNavigation();
+    renderSoundButton();   // #48 K3：記住的「靜音」一打開就顯示 🔕
     Wardrobe.applyToMascot();
     CheckinBook.updateBadge();
     MistakeBook.updateBadge();
